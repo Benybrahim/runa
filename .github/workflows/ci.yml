@@ -20,11 +20,8 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Set up Python
-        run: uv python install
-
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: make install
 
       - name: Run checks
         run: make check
