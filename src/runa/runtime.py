@@ -1,4 +1,10 @@
+from dataclasses import dataclass
 from typing import Protocol
+
+
+@dataclass(frozen=True)
+class RuntimeResult:
+    output: str
 
 
 class Runtime(Protocol):
@@ -7,5 +13,6 @@ class Runtime(Protocol):
         *,
         instructions: str,
         input: str,
-    ) -> str:
+        model: str,
+    ) -> RuntimeResult:
         """Execute an agent run."""

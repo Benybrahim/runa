@@ -10,17 +10,20 @@ class Agent:
         *,
         name: str,
         instructions: str,
+        model: str,
         runtime: Runtime,
     ) -> None:
         self.name = name
         self.instructions = instructions
+        self.model = model
         self.runtime = runtime
 
     def run(self, input: str) -> Run:
         """Execute the agent."""
-        output = self.runtime.execute(
+        result = self.runtime.execute(
             instructions=self.instructions,
             input=input,
+            model=self.model,
         )
 
-        return Run(output=output)
+        return Run(output=result.output)

@@ -7,6 +7,7 @@ def test_agent_runs():
     agent = Agent(
         name="assistant",
         instructions="Be helpful.",
+        model="gpt-5.6",
         runtime=FakeRuntime(),
     )
 

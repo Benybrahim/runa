@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from runa.runtime import RuntimeResult
+
 
 @dataclass
 class FakeRuntime:
@@ -10,5 +12,6 @@ class FakeRuntime:
         *,
         instructions: str,
         input: str,
-    ) -> str:
-        return self.response
+        model: str,
+    ) -> RuntimeResult:
+        return RuntimeResult(output=self.response)
