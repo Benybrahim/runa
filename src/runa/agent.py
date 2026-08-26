@@ -1,5 +1,5 @@
+from runa.resolver import ModelResolver
 from runa.run import Run
-from runa.runtime import Runtime
 
 
 class Agent:
@@ -11,16 +11,18 @@ class Agent:
         name: str,
         instructions: str,
         model: str,
-        runtime: Runtime,
+        resolver: ModelResolver,
     ) -> None:
         self.name = name
         self.instructions = instructions
         self.model = model
-        self.runtime = runtime
+        self.resolver = resolver
 
     def run(self, input: str) -> Run:
         """Execute the agent."""
-        result = self.runtime.execute(
+        runtime = self.resolver.resolve(self.model)
+
+        result = runtime.execute(
             instructions=self.instructions,
             input=input,
             model=self.model,
