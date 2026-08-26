@@ -36,3 +36,7 @@ class ModelResolver:
                 return factory()
 
         raise ValueError(f"Unsupported model: {model}")
+
+    def clear(self) -> None:
+        self._models.clear()
+        self._conventions.clear()
