@@ -6,9 +6,9 @@ from tests.fakes import FakeRuntime
 
 def test_resolves_registered_model():
     resolver = ModelResolver()
-    resolver.register("gpt-5.6", FakeRuntime)
+    resolver.register("gpt-5.4-nano", FakeRuntime)
 
-    runtime = resolver.resolve("gpt-5.6")
+    runtime = resolver.resolve("gpt-5.4-nano")
 
     assert isinstance(runtime, FakeRuntime)
 

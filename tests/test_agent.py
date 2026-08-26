@@ -1,15 +1,18 @@
 from runa import Agent
-from runa.config import config
+from runa.resolver import ModelResolver
+
 from tests.fakes import FakeRuntime
 
 
 def test_agent_runs():
-    config.resolver.register("gpt-5.6", FakeRuntime)
+    resolver = ModelResolver()
+    resolver.register("gpt-5.4-nano", FakeRuntime)
 
     agent = Agent(
         name="assistant",
         instructions="Be helpful.",
-        model="gpt-5.6",
+        model="gpt-5.4-nano",
+        _resolver=resolver,
     )
 
     result = agent.run("Hello")
