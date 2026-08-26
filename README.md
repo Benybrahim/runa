@@ -110,19 +110,49 @@ Runa is intentionally opinionated.
 
 Read [`RUNA.md`](RUNA.md) for the project's design principles and [`CONTRIBUTING.md`](CONTRIBUTING.md) for development and contribution guidelines.
 
+Yes. Since we're using **uv**, I'd update only the development section and keep the README otherwise simple.
+
+Replace the current `## Development` section with:
+
 ## Development
+
+Runa uses [uv](https://docs.astral.sh/uv/) for Python environment and dependency management.
+
+Clone the repository:
 
 ```bash
 git clone <repository-url>
 cd runa
+````
 
-python -m venv .venv
-source .venv/bin/activate
+Install dependencies:
 
-pip install -e ".[dev]"
-
-pytest
+```bash
+uv sync --all-extras
 ```
+
+Run the test suite:
+
+```bash
+uv run pytest
+```
+
+Or run the complete project checks:
+
+```bash
+make check
+```
+
+Individual checks are also available:
+
+```bash
+make format
+make lint
+make test
+```
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for coding conventions and development guidelines.
+
 
 ## Contributing
 
