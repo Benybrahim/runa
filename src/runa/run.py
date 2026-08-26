@@ -5,4 +5,5 @@ from dataclasses import dataclass
 class Run:
     """A single execution of an agent."""
 
+    id: str
     output: str

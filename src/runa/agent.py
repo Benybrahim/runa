@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from uuid import uuid4
 
 from runa.resolver import ModelResolver
 from runa.run import Run
@@ -40,4 +41,7 @@ class Agent:
             tools=self.tools,
         )
 
-        return Run(output=result.output)
+        return Run(
+            id=str(uuid4()),
+            output=result.output,
+        )
