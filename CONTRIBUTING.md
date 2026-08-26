@@ -47,8 +47,7 @@ run.resume()
 is a better starting point than designing internal classes first:
 
 ```python
-class CheckpointManager:
-    ...
+class CheckpointManager: ...
 ```
 
 The public API should drive the implementation.
@@ -143,11 +142,11 @@ If the answer is unclear, keep it internal until the need is proven.
 Use names that describe concepts rather than implementation details.
 
 ```python
-class Run:
-    ...
+class Run: ...
 
-def resume():
-    ...
+
+def resume(): ...
+
 
 state = ...
 ```

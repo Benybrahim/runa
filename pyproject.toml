@@ -3,6 +3,27 @@ name = "runa"
 version = "0.1.0"
 description = "The application framework for agentic AI."
 requires-python = ">=3.14"
-dependencies = [
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
     "ruff>=0.16.4",
 ]
+
+[build-system]
+requires = ["hatchling>=1.32.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/runa"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
