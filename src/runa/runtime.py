@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -14,5 +15,6 @@ class Runtime(Protocol):
         instructions: str,
         input: str,
         model: str,
+        tools: list[Callable[..., object]],
     ) -> RuntimeResult:
         """Execute an agent run."""

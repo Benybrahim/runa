@@ -1,5 +1,8 @@
+from collections.abc import Callable
+
 from agents import Agent as OpenAIAgent
 from agents import Runner
+from agents import function_tool
 
 from runa.runtime import RuntimeResult
 
@@ -13,11 +16,13 @@ class OpenAIRuntime:
         instructions: str,
         input: str,
         model: str,
+        tools: list[Callable[..., object]],
     ) -> RuntimeResult:
         agent = OpenAIAgent(
             name="Runa Agent",
             instructions=instructions,
             model=model,
+            tools=[function_tool(tool) for tool in tools],
         )
 
         result = Runner.run_sync(agent, input)

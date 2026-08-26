@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from runa.resolver import ModelResolver
 from runa.run import Run
 
@@ -11,11 +13,13 @@ class Agent:
         name: str,
         instructions: str,
         model: str,
+        tools: list[Callable[..., object]] | None = None,
         _resolver: ModelResolver | None = None,
     ) -> None:
         self.name = name
         self.instructions = instructions
         self.model = model
+        self.tools = tools or []
         self._resolver = _resolver
 
     def run(self, input: str) -> Run:
@@ -33,6 +37,7 @@ class Agent:
             instructions=self.instructions,
             input=input,
             model=self.model,
+            tools=self.tools,
         )
 
         return Run(output=result.output)

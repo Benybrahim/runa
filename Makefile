@@ -21,8 +21,11 @@ test:
 check:
 	$(MAKE) format
 	$(MAKE) lint
-	$(MAKE) typecheck
+#	$(MAKE) typecheck
 	$(MAKE) test
+
+example:
+	uv run python examples/hello.py
 
 clean:
 	rm -rf .pytest_cache

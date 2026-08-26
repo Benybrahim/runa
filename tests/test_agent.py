@@ -28,3 +28,16 @@ def test_agent_can_be_created():
 
     assert agent.name == "assistant"
     assert agent.model == "gpt-5.4-nano"
+
+def test_agent_accepts_tools():
+    def get_weather(city: str) -> str:
+        return f"Sunny in {city}"
+
+    agent = Agent(
+        name="assistant",
+        instructions="Be helpful.",
+        model="gpt-5.4-nano",
+        tools=[get_weather],
+    )
+
+    assert agent.tools == [get_weather]
