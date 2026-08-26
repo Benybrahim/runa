@@ -19,6 +19,7 @@ def test_agent_runs():
 
     assert result.output == "Hello from Runa."
 
+
 def test_agent_can_be_created():
     agent = Agent(
         name="assistant",
@@ -28,6 +29,7 @@ def test_agent_can_be_created():
 
     assert agent.name == "assistant"
     assert agent.model == "gpt-5.4-nano"
+
 
 def test_agent_accepts_tools():
     def get_weather(city: str) -> str:
