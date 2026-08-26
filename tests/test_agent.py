@@ -44,6 +44,21 @@ def test_agent_accepts_tools():
 
     assert agent.tools == [get_weather]
 
+def test_runa_agent_accepts_tools():
+    runa = Runa()
+
+    def get_weather(city: str) -> str:
+        return f"Sunny in {city}"
+
+    agent = runa.agent(
+        name="assistant",
+        instructions="Be helpful.",
+        model="gpt-5.4-nano",
+        tools=[get_weather],
+    )
+
+    assert agent.tools == [get_weather]
+
 def test_run_has_an_id():
     runa = Runa()
     runa.resolver.register("gpt-5.4-nano", FakeRuntime)

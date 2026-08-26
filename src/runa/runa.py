@@ -15,16 +15,18 @@ class Runa:
         )
 
     def agent(
-        self,
-        *,
-        name: str,
-        instructions: str,
-        model: str,
+            self,
+            *,
+            name: str,
+            instructions: str,
+            model: str,
+            tools: list[Callable[..., object]] | None = None,
     ) -> Agent:
         return Agent(
             name=name,
             instructions=instructions,
             model=model,
+            tools=tools,
             _resolver=self.resolver,
         )
 
