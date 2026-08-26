@@ -4,71 +4,64 @@
 
 Runa is an opinionated Python framework for building agentic applications.
 
-Inspired by the philosophy of Ruby on Rails, Runa brings conventions, batteries-included infrastructure, and a strong application model to agentic software.
+Inspired by the philosophy of Ruby on Rails, Runa provides conventions, batteries-included infrastructure, and a coherent application model for agentic software.
 
-Runa is not another model SDK or agent runtime.
-
-It aims to provide the application layer above them.
+Runa is not another model SDK or agent runtime. It aims to provide the **application layer above them**.
 
 ## Why Runa?
 
-Building production agentic applications currently means assembling many separate pieces:
+Building production agentic applications requires more than an agent loop. Developers need tools, state, persistence, workflows, observability, and evaluation.
 
-- Agent runtimes
-- Models
-- Tools
-- Context and state
-- Persistence
-- Workflows
-- Human approval
-- Observability
-- Evaluation
-
-Existing SDKs solve parts of this problem.
-
-Runa's goal is to provide a **coherent application framework** around them.
-
-## Quick Start
-
-```python
-from runa import Agent, tool
-
-
-@tool
-def get_weather(city: str) -> str:
-    return f"{city}: sunny"
-
-
-agent = Agent(
-    name="weather",
-    tools=[get_weather],
-)
-
-result = agent.run("What's the weather in Tokyo?")
-
-print(result.output)
-````
+Existing SDKs provide many of these pieces individually. Runa aims to bring them together into a coherent application framework.
 
 The goal is simple:
 
 > **Make the common path for building an agentic application extremely simple.**
 
+## Quick Start
+
+```python
+from runa import Runa
+
+runa = Runa()
+
+
+def get_weather(city: str) -> str:
+    return f"{city}: sunny"
+
+
+agent = runa.agent(
+    name="weather",
+    instructions="Answer weather questions.",
+    model="gpt-5.4-nano",
+    tools=[get_weather],
+)
+
+run = agent.run("What's the weather in Tokyo?")
+
+print(run.output)
+````
+
+Runa's conventional application API is `Runa.agent()`. Lower-level primitives such as `Agent` remain available when more control is needed.
+
 ## Core Ideas
 
-Runa is built around a small number of concepts:
+Runa is built around a small number of core concepts:
 
 ```text
 Application
     │
     ├── Agents
     ├── Runs
-    ├── Context
     ├── Tools
-    ├── State
-    └── Evaluation
+    └── Runtime
 ```
 
-The underlying runtime and model provider should remain replaceable.
+The framework will grow around these primitives as additional application concerns are introduced, including context, state, workflows, and evaluation.
+
+### Replaceable runtimes
+
+Runa keeps the underlying model provider and runtime replaceable.
 
 ```text
                  Runa
@@ -80,21 +73,23 @@ The underlying runtime and model provider should remain replaceable.
       OpenAI   Anthropic    Other
 ```
 
+Your application should not need to be tightly coupled to a specific model provider or runtime.
+
 ## Project Status
 
 🚧 **Early development**
 
-Runa is currently experimental and the API will change.
+Runa is experimental and the API will change.
 
-Current focus:
+### Current focus
 
-* Agent
-* Tool
-* Run
+* Agent API
+* Run model
+* Tool integration
 * Runtime abstraction
 * End-to-end execution
 
-Future work includes:
+### Future work
 
 * Durable runs
 * Context and state
@@ -108,51 +103,36 @@ Future work includes:
 
 Runa is intentionally opinionated.
 
-Read [`RUNA.md`](RUNA.md) for the project's design principles and [`CONTRIBUTING.md`](CONTRIBUTING.md) for development and contribution guidelines.
+The project follows principles such as:
 
-Yes. Since we're using **uv**, I'd update only the development section and keep the README otherwise simple.
+* Convention over configuration
+* Batteries included
+* Small number of powerful primitives
+* Simple by default
+* Transparent when necessary
+* Durability by default
+* Evaluation as part of development
+* Escape hatches for advanced users
+* Replaceable underlying runtimes
+* Optimize for the entire agent lifecycle
 
-Replace the current `## Development` section with:
+Read [`RUNA.md`](RUNA.md) for the full design principles.
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for development and contribution guidelines.
 
 ## Development
 
 Runa uses [uv](https://docs.astral.sh/uv/) for Python environment and dependency management.
 
-Clone the repository:
-
 ```bash
-git clone <repository-url>
-cd runa
-````
-
-Install dependencies:
-
-```bash
-uv sync --all-extras
-```
-
-Run the test suite:
-
-```bash
-uv run pytest
-```
-
-Or run the complete project checks:
-
-```bash
+make install
+make lint-fix
 make check
-```
-
-Individual checks are also available:
-
-```bash
-make format
-make lint
 make test
+make clean
 ```
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for coding conventions and development guidelines.
-
 
 ## Contributing
 
@@ -163,5 +143,3 @@ Before proposing significant changes, please read [`RUNA.md`](RUNA.md) and [`CON
 ## License
 
 [License TBD]
-
-

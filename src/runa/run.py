@@ -8,3 +8,5 @@ class Run:
     id: str
     input: str
     output: str
+    model: str
+    status: str

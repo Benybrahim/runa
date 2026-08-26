@@ -45,4 +45,6 @@ class Agent:
             id=str(uuid4()),
             input=input,
             output=result.output,
+            model=self.model,
+            status="completed",
         )

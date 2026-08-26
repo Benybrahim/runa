@@ -89,3 +89,32 @@ def test_each_run_has_a_unique_id():
     second = agent.run("Hello")
 
     assert first.id != second.id
+
+def test_run_records_model():
+    runa = Runa()
+    runa.resolver.register("gpt-5.4-nano", FakeRuntime)
+
+    agent = runa.agent(
+        name="assistant",
+        instructions="Be helpful.",
+        model="gpt-5.4-nano",
+    )
+
+    result = agent.run("Hello")
+
+    assert result.model == "gpt-5.4-nano"
+
+
+def test_run_is_completed_after_success():
+    runa = Runa()
+    runa.resolver.register("gpt-5.4-nano", FakeRuntime)
+
+    agent = runa.agent(
+        name="assistant",
+        instructions="Be helpful.",
+        model="gpt-5.4-nano",
+    )
+
+    result = agent.run("Hello")
+
+    assert result.status == "completed"
