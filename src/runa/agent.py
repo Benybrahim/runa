@@ -43,5 +43,6 @@ class Agent:
 
         return Run(
             id=str(uuid4()),
+            input=input,
             output=result.output,
         )

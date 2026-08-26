@@ -6,4 +6,5 @@ class Run:
     """A single execution of an agent."""
 
     id: str
+    input: str
     output: str
