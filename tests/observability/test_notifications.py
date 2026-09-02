@@ -1,0 +1,82 @@
+from runa.agent import Agent
+from runa.core import EventType, Message, Role, Run
+from runa.observability import instrument, timeline
+from runa.runtime import Executor
+from tests.fakes import FakeProvider
+
+
+class GreeterAgent(Agent):
+    instructions = "Say hello."
+
+
+def test_timeline_summarizes_events_in_order():
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    run = Executor(provider).run(GreeterAgent(), Run(input="hello"))
+
+    entries = timeline(run)
+
+    assert [entry.type for entry in entries] == [
+        EventType.RUN_STARTED,
+        EventType.MODEL_CALLED,
+        EventType.MODEL_RESPONDED,
+        EventType.RUN_COMPLETED,
+    ]
+    assert entries[0].summary == "run started"
+    assert entries[-1].summary == "run completed"
+    assert all(entry.timestamp is not None for entry in entries)
+
+
+def test_timeline_reflects_run_events_not_a_separate_copy():
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    run = Run(input="hello")
+
+    assert timeline(run) == []
+
+    Executor(provider).run(GreeterAgent(), run)
+
+    assert len(timeline(run)) == len(run.events)
+
+
+def test_instrument_notifies_subscriber_as_events_happen():
+    seen = []
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    run = Run(input="hello")
+
+    instrument(run, seen.append)
+    Executor(provider).run(GreeterAgent(), run)
+
+    assert [event.type for event in seen] == [
+        EventType.RUN_STARTED,
+        EventType.MODEL_CALLED,
+        EventType.MODEL_RESPONDED,
+        EventType.RUN_COMPLETED,
+    ]
+    assert seen == run.events
+
+
+def test_instrument_supports_multiple_subscribers():
+    first, second = [], []
+    run = Run(input="hello")
+
+    instrument(run, first.append)
+    instrument(run, second.append)
+    run.start()
+
+    assert [event.type for event in first] == [EventType.RUN_STARTED]
+    assert [event.type for event in second] == [EventType.RUN_STARTED]
+
+
+def test_unsubscribe_stops_further_notifications():
+    seen = []
+    run = Run(input="hello")
+
+    unsubscribe = instrument(run, seen.append)
+    run.start()
+    unsubscribe()
+    run.pause()
+
+    assert [event.type for event in seen] == [EventType.RUN_STARTED]
+    assert [event.type for event in run.events] == [
+        EventType.RUN_STARTED,
+        EventType.RUN_PAUSED,
+    ]

@@ -14,8 +14,6 @@ Read [RUNA.md](./RUNA.md) before making architectural or implementation decision
 - `make check` — format + lint + test
 - `make example` — run `examples/hello.py`
 
-Don't run lint, format or tests proactively — the user runs them manually.
-
 ## Conventions
 
 - Python 3.14, managed with `uv`. Ruff config: line length 88, target `py314`, rules `E`, `F`, `I`.

@@ -22,6 +22,7 @@ from runa.core import (
     TextArtifact,
     ToolCall,
 )
+from runa.observability import TimelineEntry, instrument, timeline
 from runa.persistence import InMemoryRunStore, RunStore
 from runa.providers import AnthropicProvider, OpenAIProvider
 from runa.runtime import (
@@ -72,12 +73,15 @@ __all__ = [
     "RunStore",
     "Strategy",
     "TextArtifact",
+    "TimelineEntry",
     "Tool",
     "ToolCall",
     "UnknownApprovalTool",
     "UnknownToolCall",
     "approve",
     "deny",
+    "instrument",
     "run_later",
+    "timeline",
     "tool",
 ]
