@@ -115,7 +115,7 @@ All layers described in [`docs/architecture.md`](docs/architecture.md) are imple
 * `runtime/` — `Strategy` protocol, `DefaultStrategy`, `RetryStrategy`, `Executor`
 * `providers/` — `AnthropicProvider`, `OpenAIProvider`
 * `persistence/` — `RunStore`, `InMemoryRunStore`, `SQLiteRunStore`
-* `background/` + `approval.py` — `run_later`, `approve`/`deny`
+* `background/` + `approval.py` — `run_later`, `Queue` (`InlineQueue`, `ThreadQueue`), `approve`/`deny`
 * `observability/` — `timeline()`, `instrument()`
 * `eval/` — `expect(run)`, `run_evals()`
 * `cli/` — `runa new`, `runa generate agent`

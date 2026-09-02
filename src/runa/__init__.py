@@ -2,7 +2,7 @@
 
 from runa.agent import Agent, DuplicateToolName, UnknownApprovalTool
 from runa.approval import UnknownToolCall, approve, deny
-from runa.background import InlineQueue, Queue, run_later
+from runa.background import InlineQueue, Queue, ThreadQueue, run_later
 from runa.config import ProviderNotConfigured, configure
 from runa.core import (
     ActionArtifact,
@@ -90,6 +90,7 @@ __all__ = [
     "SQLiteRunStore",
     "Strategy",
     "TextArtifact",
+    "ThreadQueue",
     "TimelineEntry",
     "Tool",
     "ToolCall",
