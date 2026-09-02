@@ -118,8 +118,6 @@ The project follows principles such as:
 
 Read [`RUNA.md`](RUNA.md) for the full design principles.
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for development and contribution guidelines.
-
 ## Development
 
 Runa uses [uv](https://docs.astral.sh/uv/) for Python environment and dependency management.
@@ -131,8 +129,6 @@ make check
 make test
 make clean
 ```
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for coding conventions and development guidelines.
 
 ## Contributing
 
