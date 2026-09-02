@@ -1,8 +1,7 @@
 """Executor: drives a Strategy against a Run, emitting Events as it acts."""
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from runa.agent import Agent
 from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime.provider import Provider
 from runa.runtime.strategy import (
@@ -14,6 +13,11 @@ from runa.runtime.strategy import (
     Fail,
     Strategy,
 )
+
+if TYPE_CHECKING:
+    # Agent.run()/.run_later() construct an Executor, so a runtime import here
+    # would cycle back through agent.py — this is used for type hints only.
+    from runa.agent import Agent
 
 
 class Executor:
@@ -37,7 +41,7 @@ class Executor:
         self.strategy = strategy or DefaultStrategy()
         self.max_steps = max_steps
 
-    def run(self, agent: Agent, run: Run) -> Run:
+    def run(self, agent: "Agent", run: Run) -> Run:
         if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
             self._seed(agent, run)
             run.start()
@@ -63,12 +67,12 @@ class Executor:
             agent.after_run(run)
         return run
 
-    def _seed(self, agent: Agent, run: Run) -> None:
+    def _seed(self, agent: "Agent", run: Run) -> None:
         if agent.instructions:
             run.add_message(Message(role=Role.SYSTEM, content=agent.instructions))
         run.add_message(Message(role=Role.USER, content=str(run.input)))
 
-    def _apply(self, agent: Agent, run: Run, action: Action) -> None:
+    def _apply(self, agent: "Agent", run: Run, action: Action) -> None:
         if isinstance(action, CallModel):
             self._call_model(agent, run)
         elif isinstance(action, CallTool):
@@ -80,7 +84,7 @@ class Executor:
         else:
             raise TypeError(f"unknown action: {action!r}")
 
-    def _call_model(self, agent: Agent, run: Run) -> None:
+    def _call_model(self, agent: "Agent", run: Run) -> None:
         run.emit(EventType.MODEL_CALLED)
         schemas = self._tool_schemas(agent)
         message = self.provider.complete(
@@ -89,7 +93,7 @@ class Executor:
         run.add_message(message)
         run.emit(EventType.MODEL_RESPONDED)
 
-    def _call_tool(self, agent: Agent, run: Run, tool_call: ToolCall) -> None:
+    def _call_tool(self, agent: "Agent", run: Run, tool_call: ToolCall) -> None:
         if (
             tool_call.name in agent.approval_tool_names()
             and tool_call.approved is not True
@@ -111,7 +115,7 @@ class Executor:
             EventType.TOOL_COMPLETED, tool=tool_call.name, tool_call_id=tool_call.id
         )
 
-    def _tool_schemas(self, agent: Agent) -> list[dict[str, Any]]:
+    def _tool_schemas(self, agent: "Agent") -> list[dict[str, Any]]:
         return [
             {
                 "name": name,

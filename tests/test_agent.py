@@ -1,7 +1,11 @@
 import pytest
 
 from runa.agent import Agent, DuplicateToolName, UnknownApprovalTool
+from runa.config import ProviderNotConfigured, configure
+from runa.core import Message, Role, RunStatus
+from runa.runtime import Executor
 from runa.tool import Tool
+from tests.fakes import FakeProvider
 
 
 class Ledger(Tool):
@@ -90,3 +94,49 @@ def test_subclasses_do_not_share_resolved_tool_cache():
 
     assert set(AgentA.resolved_tools()) == {"Ledger"}
     assert set(AgentB.resolved_tools()) == {"Reporting"}
+
+
+def test_run_uses_the_app_default_provider_when_no_executor_is_given():
+    class SimpleAgent(Agent):
+        pass
+
+    configure(provider=FakeProvider([Message(role=Role.ASSISTANT, content="hi")]))
+
+    run = SimpleAgent.run("hello")
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "hi"
+
+
+def test_run_raises_if_no_default_provider_and_no_executor(monkeypatch):
+    monkeypatch.setattr("runa.config._default_provider", None)
+
+    class SimpleAgent(Agent):
+        pass
+
+    with pytest.raises(ProviderNotConfigured):
+        SimpleAgent.run("hello")
+
+
+def test_run_accepts_an_explicit_executor_as_an_escape_hatch():
+    class SimpleAgent(Agent):
+        pass
+
+    provider = FakeProvider([Message(role=Role.ASSISTANT, content="hi")])
+    executor = Executor(provider=provider)
+
+    run = SimpleAgent.run("hello", executor=executor)
+
+    assert run.status == RunStatus.COMPLETED
+    assert provider.calls  # the explicit executor's provider was used
+
+
+def test_run_later_queues_and_runs_via_the_default_inline_queue():
+    class SimpleAgent(Agent):
+        pass
+
+    configure(provider=FakeProvider([Message(role=Role.ASSISTANT, content="hi")]))
+
+    run = SimpleAgent.run_later("hello")
+
+    assert run.status == RunStatus.COMPLETED

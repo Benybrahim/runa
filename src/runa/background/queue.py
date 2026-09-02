@@ -7,11 +7,15 @@ programming model.
 """
 
 from collections.abc import Callable
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from runa.agent import Agent
 from runa.core import Run
 from runa.runtime import Executor
+
+if TYPE_CHECKING:
+    # Agent.run_later() calls this, so a runtime import here would cycle
+    # back through agent.py — this is used for type hints only.
+    from runa.agent import Agent
 
 
 class Queue(Protocol):
@@ -31,7 +35,7 @@ class InlineQueue:
 
 
 def run_later(
-    agent: Agent, run: Run, executor: Executor, *, queue: Queue | None = None
+    agent: "Agent", run: Run, executor: Executor, *, queue: Queue | None = None
 ) -> Run:
     """Queue a Run for background execution and return it immediately.
 

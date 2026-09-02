@@ -3,6 +3,7 @@
 from runa.agent import Agent, DuplicateToolName, UnknownApprovalTool
 from runa.approval import UnknownToolCall, approve, deny
 from runa.background import InlineQueue, Queue, run_later
+from runa.config import ProviderNotConfigured, configure
 from runa.core import (
     ActionArtifact,
     Artifact,
@@ -77,6 +78,7 @@ __all__ = [
     "OpenAIProvider",
     "PlanArtifact",
     "Provider",
+    "ProviderNotConfigured",
     "Queue",
     "Role",
     "Run",
@@ -91,6 +93,7 @@ __all__ = [
     "UnknownApprovalTool",
     "UnknownToolCall",
     "approve",
+    "configure",
     "deny",
     "expect",
     "instrument",

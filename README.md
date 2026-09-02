@@ -21,7 +21,9 @@ The goal is simple:
 ## Quick Start
 
 ```python
-from runa import Agent, AnthropicProvider, Executor, Run, tool
+from runa import Agent, AnthropicProvider, configure, tool
+
+configure(provider=AnthropicProvider())
 
 
 @tool
@@ -34,14 +36,13 @@ class WeatherAgent(Agent):
     tools = [get_weather]
 
 
-executor = Executor(provider=AnthropicProvider())
-run = executor.run(WeatherAgent(), Run(input="What's the weather in Tokyo?"))
+run = WeatherAgent.run("What's the weather in Tokyo?")
 
 print(run.status)
 print(run.result)
 ```
 
-An `Agent` is a declarative class: its capabilities are readable from the class body alone. An `Executor` drives that agent against a `Run` — the object that carries input, messages, events, tool calls, artifacts, and status for one execution, and is what every other layer (persistence, background execution, observability, evaluation) is defined in terms of.
+`configure()` sets the model provider once for the app — most applications talk to exactly one. An `Agent` is a declarative class: its capabilities are readable from the class body alone, and `model` is set per agent, not per app. `Agent.run()` returns a `Run` — the object that carries input, messages, events, tool calls, artifacts, and status for one execution, and is what every other layer (persistence, background execution, observability, evaluation) is defined in terms of. For a specific run that needs its own provider, strategy, or step limit, construct an `Executor` directly and pass it in — `WeatherAgent.run("...", executor=Executor(...))` — the low-level primitives stay fully available (manifesto §9).
 
 ## Core Ideas
 

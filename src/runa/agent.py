@@ -2,7 +2,11 @@
 
 from typing import Any, ClassVar
 
+from runa.background import Queue
+from runa.background import run_later as _run_later
+from runa.config import default_provider
 from runa.core import Run
+from runa.runtime import Executor
 from runa.tool import Tool
 
 ToolEntry = type[Tool] | Tool
@@ -101,3 +105,26 @@ class Agent:
 
     def after_run(self, run: Run) -> None:
         """Called after execution completes. Override to customize."""
+
+    @classmethod
+    def run(cls, input: Any, *, executor: Executor | None = None) -> Run:
+        """Run this agent against `input` and return the completed Run.
+
+        Uses the app-wide default Provider (see `runa.configure()`) unless
+        an `Executor` is given explicitly — the escape hatch for an agent
+        that needs a specific provider, strategy, or max_steps.
+        """
+        executor = executor or Executor(provider=default_provider())
+        return executor.run(cls(), Run(input=input))
+
+    @classmethod
+    def run_later(
+        cls,
+        input: Any,
+        *,
+        executor: Executor | None = None,
+        queue: Queue | None = None,
+    ) -> Run:
+        """Queue this agent's run for background execution. See `Agent.run`."""
+        executor = executor or Executor(provider=default_provider())
+        return _run_later(cls(), Run(input=input), executor, queue=queue)
