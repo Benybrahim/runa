@@ -20,6 +20,7 @@ from runa.core import (
     TextArtifact,
     ToolCall,
 )
+from runa.persistence import InMemoryRunStore, RunStore
 from runa.providers import AnthropicProvider, OpenAIProvider
 from runa.runtime import (
     Action,
@@ -55,6 +56,7 @@ __all__ = [
     "FileArtifact",
     "FunctionTool",
     "IllegalTransition",
+    "InMemoryRunStore",
     "Message",
     "OpenAIProvider",
     "PlanArtifact",
@@ -63,6 +65,7 @@ __all__ = [
     "Run",
     "RunState",
     "RunStatus",
+    "RunStore",
     "Strategy",
     "TextArtifact",
     "Tool",
