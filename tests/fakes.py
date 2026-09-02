@@ -19,9 +19,7 @@ class FakeProvider:
         tools: list[dict[str, Any]],
         model: str | None,
     ) -> Message:
-        self.calls.append(
-            {"messages": list(messages), "tools": tools, "model": model}
-        )
+        self.calls.append({"messages": list(messages), "tools": tools, "model": model})
         if not self._responses:
             raise AssertionError("FakeProvider ran out of scripted responses")
         return self._responses.pop(0)
