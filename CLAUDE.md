@@ -12,7 +12,8 @@ Read [RUNA.md](./RUNA.md) before making architectural or implementation decision
 - `make typecheck` — pyright
 - `make test` — pytest
 - `make check` — format + lint + test
-- `make example` — run `examples/hello.py`
+- `make hello` — run `examples/hello.py`
+- `make examples` — run every example in `examples/`
 
 ## Conventions
 
