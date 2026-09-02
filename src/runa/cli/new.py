@@ -16,12 +16,36 @@ requires-python = ">=3.14"
 dependencies = ["runa"]
 """
 
+_MAIN_TEMPLATE = '''"""main.py: the application entry point.
+
+The one place to call `configure()`. A model Provider is an app-wide
+dependency (manifesto §2), not a per-agent one, so it's set once here
+rather than at each call site — swap OpenAIProvider for AnthropicProvider
+(or any other Provider) as this app's needs change. Requires an API key
+in the environment for whichever provider you use.
+"""
+
+from runa import configure
+from runa.providers import OpenAIProvider
+
+configure(provider=OpenAIProvider())
+
+
+if __name__ == "__main__":
+    # from app.agents.example_agent import ExampleAgent
+    #
+    # run = ExampleAgent.run("...")
+    # print(run.result)
+    pass
+'''
+
 _README_TEMPLATE = """# {name}
 
 A Runa application.
 
 ## Layout
 
+- `main.py` — application entry point, calls `configure()`
 - `app/agents/` — Agent subclasses
 - `app/tools/` — Tool subclasses
 - `app/resources/` — shared resources (clients, config)
@@ -52,5 +76,6 @@ def scaffold_project(name: str, *, root: Path) -> Path:
 
     (project_dir / "pyproject.toml").write_text(_PYPROJECT_TEMPLATE.format(name=name))
     (project_dir / "README.md").write_text(_README_TEMPLATE.format(name=name))
+    (project_dir / "main.py").write_text(_MAIN_TEMPLATE)
 
     return project_dir

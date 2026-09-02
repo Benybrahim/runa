@@ -15,6 +15,15 @@ def test_scaffold_project_creates_the_conventional_layout(tmp_path):
     assert (project_dir / "app" / "__init__.py").is_file()
     assert (project_dir / "pyproject.toml").is_file()
     assert (project_dir / "README.md").is_file()
+    assert (project_dir / "main.py").is_file()
+
+
+def test_scaffold_project_writes_a_main_py_that_calls_configure(tmp_path):
+    project_dir = scaffold_project("acme", root=tmp_path)
+
+    main_py = (project_dir / "main.py").read_text()
+
+    assert "configure(provider=" in main_py
 
 
 def test_scaffold_project_writes_the_project_name_into_generated_files(tmp_path):

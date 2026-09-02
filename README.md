@@ -86,6 +86,24 @@ Runa keeps the underlying model provider replaceable. A `Provider` is a small pr
 
 Every `Run` moves through the same state machine — `Created → Queued → Running → Paused / AwaitingApproval → Completed / Failed / Cancelled`. Background execution (`run_later`) and human approval (`requires_approval`, `approve`/`deny`) aren't separate systems; they're alternate transitions through that same machine, so persistence, observability, and evaluation all work identically regardless of how a Run got where it is.
 
+### Application layout
+
+`runa new myapp` scaffolds a conventional project layout — structure, not configuration, carries the meaning (manifesto §2), the same way Rails' `app/models`/`app/controllers` do:
+
+```text
+myapp/
+├── main.py                  # entry point — the one place that calls configure()
+├── app/
+│   ├── agents/               # Agent subclasses
+│   ├── tools/                 # Tool subclasses
+│   ├── resources/              # shared resources (clients, config)
+│   └── evaluations/            # eval cases
+├── pyproject.toml
+└── README.md
+```
+
+`runa generate agent Research` adds `app/agents/research_agent.py` with the `Agent` subclass skeleton. `main.py` is a plain script the developer runs (`python main.py`), not an import-time side effect of the `app` package — a `Provider` can do real work in `__init__` (e.g. `OpenAIProvider` builds a client that fails fast without credentials), so auto-configuring on `import app` would break importing an agent or tool module for anyone without a key set. Explicit beats implicit here (manifesto §7).
+
 ## Project Status
 
 ✅ **MVP complete**
