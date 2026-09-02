@@ -20,6 +20,7 @@ from runa.core import (
     TextArtifact,
     ToolCall,
 )
+from runa.providers import AnthropicProvider, OpenAIProvider
 from runa.runtime import (
     Action,
     CallModel,
@@ -37,6 +38,7 @@ __all__ = [
     "Action",
     "ActionArtifact",
     "Agent",
+    "AnthropicProvider",
     "Artifact",
     "CallModel",
     "CallTool",
@@ -54,6 +56,7 @@ __all__ = [
     "FunctionTool",
     "IllegalTransition",
     "Message",
+    "OpenAIProvider",
     "PlanArtifact",
     "Provider",
     "Role",
