@@ -98,7 +98,9 @@ def test_from_wire_message_collects_content_and_tool_calls():
 
 def test_from_wire_message_with_no_tool_calls():
     response = SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content="Hi.", tool_calls=None))]
+        choices=[
+            SimpleNamespace(message=SimpleNamespace(content="Hi.", tool_calls=None))
+        ]
     )
 
     message = from_wire_message(response)
