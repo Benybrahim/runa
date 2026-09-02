@@ -21,9 +21,9 @@ The goal is simple:
 ## Quick Start
 
 ```python
-from runa import Agent, AnthropicProvider, configure, tool
+from runa import Agent, OpenAIProvider, configure, tool
 
-configure(provider=AnthropicProvider())
+configure(provider=OpenAIProvider())
 
 
 @tool
@@ -39,8 +39,13 @@ class WeatherAgent(Agent):
 run = WeatherAgent.run("What's the weather in Tokyo?")
 
 print(run.status)
+# RunStatus.COMPLETED
+
 print(run.result)
+# "It's sunny in Tokyo right now."
 ```
+
+(`run.result` comes from a live model call, so the exact wording varies — the status and shape of the result don't.)
 
 `configure()` sets the model provider once for the app — most applications talk to exactly one. An `Agent` is a declarative class: its capabilities are readable from the class body alone, and `model` is set per agent, not per app. `Agent.run()` returns a `Run` — the object that carries input, messages, events, tool calls, artifacts, and status for one execution, and is what every other layer (persistence, background execution, observability, evaluation) is defined in terms of. For a specific run that needs its own provider, strategy, or step limit, construct an `Executor` directly and pass it in — `WeatherAgent.run("...", executor=Executor(...))` — the low-level primitives stay fully available (manifesto §9).
 

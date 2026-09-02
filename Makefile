@@ -1,4 +1,4 @@
-.PHONY: install format lint typecheck test check clean
+.PHONY: install format lint typecheck test check hello examples clean
 
 install:
 	uv sync
@@ -24,8 +24,14 @@ check:
 #	$(MAKE) typecheck
 	$(MAKE) test
 
-example:
+hello:
 	uv run python examples/hello.py
+
+examples:
+	uv run python examples/hello.py
+	uv run python examples/background.py
+	uv run python examples/approval.py
+	uv run python examples/eval.py
 
 clean:
 	rm -rf .pytest_cache
