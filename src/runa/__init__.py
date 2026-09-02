@@ -22,6 +22,14 @@ from runa.core import (
     TextArtifact,
     ToolCall,
 )
+from runa.eval import (
+    EvalCase,
+    EvalResult,
+    Expectation,
+    ExpectationFailed,
+    expect,
+    run_evals,
+)
 from runa.observability import TimelineEntry, instrument, timeline
 from runa.persistence import InMemoryRunStore, RunStore
 from runa.providers import AnthropicProvider, OpenAIProvider
@@ -52,9 +60,13 @@ __all__ = [
     "DataArtifact",
     "DefaultStrategy",
     "DuplicateToolName",
+    "EvalCase",
+    "EvalResult",
     "Event",
     "EventType",
     "Executor",
+    "Expectation",
+    "ExpectationFailed",
     "Fail",
     "FileArtifact",
     "FunctionTool",
@@ -80,7 +92,9 @@ __all__ = [
     "UnknownToolCall",
     "approve",
     "deny",
+    "expect",
     "instrument",
+    "run_evals",
     "run_later",
     "timeline",
     "tool",
