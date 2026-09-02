@@ -10,9 +10,9 @@ Runa is not another model SDK or agent runtime. It aims to provide the **applica
 
 ## Why Runa?
 
-Building production agentic applications requires more than an agent loop. Developers need tools, state, persistence, workflows, observability, and evaluation.
+Building production agentic applications requires more than an agent loop. Developers need tools, state, persistence, background execution, human approval, observability, and evaluation.
 
-Existing SDKs provide many of these pieces individually. Runa aims to bring them together into a coherent application framework.
+Existing SDKs provide many of these pieces individually. Runa brings them together into a coherent application framework.
 
 The goal is simple:
 
@@ -21,47 +21,52 @@ The goal is simple:
 ## Quick Start
 
 ```python
-from runa import Runa
-
-runa = Runa()
+from runa import Agent, AnthropicProvider, Executor, Run, tool
 
 
+@tool
 def get_weather(city: str) -> str:
     return f"{city}: sunny"
 
 
-agent = runa.agent(
-    name="weather",
-    instructions="Answer weather questions.",
-    model="gpt-5.4-nano",
-    tools=[get_weather],
-)
+class WeatherAgent(Agent):
+    instructions = "Answer weather questions."
+    tools = [get_weather]
 
-run = agent.run("What's the weather in Tokyo?")
 
-print(run.output)
-````
+executor = Executor(provider=AnthropicProvider())
+run = executor.run(WeatherAgent(), Run(input="What's the weather in Tokyo?"))
 
-Runa's conventional application API is `Runa.agent()`. Lower-level primitives such as `Agent` remain available when more control is needed.
+print(run.status)
+print(run.result)
+```
+
+An `Agent` is a declarative class: its capabilities are readable from the class body alone. An `Executor` drives that agent against a `Run` — the object that carries input, messages, events, tool calls, artifacts, and status for one execution, and is what every other layer (persistence, background execution, observability, evaluation) is defined in terms of.
 
 ## Core Ideas
 
-Runa is built around a small number of core concepts:
+Runa is built around one central object — the `Run` — and a small set of layers around it:
 
 ```text
-Application
-    │
-    ├── Agents
-    ├── Runs
-    ├── Tools
-    └── Runtime
+runa/
+├── core/            Run, Message, Event, Artifact, State — pure data
+├── agent.py         Agent: declarative tools, instructions, approval, hooks
+├── tool.py          Tool base + @tool function adapter
+├── runtime/         Strategy + Executor — drives a Run to completion
+├── providers/       Thin adapters to model APIs (Anthropic, OpenAI)
+├── persistence/      RunStore — durable Run status
+├── background/       run_later() — background execution
+├── approval.py       requires_approval — human-in-the-loop gate
+├── observability/     timeline() + instrument() — reads Run.events
+├── eval/              expect(run) + run_evals() — same code path as prod
+└── cli/               `runa new`, `runa generate agent`
 ```
 
-The framework will grow around these primitives as additional application concerns are introduced, including context, state, workflows, and evaluation.
+Every layer is defined in terms of the `Run`: persistence stores it, background execution changes when it advances, observability reads its event log, evaluation replays and scores it. See [`docs/architecture.md`](docs/architecture.md) for the full layer-by-layer breakdown.
 
 ### Replaceable runtimes
 
-Runa keeps the underlying model provider and runtime replaceable.
+Runa keeps the underlying model provider replaceable. A `Provider` is a small protocol (`complete(messages, tools, model) -> Message`); `AnthropicProvider` and `OpenAIProvider` are thin, one-directional adapters to that protocol, and nothing outside `providers/` ever branches on which one is active.
 
 ```text
                  Runa
@@ -73,60 +78,54 @@ Runa keeps the underlying model provider and runtime replaceable.
       OpenAI   Anthropic    Other
 ```
 
-Your application should not need to be tightly coupled to a specific model provider or runtime.
+### One lifecycle, many transitions
+
+Every `Run` moves through the same state machine — `Created → Queued → Running → Paused / AwaitingApproval → Completed / Failed / Cancelled`. Background execution (`run_later`) and human approval (`requires_approval`, `approve`/`deny`) aren't separate systems; they're alternate transitions through that same machine, so persistence, observability, and evaluation all work identically regardless of how a Run got where it is.
 
 ## Project Status
 
-🚧 **Early development**
+✅ **MVP complete**
 
-Runa is experimental and the API will change.
+All layers described in [`docs/architecture.md`](docs/architecture.md) are implemented and tested, in build order:
 
-### Current focus
+* `core/` — `Run`, `Message`, `Event`, `Artifact`, `State`
+* `Agent` + `Tool` — the declarative surface
+* `runtime/` — `Strategy` protocol, `DefaultStrategy`, `Executor`
+* `providers/` — `AnthropicProvider`, `OpenAIProvider`
+* `persistence/` — `RunStore`, `InMemoryRunStore`
+* `background/` + `approval.py` — `run_later`, `approve`/`deny`
+* `observability/` — `timeline()`, `instrument()`
+* `eval/` — `expect(run)`, `run_evals()`
+* `cli/` — `runa new`, `runa generate agent`
 
-* Agent API
-* Run model
-* Tool integration
-* Runtime abstraction
-* End-to-end execution
-
-### Future work
-
-* Durable runs
-* Context and state
-* Human-in-the-loop
-* Workflows
-* Evaluation
-* Production infrastructure
-* Additional runtimes
+The core API is stable enough to build against, but Runa is still young — expect the surface to keep growing (durable/remote persistence backends, richer strategies, additional providers) without changing these foundations.
 
 ## Philosophy
 
-Runa is intentionally opinionated.
+Runa is intentionally opinionated. Its principles, in full, live in [`RUNA.md`](RUNA.md):
 
-The project follows principles such as:
-
-* Convention over configuration
-* Batteries included
-* Small number of powerful primitives
-* Simple by default
-* Transparent when necessary
-* Durability by default
-* Evaluation as part of development
-* Escape hatches for advanced users
-* Replaceable underlying runtimes
-* Optimize for the entire agent lifecycle
-
-Read [`RUNA.md`](RUNA.md) for the full design principles.
+1. Optimize for developer happiness
+2. Convention over configuration
+3. Omakase agent infrastructure
+4. Agents are objects, not graphs
+5. The Run is the primary unit of computation
+6. One lifecycle, many strategies
+7. State is explicit
+8. Observability and evaluation are defaults
+9. Provide sharp knives
 
 ## Development
 
-Runa uses [uv](https://docs.astral.sh/uv/) for Python environment and dependency management.
+Runa uses [uv](https://docs.astral.sh/uv/) for Python environment and dependency management, and targets Python 3.14.
 
 ```bash
-make install
-make lint-fix
-make check
-make test
+make install     # uv sync
+make format      # ruff format
+make lint        # ruff check
+make lint-fix    # ruff check --fix
+make typecheck   # pyright
+make test        # pytest
+make check       # format + lint + test
 make clean
 ```
 
