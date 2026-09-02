@@ -43,6 +43,7 @@ from runa.runtime import (
     Executor,
     Fail,
     Provider,
+    RetryStrategy,
     Strategy,
 )
 from runa.tool import FunctionTool, Tool, tool
@@ -80,6 +81,7 @@ __all__ = [
     "Provider",
     "ProviderNotConfigured",
     "Queue",
+    "RetryStrategy",
     "Role",
     "Run",
     "RunState",

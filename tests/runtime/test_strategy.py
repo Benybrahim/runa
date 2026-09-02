@@ -1,5 +1,5 @@
 from runa.core import Message, Role, Run, ToolCall
-from runa.runtime.strategy import CallModel, CallTool, Complete, DefaultStrategy
+from runa.runtime.strategy import CallModel, CallTool, Complete, DefaultStrategy, Fail
 
 strategy = DefaultStrategy()
 
@@ -40,6 +40,16 @@ def test_assistant_with_no_tool_calls_completes_with_content():
     action = strategy.step(run)
     assert isinstance(action, Complete)
     assert action.result == "the answer"
+
+
+def test_assistant_with_errored_tool_call_fails():
+    run = Run(input="hi")
+    call = ToolCall(name="get_weather", arguments={"city": "Tokyo"}, error="boom")
+    run.add_message(Message(role=Role.ASSISTANT, tool_calls=[call]))
+
+    action = strategy.step(run)
+    assert isinstance(action, Fail)
+    assert action.error == "boom"
 
 
 def test_tool_result_message_calls_model_again():

@@ -20,6 +20,8 @@ class ToolCall:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     result: Any = None
     approved: bool | None = None
+    error: str | None = None
+    attempts: int = 0
 
     @property
     def completed(self) -> bool:

@@ -64,6 +64,8 @@ def _tool_call_to_dict(tool_call: ToolCall) -> dict[str, Any]:
         "arguments": tool_call.arguments,
         "result": tool_call.result,
         "approved": tool_call.approved,
+        "error": tool_call.error,
+        "attempts": tool_call.attempts,
     }
 
 

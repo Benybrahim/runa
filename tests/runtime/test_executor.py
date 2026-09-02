@@ -2,6 +2,7 @@ from runa.agent import Agent
 from runa.approval import approve
 from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime.executor import Executor
+from runa.runtime.retry import RetryStrategy
 from runa.runtime.strategy import CallModel, Complete, Strategy
 from runa.tool import Tool
 from tests.fakes import FakeProvider
@@ -98,6 +99,71 @@ def test_tool_exception_fails_the_run():
 
     assert result.status == RunStatus.FAILED
     assert "boom" in result.events[-1].data["error"]
+
+    tool_failed = next(e for e in result.events if e.type == EventType.TOOL_FAILED)
+    assert tool_failed.data["error"] == "boom"
+    assert result.tool_calls[0].error == "boom"
+    assert result.tool_calls[0].attempts == 1
+
+
+def test_retry_strategy_retries_a_flaky_tool_before_succeeding():
+    class FlakyTool(Tool):
+        calls = 0
+
+        def call(self) -> str:
+            FlakyTool.calls += 1
+            if FlakyTool.calls < 3:
+                raise RuntimeError("still flaky")
+            return "ok"
+
+    class FlakyAgent(Agent):
+        tools = [FlakyTool]
+
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="FlakyTool", arguments={})],
+            ),
+            Message(role=Role.ASSISTANT, content="done"),
+        ]
+    )
+    executor = Executor(provider, strategy=RetryStrategy(max_retries=3))
+    run = Run(input="do the flaky thing")
+
+    result = executor.run(FlakyAgent(), run)
+
+    assert result.status == RunStatus.COMPLETED
+    assert result.result == "done"
+    assert FlakyTool.calls == 3
+    assert result.tool_calls[0].attempts == 3
+    assert result.tool_calls[0].error is None
+
+
+def test_retry_strategy_fails_after_exhausting_retries():
+    class AlwaysBroken(Tool):
+        def call(self) -> None:
+            raise RuntimeError("nope")
+
+    class BrokenAgent(Agent):
+        tools = [AlwaysBroken]
+
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="AlwaysBroken", arguments={})],
+            )
+        ]
+    )
+    executor = Executor(provider, strategy=RetryStrategy(max_retries=2))
+    run = Run(input="do the thing")
+
+    result = executor.run(BrokenAgent(), run)
+
+    assert result.status == RunStatus.FAILED
+    assert "nope" in result.events[-1].data["error"]
+    assert result.tool_calls[0].attempts == 3
 
 
 def test_max_steps_fails_the_run_instead_of_looping_forever():

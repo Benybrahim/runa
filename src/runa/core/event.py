@@ -20,6 +20,7 @@ class EventType(StrEnum):
     MODEL_RESPONDED = "model.responded"
     TOOL_CALLED = "tool.called"
     TOOL_COMPLETED = "tool.completed"
+    TOOL_FAILED = "tool.failed"
     ARTIFACT_CREATED = "artifact.created"
 
 

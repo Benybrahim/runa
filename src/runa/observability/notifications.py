@@ -30,6 +30,9 @@ _SUMMARIES: dict[EventType, Callable[[dict[str, Any]], str]] = {
     EventType.MODEL_RESPONDED: lambda d: "model responded",
     EventType.TOOL_CALLED: lambda d: f"tool called: {d.get('tool', '')}",
     EventType.TOOL_COMPLETED: lambda d: f"tool completed: {d.get('tool', '')}",
+    EventType.TOOL_FAILED: (
+        lambda d: f"tool failed: {d.get('tool', '')}: {d.get('error', '')}"
+    ),
     EventType.ARTIFACT_CREATED: (
         lambda d: f"artifact created: {d.get('artifact_id', '')}"
     ),

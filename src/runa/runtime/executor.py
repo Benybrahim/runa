@@ -103,7 +103,21 @@ class Executor:
 
         tool = agent.resolved_tools()[tool_call.name]
         run.emit(EventType.TOOL_CALLED, tool=tool_call.name, tool_call_id=tool_call.id)
-        tool_call.result = tool.call(**tool_call.arguments)
+        tool_call.attempts += 1
+
+        try:
+            tool_call.result = tool.call(**tool_call.arguments)
+        except Exception as exc:
+            tool_call.error = str(exc)
+            run.emit(
+                EventType.TOOL_FAILED,
+                tool=tool_call.name,
+                tool_call_id=tool_call.id,
+                error=str(exc),
+            )
+            return
+
+        tool_call.error = None
         run.add_message(
             Message(
                 role=Role.TOOL,

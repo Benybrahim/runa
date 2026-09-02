@@ -49,7 +49,9 @@ class DefaultStrategy:
     """The plain tool-use loop.
 
     Call the model, run any tool calls it asks for, feed results back, and
-    repeat until the model answers without asking for more tools.
+    repeat until the model answers without asking for more tools. Fails the
+    run immediately if a tool call errors — no retry policy of its own; see
+    `RetryStrategy` for one.
     """
 
     def step(self, run: Run) -> Action:
@@ -63,6 +65,8 @@ class DefaultStrategy:
 
         pending = next((tc for tc in last.tool_calls if not tc.completed), None)
         if pending is not None:
+            if pending.error is not None:
+                return Fail(error=pending.error)
             return CallTool(tool_call=pending)
 
         return Complete(result=last.content)

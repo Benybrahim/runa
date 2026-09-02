@@ -112,7 +112,7 @@ All layers described in [`docs/architecture.md`](docs/architecture.md) are imple
 
 * `core/` — `Run`, `Message`, `Event`, `Artifact`, `State`
 * `Agent` + `Tool` — the declarative surface
-* `runtime/` — `Strategy` protocol, `DefaultStrategy`, `Executor`
+* `runtime/` — `Strategy` protocol, `DefaultStrategy`, `RetryStrategy`, `Executor`
 * `providers/` — `AnthropicProvider`, `OpenAIProvider`
 * `persistence/` — `RunStore`, `InMemoryRunStore`, `SQLiteRunStore`
 * `background/` + `approval.py` — `run_later`, `approve`/`deny`

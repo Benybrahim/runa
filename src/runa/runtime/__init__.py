@@ -2,6 +2,7 @@
 
 from runa.runtime.executor import Executor
 from runa.runtime.provider import Provider
+from runa.runtime.retry import RetryStrategy
 from runa.runtime.strategy import (
     Action,
     CallModel,
@@ -21,5 +22,6 @@ __all__ = [
     "Executor",
     "Fail",
     "Provider",
+    "RetryStrategy",
     "Strategy",
 ]
