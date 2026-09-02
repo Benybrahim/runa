@@ -39,11 +39,13 @@ class WeatherAgent(Agent):
 run = WeatherAgent.run("What's the weather in Tokyo?")
 
 print(run.status)
-# RunStatus.COMPLETED
+# completed
 
 print(run.result)
 # "It's sunny in Tokyo right now."
 ```
+
+(`run.result` comes from a live model call, so the exact wording varies — the status and shape of the result don't.)
 
 ## Core Ideas
 

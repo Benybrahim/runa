@@ -1,6 +1,6 @@
 """hello.py: the smallest complete Runa app.
 
-Requires OPENAI_API_KEY in the environment. Run with `make example`.
+Requires OPENAI_API_KEY in the environment. Run with `make hello`.
 """
 
 from runa import Agent, OpenAIProvider, configure, tool
