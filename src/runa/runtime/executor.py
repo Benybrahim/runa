@@ -3,7 +3,7 @@
 from typing import Any
 
 from runa.agent import Agent
-from runa.core import EventType, Message, Role, Run, ToolCall
+from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime.provider import Provider
 from runa.runtime.strategy import (
     Action,
@@ -20,7 +20,10 @@ class Executor:
     """Drives a Strategy against a Run.
 
     Seeds the initial messages, calls the model, executes tools, and applies
-    the Strategy's decisions until the Run reaches a terminal status.
+    the Strategy's decisions until the Run leaves RUNNING — either because it
+    reached a terminal status, or because it paused for background handoff
+    or an approval gate (see `background/` and `approval.py`). Calling `run`
+    again on a paused Run resumes it from where it left off.
     """
 
     def __init__(
@@ -35,12 +38,15 @@ class Executor:
         self.max_steps = max_steps
 
     def run(self, agent: Agent, run: Run) -> Run:
-        self._seed(agent, run)
-        run.start()
-        agent.before_run(run)
+        if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
+            self._seed(agent, run)
+            run.start()
+            agent.before_run(run)
+        elif run.status in (RunStatus.PAUSED, RunStatus.AWAITING_APPROVAL):
+            run.resume()
 
         steps = 0
-        while not run.is_terminal:
+        while run.status == RunStatus.RUNNING:
             if steps >= self.max_steps:
                 run.fail(error=f"exceeded max_steps ({self.max_steps})")
                 break
@@ -53,7 +59,8 @@ class Executor:
                 run.fail(error=str(exc))
                 break
 
-        agent.after_run(run)
+        if run.is_terminal:
+            agent.after_run(run)
         return run
 
     def _seed(self, agent: Agent, run: Run) -> None:
@@ -83,6 +90,13 @@ class Executor:
         run.emit(EventType.MODEL_RESPONDED)
 
     def _call_tool(self, agent: Agent, run: Run, tool_call: ToolCall) -> None:
+        if (
+            tool_call.name in agent.approval_tool_names()
+            and tool_call.approved is not True
+        ):
+            run.require_approval(tool_call.id)
+            return
+
         tool = agent.resolved_tools()[tool_call.name]
         run.emit(EventType.TOOL_CALLED, tool=tool_call.name, tool_call_id=tool_call.id)
         tool_call.result = tool.call(**tool_call.arguments)

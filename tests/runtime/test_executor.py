@@ -1,4 +1,5 @@
 from runa.agent import Agent
+from runa.approval import approve
 from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime.executor import Executor
 from runa.runtime.strategy import CallModel, Complete, Strategy
@@ -130,6 +131,70 @@ def test_agent_hooks_are_called_around_execution():
     Executor(provider).run(HookedAgent(), Run(input="hi"))
 
     assert calls == ["before_run", "after_run"]
+
+
+def test_gated_tool_call_pauses_the_run_for_approval():
+    class SendEmail(Tool):
+        requires_approval = True
+
+        def call(self, to: str) -> str:
+            return f"sent to {to}"
+
+    class SupportAgent(Agent):
+        tools = [SendEmail]
+
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="SendEmail", arguments={"to": "a@b.com"})],
+            )
+        ]
+    )
+    executor = Executor(provider)
+    run = Run(input="email someone")
+
+    result = executor.run(SupportAgent(), run)
+
+    assert result.status == RunStatus.AWAITING_APPROVAL
+    assert len(provider.calls) == 1  # never got past the gate to call again
+    pending = result.tool_calls[0]
+    assert pending.approved is None
+    assert not pending.completed
+
+
+def test_approving_a_gated_tool_call_lets_the_run_finish():
+    class SendEmail(Tool):
+        requires_approval = True
+
+        def call(self, to: str) -> str:
+            return f"sent to {to}"
+
+    class SupportAgent(Agent):
+        tools = [SendEmail]
+
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="SendEmail", arguments={"to": "a@b.com"})],
+            ),
+            Message(role=Role.ASSISTANT, content="Email sent."),
+        ]
+    )
+    executor = Executor(provider)
+    agent = SupportAgent()
+    run = Run(input="email someone")
+
+    executor.run(agent, run)
+    assert run.status == RunStatus.AWAITING_APPROVAL
+
+    approve(run, run.tool_calls[0].id)
+    result = executor.run(agent, run)
+
+    assert result.status == RunStatus.COMPLETED
+    assert result.result == "Email sent."
+    assert result.tool_calls[0].result == "sent to a@b.com"
 
 
 def test_strategy_protocol_is_satisfiable_without_inheritance():

@@ -66,6 +66,7 @@ class Run:
 
     def add_message(self, message: Message) -> None:
         self.messages.append(message)
+        self.tool_calls.extend(message.tool_calls)
 
     def add_artifact(self, artifact: Artifact) -> None:
         self.artifacts.append(artifact)

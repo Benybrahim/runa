@@ -19,6 +19,7 @@ class ToolCall:
     arguments: dict[str, Any] = field(default_factory=dict)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     result: Any = None
+    approved: bool | None = None
 
     @property
     def completed(self) -> bool:

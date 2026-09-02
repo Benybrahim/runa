@@ -1,6 +1,8 @@
 """Runa: the application framework for agentic AI."""
 
 from runa.agent import Agent, DuplicateToolName, UnknownApprovalTool
+from runa.approval import UnknownToolCall, approve, deny
+from runa.background import InlineQueue, Queue, run_later
 from runa.core import (
     ActionArtifact,
     Artifact,
@@ -57,10 +59,12 @@ __all__ = [
     "FunctionTool",
     "IllegalTransition",
     "InMemoryRunStore",
+    "InlineQueue",
     "Message",
     "OpenAIProvider",
     "PlanArtifact",
     "Provider",
+    "Queue",
     "Role",
     "Run",
     "RunState",
@@ -71,5 +75,9 @@ __all__ = [
     "Tool",
     "ToolCall",
     "UnknownApprovalTool",
+    "UnknownToolCall",
+    "approve",
+    "deny",
+    "run_later",
     "tool",
 ]
