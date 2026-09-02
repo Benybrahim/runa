@@ -126,9 +126,7 @@ They should not be required to express behavior.
 Every execution of an agent creates a Run.
 
 ```python
-run = ResearchAgent.run(
-    "What are the most promising approaches to fusion energy?"
-)
+run = ResearchAgent.run("What are the most promising approaches to fusion energy?")
 ```
 
 A Run represents the complete execution of an agent.
