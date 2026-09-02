@@ -32,7 +32,7 @@ from runa.eval import (
     run_evals,
 )
 from runa.observability import TimelineEntry, instrument, timeline
-from runa.persistence import InMemoryRunStore, RunStore
+from runa.persistence import InMemoryRunStore, RunStore, SQLiteRunStore
 from runa.providers import AnthropicProvider, OpenAIProvider
 from runa.runtime import (
     Action,
@@ -85,6 +85,7 @@ __all__ = [
     "RunState",
     "RunStatus",
     "RunStore",
+    "SQLiteRunStore",
     "Strategy",
     "TextArtifact",
     "TimelineEntry",

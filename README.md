@@ -114,7 +114,7 @@ All layers described in [`docs/architecture.md`](docs/architecture.md) are imple
 * `Agent` + `Tool` — the declarative surface
 * `runtime/` — `Strategy` protocol, `DefaultStrategy`, `Executor`
 * `providers/` — `AnthropicProvider`, `OpenAIProvider`
-* `persistence/` — `RunStore`, `InMemoryRunStore`
+* `persistence/` — `RunStore`, `InMemoryRunStore`, `SQLiteRunStore`
 * `background/` + `approval.py` — `run_later`, `approve`/`deny`
 * `observability/` — `timeline()`, `instrument()`
 * `eval/` — `expect(run)`, `run_evals()`
