@@ -52,8 +52,35 @@ def test_expect_to_be_completed_fails_on_a_failed_run():
         expect(run).to_be_completed()
     except ExpectationFailed as exc:
         assert "failed" in str(exc)
+        assert "boom" in str(exc)
     else:
         raise AssertionError("expected ExpectationFailed")
+
+
+def test_expect_to_have_error_passes_when_the_error_matches():
+    run = Run(input="do it")
+    run.start()
+    run.fail("boom: connection refused")
+
+    expect(run).to_have_error("connection refused")
+
+
+def test_expect_to_have_error_fails_when_the_error_does_not_match():
+    run = Run(input="do it")
+    run.start()
+    run.fail("boom")
+
+    with pytest.raises(ExpectationFailed, match="connection refused"):
+        expect(run).to_have_error("connection refused")
+
+
+def test_expect_to_have_error_fails_when_the_run_never_failed():
+    run = Run(input="do it")
+    run.start()
+    run.complete(result="done")
+
+    with pytest.raises(ExpectationFailed):
+        expect(run).to_have_error("connection refused")
 
 
 def test_expect_to_have_called_checks_tool_calls():

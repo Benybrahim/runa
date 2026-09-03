@@ -99,6 +99,18 @@ def test_round_trips_messages_tool_calls_artifacts_and_events():
     assert isinstance(loaded.events[0], Event)
 
 
+def test_round_trips_a_failed_runs_error():
+    store = SQLiteRunStore(":memory:")
+    run = Run(input="hi")
+    run.start()
+    run.fail("boom")
+
+    store.save(run)
+    loaded = store.get(run.id)
+
+    assert loaded.error == "boom"
+
+
 def test_round_trips_agent_nameentity_and_version():
     store = SQLiteRunStore(":memory:")
     run = Run(input="hi", agent_name="ResearchAgent", agent_version="1.2.0")

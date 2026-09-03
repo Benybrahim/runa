@@ -66,6 +66,7 @@ class Run:
     artifacts: list[Artifact] = field(default_factory=list)
     conversation: "Conversation | None" = None
     result: Any = None
+    error: str | None = None
     status: RunStatus = RunStatus.CREATED
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     cancel_requested: bool = False
@@ -116,6 +117,7 @@ class Run:
         self.transition_to(RunStatus.COMPLETED, EventType.RUN_COMPLETED)
 
     def fail(self, error: str) -> None:
+        self.error = error
         self.transition_to(RunStatus.FAILED, EventType.RUN_FAILED, error=error)
 
     def cancel(self) -> None:

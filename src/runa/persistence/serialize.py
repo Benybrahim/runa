@@ -117,6 +117,7 @@ def run_to_dict(run: Run) -> dict[str, Any]:
         "tool_calls": tool_calls_by_id,
         "artifacts": [_artifact_to_dict(a) for a in run.artifacts],
         "result": run.result,
+        "error": run.error,
         "status": run.status.value,
         "created_at": run.created_at.isoformat(),
     }
@@ -160,6 +161,7 @@ def run_from_dict(data: dict[str, Any]) -> Run:
         tool_calls=list(tool_calls_by_id.values()),
         artifacts=[_artifact_from_dict(a) for a in data["artifacts"]],
         result=data["result"],
+        error=data["error"],
         status=RunStatus(data["status"]),
         created_at=datetime.fromisoformat(data["created_at"]),
     )

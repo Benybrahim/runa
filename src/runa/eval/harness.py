@@ -42,14 +42,22 @@ class Expectation:
 
     def to_be_completed(self) -> "Expectation":
         if self.run.status != RunStatus.COMPLETED:
+            detail = f": {self.run.error}" if self.run.error else ""
             raise ExpectationFailed(
-                f"expected run to be completed, got {self.run.status}"
+                f"expected run to be completed, got {self.run.status}{detail}"
             )
         return self
 
     def to_be_failed(self) -> "Expectation":
         if self.run.status != RunStatus.FAILED:
             raise ExpectationFailed(f"expected run to be failed, got {self.run.status}")
+        return self
+
+    def to_have_error(self, text: str) -> "Expectation":
+        if self.run.error is None or text not in self.run.error:
+            raise ExpectationFailed(
+                f"expected run.error to contain {text!r}, got {self.run.error!r}"
+            )
         return self
 
     def to_have_result(self, expected: Any) -> "Expectation":
