@@ -1,8 +1,9 @@
 import threading
 
 from runa.agent import Agent
-from runa.background import SQLiteQueue, run_later
+from runa.background import SQLiteQueue, recover_pending, run_later
 from runa.core import Message, Role, Run, RunStatus
+from runa.persistence import SQLiteRunStore
 from runa.runtime import Executor
 from tests.fakes import FakeProvider
 
@@ -85,3 +86,42 @@ def test_run_later_with_sqlite_queue_completes_once_the_queue_drains(tmp_path):
     assert result is run
     assert result.status == RunStatus.COMPLETED
     assert result.result == "hi"
+
+
+def test_recover_pending_resumes_a_run_orphaned_by_a_crashed_process(tmp_path):
+    queue_path = str(tmp_path / "queue.db")
+    run_store_path = str(tmp_path / "runs.db")
+
+    # Simulate the previous process: journal a run and persist it as QUEUED,
+    # then crash before the job could clear the pending_jobs row (same setup
+    # as test_pending_survives_reopening_the_same_database above).
+    run = Run(input="hello", agent_name="GreeterAgent")
+    run.queue()
+    crashed_store = SQLiteRunStore(run_store_path)
+    crashed_store.save(run)
+    crashed_queue = SQLiteQueue(queue_path)
+    crashed_queue._connection.execute(
+        "INSERT INTO pending_jobs (run_id) VALUES (?)", (run.id,)
+    )
+    crashed_queue._connection.commit()
+    crashed_queue.close(wait=False)
+    crashed_store.close()
+
+    # A new process reopens both and recovers.
+    run_store = SQLiteRunStore(run_store_path)
+    queue = SQLiteQueue(queue_path, max_workers=1)
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    executor = Executor(provider)
+
+    recovered = recover_pending(queue, run_store, executor, agents=[GreeterAgent])
+    # enqueue_run() dispatches to the thread pool and returns immediately —
+    # wait for it to drain before checking pending(), without closing the
+    # connection pending() itself needs.
+    queue._executor.shutdown(wait=True)
+
+    assert [r.id for r in recovered] == [run.id]
+    assert queue.pending() == []
+    queue.close(wait=False)
+    reloaded = run_store.get(run.id)
+    assert reloaded.status == RunStatus.COMPLETED
+    assert reloaded.result == "hi"

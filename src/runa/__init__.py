@@ -14,6 +14,7 @@ from runa.background import (
     Queue,
     SQLiteQueue,
     ThreadQueue,
+    recover_pending,
     run_later,
 )
 from runa.config import AsyncProviderNotConfigured, ProviderNotConfigured, configure
@@ -164,6 +165,7 @@ __all__ = [
     "deny",
     "expect",
     "instrument",
+    "recover_pending",
     "run_evals",
     "run_later",
     "timeline",
