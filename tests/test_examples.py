@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from runa import Executor, Run, RunStatus, approve, configure, run_evals
+from runa import Executor, Judge, Run, RunStatus, approve, configure, run_evals
 from runa.core import Message, Role, ToolCall
 from tests.fakes import FakeProvider
 
@@ -108,10 +108,16 @@ def test_eval_example():
             ),
             Message(role=Role.ASSISTANT, content="Tokyo is sunny."),
             Message(role=Role.ASSISTANT, content="Kyoto is sunny."),
+            Message(role=Role.ASSISTANT, content="Osaka is sunny."),
         ]
     )
     executor = Executor(provider=fake)
     agent = eval_example.WeatherAgent()
+    # the module's `judge` is bound to a real OpenAIProvider at import time —
+    # swap it for a fake so the "is a helpful answer" case stays offline too.
+    eval_example.judge = Judge(
+        FakeProvider([Message(role=Role.ASSISTANT, content="PASS")])
+    )
 
     results = run_evals(agent, executor, eval_example.cases)
 

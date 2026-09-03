@@ -5,6 +5,13 @@ production (manifesto §8) — `run_evals()` is a thin loop around
 `executor.run()`, not a parallel mock harness. `expect(run).to_...()` reads
 the same `Run` a test would, so eval assertions and application invariants
 share one vocabulary.
+
+`Expectation` holds both halves of manifesto §12. `to_be_completed`,
+`to_have_result`, `to_contain`, and `to_have_called` verify invariants —
+deterministic facts about the Run's shape, cheap enough for `test`-style
+checks. `to_satisfy` and its named rubrics (`to_be_helpful`, `to_be_factual`,
+`not_to_hallucinate`, see `eval/judge.py`) measure behavior — a real,
+non-deterministic model call grading what the agent actually did.
 """
 
 from collections.abc import Callable
@@ -12,7 +19,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from runa.agent import Agent
+from runa.config import default_provider
 from runa.core import Run, RunStatus
+from runa.eval.judge import (
+    RUBRIC_FACTUAL,
+    RUBRIC_HELPFUL,
+    RUBRIC_NOT_HALLUCINATE,
+    Judge,
+)
 from runa.runtime import Executor
 
 
@@ -52,6 +66,33 @@ class Expectation:
         if not any(call.name == tool_name for call in self.run.tool_calls):
             raise ExpectationFailed(f"expected tool {tool_name!r} to have been called")
         return self
+
+    def to_satisfy(self, rubric: str, *, judge: Judge | None = None) -> "Expectation":
+        """Grade this Run against `rubric` with an LLM judge (manifesto §12).
+
+        Unlike the structural checks above, this makes a real model request
+        and its result is not deterministic — reserve it for
+        `app/evaluations/` cases, not `test`-style invariants. Defaults to a
+        `Judge` backed by `runa.configure()`'s default Provider; pass `judge`
+        explicitly to grade with a different model, or a `FakeProvider` in
+        tests of your own eval cases.
+        """
+        judge = judge or Judge(default_provider())
+        verdict = judge.grade(self.run, rubric)
+        if not verdict.passed:
+            raise ExpectationFailed(
+                f"failed to satisfy {rubric!r}: {verdict.reasoning}"
+            )
+        return self
+
+    def to_be_helpful(self, *, judge: Judge | None = None) -> "Expectation":
+        return self.to_satisfy(RUBRIC_HELPFUL, judge=judge)
+
+    def to_be_factual(self, *, judge: Judge | None = None) -> "Expectation":
+        return self.to_satisfy(RUBRIC_FACTUAL, judge=judge)
+
+    def not_to_hallucinate(self, *, judge: Judge | None = None) -> "Expectation":
+        return self.to_satisfy(RUBRIC_NOT_HALLUCINATE, judge=judge)
 
 
 def expect(run: Run) -> Expectation:

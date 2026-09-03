@@ -1,6 +1,15 @@
+import pytest
+
 from runa.agent import Agent
 from runa.core import Message, Role, Run, ToolCall
-from runa.eval import EvalCase, ExpectationFailed, expect, run_evals
+from runa.eval import (
+    RUBRIC_HELPFUL,
+    EvalCase,
+    ExpectationFailed,
+    Judge,
+    expect,
+    run_evals,
+)
 from runa.runtime import Executor
 from runa.tool import Tool
 from tests.fakes import FakeProvider
@@ -89,6 +98,38 @@ def test_run_evals_reports_pass_and_fail_for_each_case():
     assert results[0].error is None
     assert results[1].passed is False
     assert "goodbye" in results[1].error
+
+
+def test_to_satisfy_passes_when_judge_returns_pass():
+    run = Run(input="what's the capital of France?")
+    run.add_message(Message(role=Role.ASSISTANT, content="Paris."))
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="PASS")])
+    judge = Judge(provider)
+
+    expect(run).to_satisfy("answers the question", judge=judge)
+
+
+def test_to_satisfy_raises_when_judge_returns_fail():
+    run = Run(input="what's the capital of France?")
+    run.add_message(Message(role=Role.ASSISTANT, content="I don't know."))
+    judge = Judge(
+        FakeProvider(
+            responses=[Message(role=Role.ASSISTANT, content="FAIL\nnever answers")]
+        )
+    )
+
+    with pytest.raises(ExpectationFailed, match="never answers"):
+        expect(run).to_satisfy("answers the question", judge=judge)
+
+
+def test_to_be_helpful_grades_against_the_helpful_rubric():
+    run = Run(input="what's the capital of France?")
+    run.add_message(Message(role=Role.ASSISTANT, content="Paris."))
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="PASS")])
+
+    expect(run).to_be_helpful(judge=Judge(provider))
+
+    assert RUBRIC_HELPFUL in provider.calls[0]["messages"][0].content
 
 
 def test_run_evals_runs_every_case_even_after_a_failure():
