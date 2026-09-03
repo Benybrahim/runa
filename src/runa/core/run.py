@@ -54,7 +54,7 @@ class IllegalTransition(Exception):
 class Run:
     input: Any
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    agent_id: str | None = None
+    agent_name: str | None = None
     agent_version: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
     state: RunState = field(default_factory=RunState)

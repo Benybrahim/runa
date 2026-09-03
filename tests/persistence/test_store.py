@@ -68,14 +68,14 @@ def test_list_filters_by_since():
     assert store.list(since=datetime.now(UTC) - timedelta(hours=1)) == [recent]
 
 
-def test_list_filters_by_agent_id():
+def test_list_filters_by_agent_name():
     store = InMemoryRunStore()
-    research = Run(input="one", agent_id="ResearchAgent")
-    support = Run(input="two", agent_id="SupportAgent")
+    research = Run(input="one", agent_name="ResearchAgent")
+    support = Run(input="two", agent_name="SupportAgent")
     store.save(research)
     store.save(support)
 
-    assert store.list(agent_id="ResearchAgent") == [research]
+    assert store.list(agent_name="ResearchAgent") == [research]
 
 
 def test_list_combines_status_and_since_filters():

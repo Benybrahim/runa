@@ -144,7 +144,7 @@ def test_runs_list_filters_by_status(tmp_path, capsys):
     assert completed.id not in output
 
 
-def test_runs_list_filters_by_agent_id(tmp_path, capsys):
+def test_runs_list_filters_by_agent_name(tmp_path, capsys):
     project_dir = tmp_path / "acme"
     main(["new", "acme"], cwd=tmp_path)
     db_path = str(tmp_path / "runs.db")
@@ -156,13 +156,13 @@ def test_runs_list_filters_by_agent_id(tmp_path, capsys):
         f"run_store=SQLiteRunStore({db_path!r}))\n"
     )
     store = SQLiteRunStore(db_path)
-    research = Run(input="hello", agent_id="ResearchAgent")
-    support = Run(input="hi", agent_id="SupportAgent")
+    research = Run(input="hello", agent_name="ResearchAgent")
+    support = Run(input="hi", agent_name="SupportAgent")
     store.save(research)
     store.save(support)
     store.close()
 
-    exit_code = main(["runs", "list", "--agent-id", "ResearchAgent"], cwd=project_dir)
+    exit_code = main(["runs", "list", "--agent-name", "ResearchAgent"], cwd=project_dir)
 
     output = capsys.readouterr().out
     assert exit_code == 0

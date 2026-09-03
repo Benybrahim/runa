@@ -30,7 +30,7 @@ class RunNotFound(Exception):
 
 
 def format_run_timeline(run: Run) -> str:
-    agent = run.agent_id or "unknown agent"
+    agent = run.agent_name or "unknown agent"
     if run.agent_version:
         agent += f"@{run.agent_version}"
     lines = [f"Run {run.id} ({run.status.value}) — {agent}", ""]
@@ -53,7 +53,7 @@ def format_run_list(runs: list[Run]) -> str:
     if not runs:
         return "no runs found"
     lines = [
-        f"{run.id}  {run.status.value}  {run.agent_id or '-'}  "
+        f"{run.id}  {run.status.value}  {run.agent_name or '-'}  "
         f"{run.created_at.isoformat()}"
         for run in sorted(runs, key=lambda r: r.created_at)
     ]
@@ -65,17 +65,17 @@ def list_runs(
     root: Path,
     status: str | None = None,
     since: str | None = None,
-    agent_id: str | None = None,
+    agent_name: str | None = None,
 ) -> str:
     """List Runs in the app's RunStore, optionally filtered by `status`,
     `since` (an ISO 8601 timestamp; only Runs created at or after it match),
-    and/or `agent_id` (the Agent that produced the Run — see `Agent.name`).
+    and/or `agent_name` (the Agent that produced the Run — see `Agent.name`).
     """
     parsed_status = RunStatus(status) if status is not None else None
     parsed_since = datetime.fromisoformat(since) if since is not None else None
     with loaded_app(root):
         runs = default_run_store().list(
-            status=parsed_status, since=parsed_since, agent_id=agent_id
+            status=parsed_status, since=parsed_since, agent_name=agent_name
         )
     return format_run_list(runs)
 

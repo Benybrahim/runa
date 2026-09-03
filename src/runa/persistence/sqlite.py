@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS runs (
     id TEXT PRIMARY KEY,
     status TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    agent_id TEXT,
+    agent_name TEXT,
     data TEXT NOT NULL
 )
 """
@@ -34,16 +34,16 @@ class SQLiteRunStore:
 
     def save(self, run: Run) -> None:
         self._connection.execute(
-            "INSERT INTO runs (id, status, created_at, agent_id, data) "
+            "INSERT INTO runs (id, status, created_at, agent_name, data) "
             "VALUES (?, ?, ?, ?, ?) "
             "ON CONFLICT(id) DO UPDATE SET status = excluded.status, "
-            "created_at = excluded.created_at, agent_id = excluded.agent_id, "
+            "created_at = excluded.created_at, agent_name = excluded.agent_name, "
             "data = excluded.data",
             (
                 run.id,
                 run.status.value,
                 run.created_at.isoformat(),
-                run.agent_id,
+                run.agent_name,
                 run_to_json(run),
             ),
         )
@@ -60,7 +60,7 @@ class SQLiteRunStore:
         *,
         status: RunStatus | None = None,
         since: datetime | None = None,
-        agent_id: str | None = None,
+        agent_name: str | None = None,
     ) -> list[Run]:
         query = "SELECT data FROM runs"
         clauses: list[str] = []
@@ -71,9 +71,9 @@ class SQLiteRunStore:
         if since is not None:
             clauses.append("created_at >= ?")
             params.append(since.isoformat())
-        if agent_id is not None:
-            clauses.append("agent_id = ?")
-            params.append(agent_id)
+        if agent_name is not None:
+            clauses.append("agent_name = ?")
+            params.append(agent_name)
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         rows = self._connection.execute(query, params).fetchall()

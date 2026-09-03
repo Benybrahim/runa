@@ -131,7 +131,7 @@ def test_agent_name_can_be_overridden():
     assert ResearchAgent.agent_name() == "researcher-v2"
 
 
-def test_run_is_stamped_with_agent_identity_and_version():
+def test_run_is_stamped_with_agent_nameentity_and_version():
     class ResearchAgent(Agent):
         version = "1.2.0"
 
@@ -139,17 +139,17 @@ def test_run_is_stamped_with_agent_identity_and_version():
 
     run = ResearchAgent.run("hello", executor=Executor(provider=provider))
 
-    assert run.agent_id == "ResearchAgent"
+    assert run.agent_name == "ResearchAgent"
     assert run.agent_version == "1.2.0"
 
 
-def test_run_async_and_run_later_also_stamp_agent_identity():
+def test_run_async_and_run_later_also_stamp_agent_nameentity():
     class ResearchAgent(Agent):
         pass
 
     configure(provider=FakeProvider([Message(role=Role.ASSISTANT, content="hi")]))
     later = ResearchAgent.run_later("hello")
-    assert later.agent_id == "ResearchAgent"
+    assert later.agent_name == "ResearchAgent"
 
     async_provider = FakeAsyncProvider([Message(role=Role.ASSISTANT, content="hi")])
     async_run = asyncio.run(
@@ -157,7 +157,7 @@ def test_run_async_and_run_later_also_stamp_agent_identity():
             "hello", executor=AsyncExecutor(provider=async_provider)
         )
     )
-    assert async_run.agent_id == "ResearchAgent"
+    assert async_run.agent_name == "ResearchAgent"
 
 
 def test_run_raises_if_no_default_provider_and_no_executor(monkeypatch):
@@ -306,7 +306,7 @@ def test_a_parent_agent_can_delegate_to_a_sub_agent():
     assert research_tool.last_run.status == RunStatus.COMPLETED
     assert research_tool.last_run.result == "Fusion is promising."
     # the sub-agent's own Run carries its own identity, not the parent's
-    assert research_tool.last_run.agent_id == "ResearchAgent"
+    assert research_tool.last_run.agent_name == "ResearchAgent"
 
 
 def test_a_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
