@@ -1,11 +1,13 @@
+import asyncio
+
 import pytest
 
 from runa.agent import Agent, DelegateTool, DuplicateToolName, UnknownApprovalTool
 from runa.config import ProviderNotConfigured, configure
 from runa.core import Conversation, Message, Role, RunStatus, ToolCall
-from runa.runtime import Executor
+from runa.runtime import AsyncExecutor, Executor
 from runa.tool import Tool
-from tests.fakes import FakeProvider
+from tests.fakes import FakeAsyncProvider, FakeProvider
 
 
 class Ledger(Tool):
@@ -128,6 +130,20 @@ def test_run_accepts_an_explicit_executor_as_an_escape_hatch():
     run = SimpleAgent.run("hello", executor=executor)
 
     assert run.status == RunStatus.COMPLETED
+    assert provider.calls  # the explicit executor's provider was used
+
+
+def test_run_async_accepts_an_explicit_async_executor_as_an_escape_hatch():
+    class SimpleAgent(Agent):
+        pass
+
+    provider = FakeAsyncProvider([Message(role=Role.ASSISTANT, content="hi")])
+    executor = AsyncExecutor(provider=provider)
+
+    run = asyncio.run(SimpleAgent.run_async("hello", executor=executor))
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "hi"
     assert provider.calls  # the explicit executor's provider was used
 
 

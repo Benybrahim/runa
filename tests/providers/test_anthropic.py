@@ -1,7 +1,9 @@
+import asyncio
 from types import SimpleNamespace
 
 from runa.core import Message, Role, ToolCall
 from runa.providers.anthropic import (
+    AsyncAnthropicProvider,
     from_wire_message,
     to_wire_messages,
     to_wire_tools,
@@ -121,3 +123,28 @@ def test_from_wire_message_with_no_tool_use_blocks():
 
     assert message.content == "Hi."
     assert message.tool_calls == []
+
+
+def test_async_anthropic_provider_awaits_the_async_client():
+    class FakeMessages:
+        async def create(self, **kwargs):
+            self.kwargs = kwargs
+            return SimpleNamespace(content=[SimpleNamespace(type="text", text="hi")])
+
+    class FakeAsyncClient:
+        def __init__(self):
+            self.messages = FakeMessages()
+
+    client = FakeAsyncClient()
+    provider = AsyncAnthropicProvider(client=client)
+
+    message = asyncio.run(
+        provider.complete(
+            messages=[Message(role=Role.USER, content="hello")],
+            tools=[],
+            model=None,
+        )
+    )
+
+    assert message.content == "hi"
+    assert client.messages.kwargs["model"] == "claude-sonnet-5"

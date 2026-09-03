@@ -1,7 +1,13 @@
+import asyncio
 from types import SimpleNamespace
 
 from runa.core import Message, Role, ToolCall
-from runa.providers.openai import from_wire_message, to_wire_messages, to_wire_tools
+from runa.providers.openai import (
+    AsyncOpenAIProvider,
+    from_wire_message,
+    to_wire_messages,
+    to_wire_tools,
+)
 
 
 def test_system_and_user_messages_pass_through():
@@ -107,3 +113,38 @@ def test_from_wire_message_with_no_tool_calls():
 
     assert message.content == "Hi."
     assert message.tool_calls == []
+
+
+def test_async_openai_provider_awaits_the_async_client():
+    class FakeCompletions:
+        async def create(self, **kwargs):
+            self.kwargs = kwargs
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="hi", tool_calls=None)
+                    )
+                ]
+            )
+
+    class FakeChat:
+        def __init__(self):
+            self.completions = FakeCompletions()
+
+    class FakeAsyncClient:
+        def __init__(self):
+            self.chat = FakeChat()
+
+    client = FakeAsyncClient()
+    provider = AsyncOpenAIProvider(client=client)
+
+    message = asyncio.run(
+        provider.complete(
+            messages=[Message(role=Role.USER, content="hello")],
+            tools=[],
+            model=None,
+        )
+    )
+
+    assert message.content == "hi"
+    assert client.chat.completions.kwargs["model"] == "gpt-5-nano"

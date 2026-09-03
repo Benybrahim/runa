@@ -3,7 +3,7 @@
 from runa.agent import Agent, DelegateTool, DuplicateToolName, UnknownApprovalTool
 from runa.approval import UnknownToolCall, approve, deny
 from runa.background import InlineQueue, Queue, ThreadQueue, run_later
-from runa.config import ProviderNotConfigured, configure
+from runa.config import AsyncProviderNotConfigured, ProviderNotConfigured, configure
 from runa.core import (
     ActionArtifact,
     Artifact,
@@ -40,9 +40,16 @@ from runa.persistence import (
     RunStore,
     SQLiteRunStore,
 )
-from runa.providers import AnthropicProvider, OpenAIProvider
+from runa.providers import (
+    AnthropicProvider,
+    AsyncAnthropicProvider,
+    AsyncOpenAIProvider,
+    OpenAIProvider,
+)
 from runa.runtime import (
     Action,
+    AsyncExecutor,
+    AsyncProvider,
     CallModel,
     CallTool,
     Complete,
@@ -61,6 +68,11 @@ __all__ = [
     "Agent",
     "AnthropicProvider",
     "Artifact",
+    "AsyncAnthropicProvider",
+    "AsyncExecutor",
+    "AsyncOpenAIProvider",
+    "AsyncProvider",
+    "AsyncProviderNotConfigured",
     "CallModel",
     "CallTool",
     "CitationSetArtifact",

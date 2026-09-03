@@ -112,3 +112,38 @@ class AnthropicProvider:
             tools=to_wire_tools(tools) if tools else anthropic.NOT_GIVEN,
         )
         return from_wire_message(response)
+
+
+class AsyncAnthropicProvider:
+    """The async counterpart to `AnthropicProvider`.
+
+    Satisfies `AsyncProvider` structurally, backed by `anthropic.AsyncAnthropic`
+    instead of `anthropic.Anthropic`. Shares the exact same wire-format
+    functions as the sync provider — only the client and the `await` differ.
+    """
+
+    def __init__(
+        self,
+        client: anthropic.AsyncAnthropic | None = None,
+        *,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+    ) -> None:
+        self.client = client or anthropic.AsyncAnthropic()
+        self.max_tokens = max_tokens
+
+    async def complete(
+        self,
+        *,
+        messages: list[Message],
+        tools: list[dict[str, Any]],
+        model: str | None,
+    ) -> Message:
+        system, wire_messages = to_wire_messages(messages)
+        response = await self.client.messages.create(
+            model=model or DEFAULT_MODEL,
+            max_tokens=self.max_tokens,
+            system=system,
+            messages=wire_messages,
+            tools=to_wire_tools(tools) if tools else anthropic.NOT_GIVEN,
+        )
+        return from_wire_message(response)

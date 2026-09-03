@@ -56,8 +56,8 @@ runa/
 ├── core/            Run, Message, Event, Artifact, State — pure data
 ├── agent.py         Agent: declarative tools, instructions, approval, hooks
 ├── tool.py          Tool base + @tool function adapter
-├── runtime/         Strategy + Executor — drives a Run to completion
-├── providers/       Thin adapters to model APIs (Anthropic, OpenAI)
+├── runtime/         Strategy + Executor (sync and async) — drives a Run to completion
+├── providers/       Thin adapters to model APIs (Anthropic, OpenAI; sync and async)
 ├── persistence/      RunStore — durable Run status
 ├── background/       run_later() — background execution
 ├── approval.py       requires_approval — human-in-the-loop gate
@@ -71,6 +71,18 @@ Every layer is defined in terms of the `Run`: persistence stores it, background 
 ### Replaceable runtimes
 
 Runa keeps the underlying model provider replaceable. A `Provider` is a small protocol (`complete(messages, tools, model) -> Message`); `AnthropicProvider` and `OpenAIProvider` are thin, one-directional adapters to that protocol, and nothing outside `providers/` ever branches on which one is active.
+
+### Async is a parallel path, not a rewrite
+
+`Agent.run_async()` drives an `AsyncExecutor` against an `AsyncProvider` (`AsyncAnthropicProvider`, `AsyncOpenAIProvider`) — same `Run`/`Strategy` contract as the sync path, so persistence, observability, and eval all work identically either way. It buys two things the sync path can't: I/O-bound tools/providers that don't tie up a thread, and independent tool calls from one model turn running concurrently via `asyncio.gather` instead of one at a time. A `Tool.call` may be `async def` or a plain function — `AsyncExecutor` awaits one and runs the other through `asyncio.to_thread`; the sync `Executor` raises a clear error if handed an async-only tool rather than mishandling it silently.
+
+```python
+configure(provider=AnthropicProvider(), async_provider=AsyncAnthropicProvider())
+
+run = await ResearchAgent.run_async(
+    "What are the most promising approaches to fusion energy?"
+)
+```
 
 ```text
                  Runa
@@ -130,8 +142,8 @@ All layers described in [`docs/architecture.md`](docs/architecture.md) are imple
 
 * `core/` — `Run`, `Message`, `Event`, `Artifact`, `State`, `Conversation`
 * `Agent` + `Tool` — the declarative surface, including `Agent.as_tool()` for delegation
-* `runtime/` — `Strategy` protocol, `DefaultStrategy`, `RetryStrategy`, `Executor`
-* `providers/` — `AnthropicProvider`, `OpenAIProvider`
+* `runtime/` — `Strategy` protocol, `DefaultStrategy`, `RetryStrategy`, `Executor`, `AsyncExecutor`
+* `providers/` — `AnthropicProvider`, `OpenAIProvider`, `AsyncAnthropicProvider`, `AsyncOpenAIProvider`
 * `persistence/` — `RunStore`, `InMemoryRunStore`, `SQLiteRunStore`, `ConversationStore`, `InMemoryConversationStore`
 * `background/` + `approval.py` — `run_later`, `Queue` (`InlineQueue`, `ThreadQueue`), `approve`/`deny`
 * `observability/` — `timeline()`, `instrument()`

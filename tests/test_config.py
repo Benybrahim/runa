@@ -1,13 +1,15 @@
 import pytest
 
 from runa.config import (
+    AsyncProviderNotConfigured,
     ProviderNotConfigured,
     configure,
+    default_async_provider,
     default_provider,
     default_run_store,
 )
 from runa.persistence import InMemoryRunStore
-from tests.fakes import FakeProvider
+from tests.fakes import FakeAsyncProvider, FakeProvider
 
 
 def test_default_provider_raises_before_configure(monkeypatch):
@@ -48,3 +50,27 @@ def test_configure_without_run_store_leaves_the_previous_one(monkeypatch):
     configure(provider=provider)
 
     assert default_run_store() is store
+
+
+def test_default_async_provider_raises_before_configure(monkeypatch):
+    monkeypatch.setattr("runa.config._default_async_provider", None)
+
+    with pytest.raises(AsyncProviderNotConfigured):
+        default_async_provider()
+
+
+def test_configure_sets_the_default_async_provider():
+    async_provider = FakeAsyncProvider(responses=[])
+
+    configure(provider=FakeProvider(responses=[]), async_provider=async_provider)
+
+    assert default_async_provider() is async_provider
+
+
+def test_configure_without_async_provider_leaves_the_previous_one(monkeypatch):
+    async_provider = FakeAsyncProvider(responses=[])
+    monkeypatch.setattr("runa.config._default_async_provider", async_provider)
+
+    configure(provider=FakeProvider(responses=[]))
+
+    assert default_async_provider() is async_provider

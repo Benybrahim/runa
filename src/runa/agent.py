@@ -4,9 +4,9 @@ from typing import Any, ClassVar
 
 from runa.background import Queue
 from runa.background import run_later as _run_later
-from runa.config import default_provider
+from runa.config import default_async_provider, default_provider
 from runa.core import Conversation, Run, RunStatus
-from runa.runtime import Executor
+from runa.runtime import AsyncExecutor, Executor
 from runa.tool import Tool
 
 ToolEntry = type[Tool] | Tool
@@ -127,6 +127,24 @@ class Agent:
         """
         executor = executor or Executor(provider=default_provider())
         return executor.run(cls(), Run(input=input, conversation=conversation))
+
+    @classmethod
+    async def run_async(
+        cls,
+        input: Any,
+        *,
+        executor: AsyncExecutor | None = None,
+        conversation: Conversation | None = None,
+    ) -> Run:
+        """Run this agent against `input` using an `AsyncExecutor`. See `Agent.run`.
+
+        Uses the app-wide default AsyncProvider (`runa.configure(provider=...,
+        async_provider=...)`) unless an `AsyncExecutor` is given explicitly.
+        Independent tool calls the model asks for in one turn run
+        concurrently — see `AsyncExecutor` for the exact rule.
+        """
+        executor = executor or AsyncExecutor(provider=default_async_provider())
+        return await executor.run(cls(), Run(input=input, conversation=conversation))
 
     @classmethod
     def run_later(

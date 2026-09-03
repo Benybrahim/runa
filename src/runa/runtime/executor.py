@@ -1,8 +1,10 @@
 """Executor: drives a Strategy against a Run, emitting Events as it acts."""
 
-from typing import TYPE_CHECKING, Any
+import inspect
+from typing import TYPE_CHECKING
 
 from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
+from runa.runtime._shared import seed_run, tool_schemas
 from runa.runtime.provider import Provider
 from runa.runtime.strategy import (
     Action,
@@ -54,7 +56,7 @@ class Executor:
 
     def run(self, agent: "Agent", run: Run) -> Run:
         if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
-            self._seed(agent, run)
+            seed_run(agent, run)
             run.start()
             agent.before_run(run)
             agent.plan(run)
@@ -81,13 +83,6 @@ class Executor:
                 run.conversation.record(run)
         return run
 
-    def _seed(self, agent: "Agent", run: Run) -> None:
-        if agent.instructions:
-            run.add_message(Message(role=Role.SYSTEM, content=agent.instructions))
-        if run.conversation is not None:
-            run.messages.extend(run.conversation.messages)
-        run.add_message(Message(role=Role.USER, content=str(run.input)))
-
     def _apply(self, agent: "Agent", run: Run, action: Action) -> None:
         if isinstance(action, CallModel):
             self._call_model(agent, run)
@@ -103,7 +98,7 @@ class Executor:
 
     def _call_model(self, agent: "Agent", run: Run) -> None:
         run.emit(EventType.MODEL_CALLED)
-        schemas = self._tool_schemas(agent)
+        schemas = tool_schemas(agent)
         message = self.provider.complete(
             messages=run.messages, tools=schemas, model=agent.model
         )
@@ -119,6 +114,11 @@ class Executor:
             return
 
         tool = agent.resolved_tools()[tool_call.name]
+        if inspect.iscoroutinefunction(tool.call):
+            raise TypeError(
+                f"{tool.tool_name()!r} defines an async call() — run this Agent with "
+                "AsyncExecutor instead of Executor"
+            )
         run.emit(EventType.TOOL_CALLED, tool=tool_call.name, tool_call_id=tool_call.id)
         tool_call.attempts += 1
 
@@ -145,13 +145,3 @@ class Executor:
         run.emit(
             EventType.TOOL_COMPLETED, tool=tool_call.name, tool_call_id=tool_call.id
         )
-
-    def _tool_schemas(self, agent: "Agent") -> list[dict[str, Any]]:
-        return [
-            {
-                "name": name,
-                "description": tool.tool_description(),
-                "parameters": tool.schema(),
-            }
-            for name, tool in agent.resolved_tools().items()
-        ]

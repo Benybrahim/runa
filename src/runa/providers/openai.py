@@ -102,3 +102,29 @@ class OpenAIProvider:
             tools=to_wire_tools(tools) if tools else openai.NOT_GIVEN,
         )
         return from_wire_message(response)
+
+
+class AsyncOpenAIProvider:
+    """The async counterpart to `OpenAIProvider`.
+
+    Satisfies `AsyncProvider` structurally, backed by `openai.AsyncOpenAI`
+    instead of `openai.OpenAI`. Shares the exact same wire-format functions
+    as the sync provider — only the client and the `await` differ.
+    """
+
+    def __init__(self, client: openai.AsyncOpenAI | None = None) -> None:
+        self.client = client or openai.AsyncOpenAI()
+
+    async def complete(
+        self,
+        *,
+        messages: list[Message],
+        tools: list[dict[str, Any]],
+        model: str | None,
+    ) -> Message:
+        response = await self.client.chat.completions.create(
+            model=model or DEFAULT_MODEL,
+            messages=to_wire_messages(messages),
+            tools=to_wire_tools(tools) if tools else openai.NOT_GIVEN,
+        )
+        return from_wire_message(response)

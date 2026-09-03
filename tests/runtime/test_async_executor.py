@@ -1,0 +1,303 @@
+import asyncio
+import time
+
+from runa.agent import Agent
+from runa.approval import approve
+from runa.config import configure
+from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
+from runa.runtime.async_executor import AsyncExecutor
+from runa.runtime.executor import Executor
+from runa.runtime.retry import RetryStrategy
+from runa.tool import Tool
+from tests.fakes import FakeAsyncProvider, FakeProvider
+
+
+class GetWeather(Tool):
+    def call(self, city: str) -> str:
+        return f"{city}: sunny"
+
+
+class WeatherAgent(Agent):
+    instructions = "Answer weather questions."
+    tools = [GetWeather]
+
+
+def test_async_executor_runs_a_full_tool_use_loop():
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="GetWeather", arguments={"city": "Tokyo"})],
+            ),
+            Message(role=Role.ASSISTANT, content="Tokyo is sunny."),
+        ]
+    )
+    executor = AsyncExecutor(provider)
+    run = asyncio.run(executor.run(WeatherAgent(), Run(input="weather in Tokyo?")))
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "Tokyo is sunny."
+    assert len(provider.calls) == 2
+
+    event_types = [event.type for event in run.events]
+    assert event_types == [
+        EventType.RUN_STARTED,
+        EventType.MODEL_CALLED,
+        EventType.MODEL_RESPONDED,
+        EventType.TOOL_CALLED,
+        EventType.TOOL_COMPLETED,
+        EventType.MODEL_CALLED,
+        EventType.MODEL_RESPONDED,
+        EventType.RUN_COMPLETED,
+    ]
+
+
+def test_async_executor_answers_directly_without_tools():
+    provider = FakeAsyncProvider(
+        responses=[Message(role=Role.ASSISTANT, content="No tools needed.")]
+    )
+    executor = AsyncExecutor(provider)
+    run = asyncio.run(executor.run(WeatherAgent(), Run(input="hello")))
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "No tools needed."
+
+
+def test_independent_tool_calls_run_concurrently():
+    class SlowToolA(Tool):
+        async def call(self) -> str:
+            await asyncio.sleep(0.2)
+            return "a done"
+
+    class SlowToolB(Tool):
+        async def call(self) -> str:
+            await asyncio.sleep(0.2)
+            return "b done"
+
+    class FanOutAgent(Agent):
+        tools = [SlowToolA, SlowToolB]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(name="SlowToolA", arguments={}),
+                    ToolCall(name="SlowToolB", arguments={}),
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="both done"),
+        ]
+    )
+    executor = AsyncExecutor(provider)
+
+    start = time.monotonic()
+    run = asyncio.run(executor.run(FanOutAgent(), Run(input="do both")))
+    elapsed = time.monotonic() - start
+
+    assert run.status == RunStatus.COMPLETED
+    # sequential execution would take >= 0.4s; concurrent stays close to 0.2s
+    assert elapsed < 0.35, f"tool calls did not run concurrently (took {elapsed}s)"
+
+
+def test_sync_tool_runs_via_to_thread_under_async_executor():
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="GetWeather", arguments={"city": "Osaka"})],
+            ),
+            Message(role=Role.ASSISTANT, content="Osaka is sunny."),
+        ]
+    )
+    run = asyncio.run(AsyncExecutor(provider).run(WeatherAgent(), Run(input="x")))
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.tool_calls[0].result == "Osaka: sunny"
+
+
+def test_tool_exception_fails_the_run():
+    class BrokenTool(Tool):
+        async def call(self) -> None:
+            raise RuntimeError("boom")
+
+    class BrokenAgent(Agent):
+        tools = [BrokenTool]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="BrokenTool", arguments={})],
+            )
+        ]
+    )
+    run = asyncio.run(AsyncExecutor(provider).run(BrokenAgent(), Run(input="x")))
+
+    assert run.status == RunStatus.FAILED
+    assert result_error(run) == "boom"
+    assert run.tool_calls[0].attempts == 1
+
+
+def result_error(run: Run) -> str:
+    return run.events[-1].data["error"]
+
+
+def test_retry_strategy_retries_a_flaky_tool_before_succeeding():
+    class FlakyTool(Tool):
+        calls = 0
+
+        async def call(self) -> str:
+            FlakyTool.calls += 1
+            if FlakyTool.calls < 3:
+                raise RuntimeError("still flaky")
+            return "ok"
+
+    class FlakyAgent(Agent):
+        tools = [FlakyTool]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="FlakyTool", arguments={})],
+            ),
+            Message(role=Role.ASSISTANT, content="done"),
+        ]
+    )
+    executor = AsyncExecutor(provider, strategy=RetryStrategy(max_retries=3))
+    run = asyncio.run(executor.run(FlakyAgent(), Run(input="x")))
+
+    assert run.status == RunStatus.COMPLETED
+    assert FlakyTool.calls == 3
+    assert run.tool_calls[0].attempts == 3
+    assert run.tool_calls[0].error is None
+
+
+def test_gated_tool_call_pauses_the_run_for_approval():
+    class SendEmail(Tool):
+        requires_approval = True
+
+        async def call(self, to: str) -> str:
+            return f"sent to {to}"
+
+    class SupportAgent(Agent):
+        tools = [SendEmail]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="SendEmail", arguments={"to": "a@b.com"})],
+            )
+        ]
+    )
+    run = asyncio.run(AsyncExecutor(provider).run(SupportAgent(), Run(input="x")))
+
+    assert run.status == RunStatus.AWAITING_APPROVAL
+    assert not run.tool_calls[0].completed
+
+
+def test_runnable_siblings_execute_while_a_gated_call_blocks_the_batch():
+    class SendEmail(Tool):
+        requires_approval = True
+
+        async def call(self, to: str) -> str:
+            return f"sent to {to}"
+
+    class GetWeatherAsync(Tool):
+        async def call(self, city: str) -> str:
+            return f"{city}: sunny"
+
+    class MixedAgent(Agent):
+        tools = [SendEmail, GetWeatherAsync]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(name="SendEmail", arguments={"to": "a@b.com"}),
+                    ToolCall(name="GetWeatherAsync", arguments={"city": "Kyoto"}),
+                ],
+            )
+        ]
+    )
+    run = asyncio.run(AsyncExecutor(provider).run(MixedAgent(), Run(input="x")))
+
+    assert run.status == RunStatus.AWAITING_APPROVAL
+    send_email_call = next(tc for tc in run.tool_calls if tc.name == "SendEmail")
+    weather_call = next(tc for tc in run.tool_calls if tc.name == "GetWeatherAsync")
+    assert not send_email_call.completed
+    assert weather_call.completed
+    assert weather_call.result == "Kyoto: sunny"
+
+
+def test_approving_a_gated_tool_call_lets_the_run_finish():
+    class SendEmail(Tool):
+        requires_approval = True
+
+        async def call(self, to: str) -> str:
+            return f"sent to {to}"
+
+    class SupportAgent(Agent):
+        tools = [SendEmail]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="SendEmail", arguments={"to": "a@b.com"})],
+            ),
+            Message(role=Role.ASSISTANT, content="Email sent."),
+        ]
+    )
+    executor = AsyncExecutor(provider)
+    agent = SupportAgent()
+    run = asyncio.run(executor.run(agent, Run(input="x")))
+    assert run.status == RunStatus.AWAITING_APPROVAL
+
+    approve(run, run.tool_calls[0].id)
+    run = asyncio.run(executor.run(agent, run))
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "Email sent."
+
+
+def test_sync_executor_rejects_a_tool_with_an_async_call():
+    class AsyncOnlyTool(Tool):
+        async def call(self) -> str:
+            return "nope"
+
+    class BrokenAgent(Agent):
+        tools = [AsyncOnlyTool]
+
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="AsyncOnlyTool", arguments={})],
+            )
+        ]
+    )
+    run = Executor(provider).run(BrokenAgent(), Run(input="x"))
+
+    # Executor converts the TypeError into a failed Run rather than crashing,
+    # same as any other exception raised while applying an Action.
+    assert run.status == RunStatus.FAILED
+    assert "AsyncExecutor" in run.events[-1].data["error"]
+
+
+def test_run_async_uses_the_app_default_async_provider():
+    class SimpleAgent(Agent):
+        pass
+
+    configure(
+        provider=FakeProvider([]),
+        async_provider=FakeAsyncProvider([Message(role=Role.ASSISTANT, content="hi")]),
+    )
+
+    run = asyncio.run(SimpleAgent.run_async("hello"))
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "hi"
