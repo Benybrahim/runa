@@ -6,6 +6,7 @@ never executes on import) and drive the same Agent classes through
 Executor/FakeProvider, to catch example rot without spending API credits.
 """
 
+import asyncio
 import importlib.util
 from pathlib import Path
 
@@ -13,7 +14,7 @@ import pytest
 
 from runa import Executor, Judge, Run, RunStatus, approve, configure, run_evals
 from runa.core import Message, Role, ToolCall
-from tests.fakes import FakeProvider, FakeStreamingProvider
+from tests.fakes import FakeAsyncProvider, FakeProvider, FakeStreamingProvider
 
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 
@@ -217,3 +218,27 @@ def test_delegate_example():
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "Fusion is making progress."
+
+
+def test_parallel_delegate_example():
+    parallel_delegate = _load("parallel_delegate")
+    fake = FakeAsyncProvider(
+        [
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(name="WeatherAgent", arguments={"input": "Tokyo"}),
+                    ToolCall(name="NewsAgent", arguments={"input": "Tokyo"}),
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="Sunny, 22C."),
+            Message(role=Role.ASSISTANT, content="Local team wins championship."),
+            Message(role=Role.ASSISTANT, content="Sunny and 22C; the local team won."),
+        ]
+    )
+    configure(provider=FakeProvider([]), async_provider=fake)
+
+    run = asyncio.run(parallel_delegate.BriefingAgent.run_async("Tokyo"))
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "Sunny and 22C; the local team won."

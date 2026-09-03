@@ -1,4 +1,4 @@
-"""cli/runs.py: `runa runs show/pending/approve/deny` — the Run store over argv.
+"""cli/runs.py: `runa runs show/list/pending/approve/deny` — the Run store over argv.
 
 Manifesto §11 asks that "what happened?" have an answer without adding
 tracing code to every agent; §14 asks that human approval be part of the
@@ -14,6 +14,7 @@ same as resuming any other paused Run: call the Executor again with the
 Agent that produced it.
 """
 
+from datetime import datetime
 from pathlib import Path
 
 from runa.approval import approve, deny
@@ -43,6 +44,29 @@ def show_run(run_id: str, *, root: Path) -> str:
     if run is None:
         raise RunNotFound(f"no run found with id {run_id!r}")
     return format_run_timeline(run)
+
+
+def format_run_list(runs: list[Run]) -> str:
+    if not runs:
+        return "no runs found"
+    lines = [
+        f"{run.id}  {run.status.value}  {run.created_at.isoformat()}"
+        for run in sorted(runs, key=lambda r: r.created_at)
+    ]
+    return "\n".join(lines)
+
+
+def list_runs(
+    *, root: Path, status: str | None = None, since: str | None = None
+) -> str:
+    """List Runs in the app's RunStore, optionally filtered by `status` and/or
+    `since` (an ISO 8601 timestamp; only Runs created at or after it match).
+    """
+    parsed_status = RunStatus(status) if status is not None else None
+    parsed_since = datetime.fromisoformat(since) if since is not None else None
+    with loaded_app(root):
+        runs = default_run_store().list(status=parsed_status, since=parsed_since)
+    return format_run_list(runs)
 
 
 def _pending_tool_call(run: Run) -> ToolCall | None:

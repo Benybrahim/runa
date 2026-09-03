@@ -180,9 +180,34 @@ class Agent:
         A parent agent delegates by declaring the sub-agent as an ordinary
         tool — `tools = [ResearchAgent.as_tool()]` — no new Strategy needed:
         `DefaultStrategy`'s existing tool-use loop already covers it once an
-        Agent can be handed in as a Tool.
+        Agent can be handed in as a Tool. For a parent driven by
+        `AsyncExecutor`/`run_async()`, see `as_async_tool()`.
         """
         return DelegateTool(cls, name=name, description=description, executor=executor)
+
+    @classmethod
+    def as_async_tool(
+        cls,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        executor: AsyncExecutor | None = None,
+    ) -> Tool:
+        """Wrap this Agent as a Tool for a parent run via AsyncExecutor/
+        `run_async()` — the async counterpart to `as_tool()`.
+
+        `DelegateTool.call()` is a plain function, so under AsyncExecutor it
+        runs via `asyncio.to_thread` — one thread per delegate, not true
+        concurrency. `AsyncDelegateTool.call()` is `async def` and delegates
+        through `AsyncExecutor` instead, so when a model turn requests
+        several sub-agents at once, AsyncExecutor's existing `asyncio.gather`
+        batching (see its docstring) runs them as genuine concurrent async
+        I/O. Only usable with `AsyncExecutor` — like any async-only tool,
+        `Executor` rejects it outright rather than mishandling it silently.
+        """
+        return AsyncDelegateTool(
+            cls, name=name, description=description, executor=executor
+        )
 
 
 class DelegateTool(Tool):
@@ -218,6 +243,50 @@ class DelegateTool(Tool):
     def call(self, input: str) -> Any:
         executor = self._executor or Executor(provider=default_provider())
         run = executor.run(self._agent_cls(), Run(input=input))
+        self.last_run = run
+        if run.status != RunStatus.COMPLETED:
+            raise RuntimeError(
+                f"delegated run to {self.tool_name()} did not complete: {run.status}"
+            )
+        return run.result
+
+    def schema(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {"input": {"type": "string"}},
+            "required": ["input"],
+        }
+
+
+class AsyncDelegateTool(Tool):
+    """The async counterpart to `DelegateTool` — see `Agent.as_async_tool()`.
+
+    `call()` is `async def` and runs the wrapped Agent through an
+    `AsyncExecutor`, using the app-wide default AsyncProvider
+    (`runa.configure(async_provider=...)`) unless an `executor` is given.
+    Otherwise identical to `DelegateTool`: `run.result` becomes the tool's
+    output, a non-completed sub-run raises (surfacing as an ordinary
+    `TOOL_FAILED` event on the parent), and the sub-agent's own `Run` stays
+    reachable on `self.last_run` for direct inspection (manifesto §15).
+    """
+
+    def __init__(
+        self,
+        agent_cls: type[Agent],
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        executor: AsyncExecutor | None = None,
+    ) -> None:
+        self._agent_cls = agent_cls
+        self.name = name or agent_cls.__name__
+        self.description = description or agent_cls.instructions
+        self._executor = executor
+        self.last_run: Run | None = None
+
+    async def call(self, input: str) -> Any:
+        executor = self._executor or AsyncExecutor(provider=default_async_provider())
+        run = await executor.run(self._agent_cls(), Run(input=input))
         self.last_run = run
         if run.status != RunStatus.COMPLETED:
             raise RuntimeError(

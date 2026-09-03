@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from runa.cli.new import scaffold_project
@@ -6,6 +8,7 @@ from runa.cli.runs import (
     approve_run,
     deny_run,
     list_pending_runs,
+    list_runs,
     show_run,
 )
 from runa.core import Message, Role, Run, RunStatus, ToolCall
@@ -51,6 +54,62 @@ def test_show_run_raises_for_an_unknown_id(tmp_path):
 
     with pytest.raises(RunNotFound):
         show_run("does-not-exist", root=project_dir)
+
+
+def test_list_runs_shows_every_saved_run(tmp_path):
+    project_dir, db_path = _scaffold_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    completed = Run(input="one")
+    completed.start()
+    completed.complete(result="done")
+    store.save(completed)
+    store.close()
+
+    output = list_runs(root=project_dir)
+
+    assert completed.id in output
+    assert "completed" in output
+
+
+def test_list_runs_filters_by_status(tmp_path):
+    project_dir, db_path = _scaffold_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    completed = Run(input="one")
+    completed.start()
+    completed.complete(result="done")
+    failed = Run(input="two")
+    failed.start()
+    failed.fail("boom")
+    store.save(completed)
+    store.save(failed)
+    store.close()
+
+    output = list_runs(root=project_dir, status="failed")
+
+    assert failed.id in output
+    assert completed.id not in output
+
+
+def test_list_runs_filters_by_since(tmp_path):
+    project_dir, db_path = _scaffold_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    old = Run(input="old", created_at=datetime.now(UTC) - timedelta(days=1))
+    recent = Run(input="recent")
+    store.save(old)
+    store.save(recent)
+    store.close()
+
+    since = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+    output = list_runs(root=project_dir, since=since)
+
+    assert recent.id in output
+    assert old.id not in output
+
+
+def test_list_runs_is_empty_with_no_saved_runs(tmp_path):
+    project_dir, _ = _scaffold_with_store(tmp_path)
+
+    assert list_runs(root=project_dir) == "no runs found"
 
 
 def _save_awaiting_approval(store: SQLiteRunStore) -> tuple[Run, ToolCall]:

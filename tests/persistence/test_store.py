@@ -1,4 +1,6 @@
-from runa.core import Run
+from datetime import UTC, datetime, timedelta
+
+from runa.core import Run, RunStatus
 from runa.persistence import InMemoryRunStore, RunStore
 
 
@@ -41,6 +43,49 @@ def test_save_again_overwrites_the_previous_version():
     assert len(store.list()) == 1
 
 
+def test_list_filters_by_status():
+    store = InMemoryRunStore()
+    completed = Run(input="one")
+    completed.start()
+    completed.complete(result="done")
+    failed = Run(input="two")
+    failed.start()
+    failed.fail("boom")
+    store.save(completed)
+    store.save(failed)
+
+    assert store.list(status=RunStatus.COMPLETED) == [completed]
+    assert store.list(status=RunStatus.FAILED) == [failed]
+
+
+def test_list_filters_by_since():
+    store = InMemoryRunStore()
+    old = Run(input="old", created_at=datetime.now(UTC) - timedelta(days=1))
+    recent = Run(input="recent")
+    store.save(old)
+    store.save(recent)
+
+    assert store.list(since=datetime.now(UTC) - timedelta(hours=1)) == [recent]
+
+
+def test_list_combines_status_and_since_filters():
+    store = InMemoryRunStore()
+    old_failed = Run(input="old", created_at=datetime.now(UTC) - timedelta(days=1))
+    old_failed.start()
+    old_failed.fail("boom")
+    recent_failed = Run(input="recent")
+    recent_failed.start()
+    recent_failed.fail("boom")
+    store.save(old_failed)
+    store.save(recent_failed)
+
+    matches = store.list(
+        status=RunStatus.FAILED, since=datetime.now(UTC) - timedelta(hours=1)
+    )
+
+    assert matches == [recent_failed]
+
+
 def test_run_store_protocol_is_satisfiable_without_inheritance():
     class DictBackedStore:
         def __init__(self):
@@ -52,8 +97,13 @@ def test_run_store_protocol_is_satisfiable_without_inheritance():
         def get(self, run_id):
             return self._runs.get(run_id)
 
-        def list(self):
-            return list(self._runs.values())
+        def list(self, *, status=None, since=None):
+            return [
+                run
+                for run in self._runs.values()
+                if (status is None or run.status == status)
+                and (since is None or run.created_at >= since)
+            ]
 
     store: RunStore = DictBackedStore()
     run = Run(input="hi")

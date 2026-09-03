@@ -114,6 +114,36 @@ def test_runs_show_renders_a_saved_runs_timeline(tmp_path, capsys):
     assert "run completed" in output
 
 
+def test_runs_list_filters_by_status(tmp_path, capsys):
+    project_dir = tmp_path / "acme"
+    main(["new", "acme"], cwd=tmp_path)
+    db_path = str(tmp_path / "runs.db")
+    (project_dir / "main.py").write_text(
+        "from runa import configure\n"
+        "from runa.persistence import SQLiteRunStore\n"
+        "from tests.fakes import FakeProvider\n\n"
+        "configure(provider=FakeProvider(responses=[]), "
+        f"run_store=SQLiteRunStore({db_path!r}))\n"
+    )
+    store = SQLiteRunStore(db_path)
+    completed = Run(input="hello")
+    completed.start()
+    completed.complete(result="hi")
+    failed = Run(input="oops")
+    failed.start()
+    failed.fail("boom")
+    store.save(completed)
+    store.save(failed)
+    store.close()
+
+    exit_code = main(["runs", "list", "--status", "failed"], cwd=project_dir)
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert failed.id in output
+    assert completed.id not in output
+
+
 def test_runs_requires_an_action():
     with pytest.raises(SystemExit):
         main(["runs"])

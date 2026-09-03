@@ -5,15 +5,18 @@ a paused or awaiting-approval Run has to live somewhere between the request
 that created it and the request that resumes it.
 """
 
+from datetime import datetime
 from typing import Protocol
 
-from runa.core import Run
+from runa.core import Run, RunStatus
 
 
 class RunStore(Protocol):
     def save(self, run: Run) -> None: ...
     def get(self, run_id: str) -> Run | None: ...
-    def list(self) -> list[Run]: ...
+    def list(
+        self, *, status: RunStatus | None = None, since: datetime | None = None
+    ) -> list[Run]: ...
 
 
 class InMemoryRunStore:
@@ -33,5 +36,12 @@ class InMemoryRunStore:
     def get(self, run_id: str) -> Run | None:
         return self._runs.get(run_id)
 
-    def list(self) -> list[Run]:
-        return list(self._runs.values())
+    def list(
+        self, *, status: RunStatus | None = None, since: datetime | None = None
+    ) -> list[Run]:
+        return [
+            run
+            for run in self._runs.values()
+            if (status is None or run.status == status)
+            and (since is None or run.created_at >= since)
+        ]

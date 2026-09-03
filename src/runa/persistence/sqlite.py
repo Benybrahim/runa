@@ -8,14 +8,16 @@ without deserializing every row.
 """
 
 import sqlite3
+from datetime import datetime
 
-from runa.core import Run
+from runa.core import Run, RunStatus
 from runa.persistence.serialize import run_from_json, run_to_json
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
     id TEXT PRIMARY KEY,
     status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
     data TEXT NOT NULL
 )
 """
@@ -31,10 +33,10 @@ class SQLiteRunStore:
 
     def save(self, run: Run) -> None:
         self._connection.execute(
-            "INSERT INTO runs (id, status, data) VALUES (?, ?, ?) "
+            "INSERT INTO runs (id, status, created_at, data) VALUES (?, ?, ?, ?) "
             "ON CONFLICT(id) DO UPDATE SET status = excluded.status, "
-            "data = excluded.data",
-            (run.id, run.status.value, run_to_json(run)),
+            "created_at = excluded.created_at, data = excluded.data",
+            (run.id, run.status.value, run.created_at.isoformat(), run_to_json(run)),
         )
         self._connection.commit()
 
@@ -44,8 +46,21 @@ class SQLiteRunStore:
         ).fetchone()
         return run_from_json(row[0]) if row else None
 
-    def list(self) -> list[Run]:
-        rows = self._connection.execute("SELECT data FROM runs").fetchall()
+    def list(
+        self, *, status: RunStatus | None = None, since: datetime | None = None
+    ) -> list[Run]:
+        query = "SELECT data FROM runs"
+        clauses: list[str] = []
+        params: list[str] = []
+        if status is not None:
+            clauses.append("status = ?")
+            params.append(status.value)
+        if since is not None:
+            clauses.append("created_at >= ?")
+            params.append(since.isoformat())
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        rows = self._connection.execute(query, params).fetchall()
         return [run_from_json(row[0]) for row in rows]
 
     def close(self) -> None:

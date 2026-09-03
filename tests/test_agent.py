@@ -1,8 +1,15 @@
 import asyncio
+import time
 
 import pytest
 
-from runa.agent import Agent, DelegateTool, DuplicateToolName, UnknownApprovalTool
+from runa.agent import (
+    Agent,
+    AsyncDelegateTool,
+    DelegateTool,
+    DuplicateToolName,
+    UnknownApprovalTool,
+)
 from runa.config import ProviderNotConfigured, configure
 from runa.core import Conversation, Message, Role, RunStatus, ToolCall
 from runa.runtime import AsyncExecutor, Executor
@@ -285,3 +292,144 @@ def test_a_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
     assert failed_call.error is not None
     # still reachable for inspection even though the delegated run failed
     assert research_tool.last_run.status == RunStatus.FAILED
+
+
+def test_as_async_tool_defaults_name_and_description_from_the_agent():
+    class ResearchAgent(Agent):
+        instructions = "Research thoroughly."
+
+    tool = ResearchAgent.as_async_tool()
+
+    assert isinstance(tool, AsyncDelegateTool)
+    assert tool.tool_name() == "ResearchAgent"
+    assert tool.tool_description() == "Research thoroughly."
+
+
+def test_async_delegate_tool_schema_is_a_single_input_field():
+    class ResearchAgent(Agent):
+        pass
+
+    assert ResearchAgent.as_async_tool().schema() == {
+        "type": "object",
+        "properties": {"input": {"type": "string"}},
+        "required": ["input"],
+    }
+
+
+def test_a_parent_agent_can_delegate_to_a_sub_agent_via_async_executor():
+    class ResearchAgent(Agent):
+        instructions = "Research."
+
+    provider = FakeAsyncProvider(
+        [
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(name="ResearchAgent", arguments={"input": "fusion energy"})
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="Fusion is promising."),
+            Message(role=Role.ASSISTANT, content="Fusion is promising, per research."),
+        ]
+    )
+    executor = AsyncExecutor(provider=provider)
+    research_tool = ResearchAgent.as_async_tool(executor=executor)
+
+    class LeadAgent(Agent):
+        instructions = "Delegate research questions."
+        tools = [research_tool]
+
+    run = asyncio.run(LeadAgent.run_async("What about fusion?", executor=executor))
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "Fusion is promising, per research."
+    # the sub-run isn't folded into the parent's own event log, but it
+    # stays reachable for direct inspection (manifesto §15)
+    assert research_tool.last_run.status == RunStatus.COMPLETED
+    assert research_tool.last_run.result == "Fusion is promising."
+
+
+def test_an_async_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
+    class ResearchAgent(Agent):
+        pass
+
+    provider = FakeAsyncProvider(
+        [
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="ResearchAgent", arguments={"input": "x"})],
+            ),
+        ]
+    )
+    executor = AsyncExecutor(provider=provider)
+    # ResearchAgent's own model call has no scripted response, so its Run fails
+    research_tool = ResearchAgent.as_async_tool(
+        executor=AsyncExecutor(provider=FakeAsyncProvider([]))
+    )
+
+    class LeadAgent(Agent):
+        tools = [research_tool]
+
+    run = asyncio.run(LeadAgent.run_async("delegate this", executor=executor))
+
+    assert run.status == RunStatus.FAILED
+    failed_call = next(tc for tc in run.tool_calls if tc.name == "ResearchAgent")
+    assert failed_call.error is not None
+    assert research_tool.last_run.status == RunStatus.FAILED
+
+
+def test_async_delegate_tools_run_concurrently_under_async_executor():
+    """AsyncDelegateTool delegates through AsyncExecutor instead of a thread,
+    so two independent delegate calls in one model turn run as genuine
+    concurrent async I/O — see AsyncExecutor's docstring for the batching
+    this rides on."""
+
+    class SlowAsyncProvider:
+        def __init__(self, response: Message) -> None:
+            self._response = response
+
+        async def complete(self, *, messages, tools, model) -> Message:
+            await asyncio.sleep(0.2)
+            return self._response
+
+    class ResearchAgentA(Agent):
+        pass
+
+    class ResearchAgentB(Agent):
+        pass
+
+    tool_a = ResearchAgentA.as_async_tool(
+        executor=AsyncExecutor(
+            provider=SlowAsyncProvider(Message(role=Role.ASSISTANT, content="a done"))
+        )
+    )
+    tool_b = ResearchAgentB.as_async_tool(
+        executor=AsyncExecutor(
+            provider=SlowAsyncProvider(Message(role=Role.ASSISTANT, content="b done"))
+        )
+    )
+
+    class LeadAgent(Agent):
+        tools = [tool_a, tool_b]
+
+    provider = FakeAsyncProvider(
+        [
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(name="ResearchAgentA", arguments={"input": "a"}),
+                    ToolCall(name="ResearchAgentB", arguments={"input": "b"}),
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="both done"),
+        ]
+    )
+    executor = AsyncExecutor(provider=provider)
+
+    start = time.monotonic()
+    run = asyncio.run(LeadAgent.run_async("do both", executor=executor))
+    elapsed = time.monotonic() - start
+
+    assert run.status == RunStatus.COMPLETED
+    # sequential delegation would take >= 0.4s; concurrent stays close to 0.2s
+    assert elapsed < 0.35, f"delegate calls did not run concurrently (took {elapsed}s)"

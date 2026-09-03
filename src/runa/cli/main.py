@@ -14,7 +14,13 @@ from pathlib import Path
 from runa.cli.eval import run_project_evals
 from runa.cli.generate import generate_agent
 from runa.cli.new import scaffold_project
-from runa.cli.runs import approve_run, deny_run, list_pending_runs, show_run
+from runa.cli.runs import (
+    approve_run,
+    deny_run,
+    list_pending_runs,
+    list_runs,
+    show_run,
+)
 from runa.cli.test import run_project_tests
 
 
@@ -42,6 +48,16 @@ def _build_parser() -> argparse.ArgumentParser:
 
     runs_show_parser = runs_subparsers.add_parser("show", help="Show a Run's timeline")
     runs_show_parser.add_argument("run_id")
+
+    runs_list_parser = runs_subparsers.add_parser(
+        "list", help="List Runs, optionally filtered by status/since"
+    )
+    runs_list_parser.add_argument(
+        "--status", default=None, help="e.g. completed, failed, awaiting_approval"
+    )
+    runs_list_parser.add_argument(
+        "--since", default=None, help="ISO 8601 timestamp; only Runs at or after it"
+    )
 
     runs_subparsers.add_parser("pending", help="List Runs paused awaiting approval")
 
@@ -95,6 +111,10 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
 
     if args.action == "show":
         print(show_run(args.run_id, root=cwd))
+        return 0
+
+    if args.action == "list":
+        print(list_runs(root=cwd, status=args.status, since=args.since))
         return 0
 
     if args.action == "pending":

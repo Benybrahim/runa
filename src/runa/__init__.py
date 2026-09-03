@@ -1,6 +1,12 @@
 """Runa: the application framework for agentic AI."""
 
-from runa.agent import Agent, DelegateTool, DuplicateToolName, UnknownApprovalTool
+from runa.agent import (
+    Agent,
+    AsyncDelegateTool,
+    DelegateTool,
+    DuplicateToolName,
+    UnknownApprovalTool,
+)
 from runa.approval import UnknownToolCall, approve, deny
 from runa.background import (
     DurableQueue,
@@ -88,6 +94,7 @@ __all__ = [
     "AnthropicProvider",
     "Artifact",
     "AsyncAnthropicProvider",
+    "AsyncDelegateTool",
     "AsyncExecutor",
     "AsyncOpenAIProvider",
     "AsyncProvider",

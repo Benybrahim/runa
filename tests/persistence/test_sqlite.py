@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 from runa.core import (
     Event,
     EventType,
@@ -87,6 +89,33 @@ def test_round_trips_messages_tool_calls_artifacts_and_events():
     assert loaded.artifacts[0].text == "refunded"
     assert any(e.type == EventType.MODEL_CALLED for e in loaded.events)
     assert isinstance(loaded.events[0], Event)
+
+
+def test_list_filters_by_status():
+    store = SQLiteRunStore(":memory:")
+    completed = Run(input="one")
+    completed.start()
+    completed.complete(result="done")
+    failed = Run(input="two")
+    failed.start()
+    failed.fail("boom")
+    store.save(completed)
+    store.save(failed)
+
+    assert [r.id for r in store.list(status=RunStatus.COMPLETED)] == [completed.id]
+    assert [r.id for r in store.list(status=RunStatus.FAILED)] == [failed.id]
+
+
+def test_list_filters_by_since():
+    store = SQLiteRunStore(":memory:")
+    old = Run(input="old", created_at=datetime.now(UTC) - timedelta(days=1))
+    recent = Run(input="recent")
+    store.save(old)
+    store.save(recent)
+
+    matches = store.list(since=datetime.now(UTC) - timedelta(hours=1))
+
+    assert [r.id for r in matches] == [recent.id]
 
 
 def test_a_tool_call_found_via_run_tool_calls_is_the_same_object_in_its_message():

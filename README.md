@@ -63,7 +63,7 @@ runa/
 ├── approval.py       requires_approval — human-in-the-loop gate
 ├── observability/     timeline() + instrument() — reads Run.events
 ├── eval/              expect(run) + run_evals() + Judge — same code path as prod
-└── cli/               `runa new`, `runa generate agent`, `runa eval`, `runa test`, `runa runs show`
+└── cli/               `runa new`, `runa generate agent`, `runa eval`, `runa test`, `runa runs show`/`list`
 ```
 
 Every layer is defined in terms of the `Run`: persistence stores it, background execution changes when it advances, observability reads its event log, evaluation replays and scores it. See [`docs/architecture.md`](docs/architecture.md) for the full layer-by-layer breakdown.
@@ -126,6 +126,16 @@ class LeadAgent(Agent):
 
 The sub-agent runs to completion and its `run.result` comes back as the tool's output; a sub-run that fails surfaces as an ordinary failed tool call. `DefaultStrategy`'s existing tool-use loop handles it — delegation didn't need a new `Strategy`.
 
+For a parent driven by `AsyncExecutor`/`run_async()`, `Agent.as_async_tool()` is the async counterpart: its `call()` is `async def` and delegates through `AsyncExecutor` instead of a thread, so when a model turn requests several sub-agents at once, `AsyncExecutor`'s existing concurrent tool-call batching (see "Async is a parallel path" above) runs them as genuine concurrent async I/O rather than one thread per delegate:
+
+```python
+class LeadAgent(Agent):
+    instructions = "Delegate research and news questions to their agents."
+    tools = [ResearchAgent.as_async_tool(), NewsAgent.as_async_tool()]
+```
+
+See `examples/parallel_delegate.py` for a runnable version where the model calls both sub-agents in one turn.
+
 ### A Tool result can be an Artifact
 
 Agents produce more than text (manifesto §10) — reports, extracted data, files, plans. A `Tool.call()` that returns an `Artifact` (`TextArtifact`, `DataArtifact`, `FileArtifact`, `CitationSetArtifact`, `PlanArtifact`, `ActionArtifact`) has it recorded on `run.artifacts` automatically; a plain return value behaves exactly as before. No separate API to remember — the Executor dispatches on the result's type (manifesto §2: "types are configuration"):
@@ -181,7 +191,7 @@ myapp/
 
 `runa test` imports `main.py` and every module under `app/tests/`, running each `test_*` function and reporting PASS/FAIL the same way — the deterministic half of manifesto §12: plain `assert` statements against a Run (`assert run.result == "..."`), not a graded rubric. It's a small runner of its own rather than a pytest wrapper, so a generated app carries no test-framework dependency beyond `runa` itself.
 
-`runa runs show <id>` looks the id up in the app's configured `RunStore` and prints `timeline(run)` (manifesto §11); it only finds runs across process boundaries once the app passes a durable store to `configure(provider=..., run_store=SQLiteRunStore(...))` — the default is in-memory.
+`runa runs show <id>` looks the id up in the app's configured `RunStore` and prints `timeline(run)` (manifesto §11); it only finds runs across process boundaries once the app passes a durable store to `configure(provider=..., run_store=SQLiteRunStore(...))` — the default is in-memory. `runa runs list [--status STATUS] [--since TIMESTAMP]` answers the question one Run's timeline can't — "what happened across every Run" — by filtering `RunStore.list()` itself: `InMemoryRunStore` filters in Python, `SQLiteRunStore` pushes both filters into the `WHERE` clause using the `status`/`created_at` columns it already keeps outside the JSON blob, so listing doesn't deserialize every row just to discard most of them.
 
 ## Project Status
 
@@ -190,14 +200,14 @@ myapp/
 All layers described in [`docs/architecture.md`](docs/architecture.md) are implemented and tested, in build order:
 
 * `core/` — `Run`, `Message`, `Event`, `Artifact` (auto-recorded when a Tool returns one), `State`, `Conversation`
-* `Agent` + `Tool` — the declarative surface, including `Agent.as_tool()` for delegation
+* `Agent` + `Tool` — the declarative surface, including `Agent.as_tool()`/`as_async_tool()` for delegation
 * `runtime/` — `Strategy` protocol, `DefaultStrategy`, `RetryStrategy`, `Executor`, `AsyncExecutor`, `on_chunk` streaming via `StreamingProvider`/`AsyncStreamingProvider`
 * `providers/` — `AnthropicProvider`, `OpenAIProvider`, `AsyncAnthropicProvider`, `AsyncOpenAIProvider`, each also implementing `stream()`
 * `persistence/` — `RunStore`, `InMemoryRunStore`, `SQLiteRunStore`, `ConversationStore`, `InMemoryConversationStore`
 * `background/` + `approval.py` — `run_later`, `Queue` (`InlineQueue`, `ThreadQueue`), `approve`/`deny`
 * `observability/` — `timeline()`, `instrument()`
 * `eval/` — `expect(run)`, `run_evals()`, `Judge` (LLM-graded `to_be_helpful()`/`to_be_factual()`/`not_to_hallucinate()`)
-* `cli/` — `runa new`, `runa generate agent`, `runa eval`, `runa test`, `runa runs show`
+* `cli/` — `runa new`, `runa generate agent`, `runa eval`, `runa test`, `runa runs show`/`list`/`pending`/`approve`/`deny`
 
 The core API is stable enough to build against, but Runa is still young — expect the surface to keep growing (durable/remote persistence backends, richer strategies, additional providers) without changing these foundations.
 
