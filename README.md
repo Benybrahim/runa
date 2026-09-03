@@ -63,7 +63,7 @@ runa/
 ├── approval.py       requires_approval — human-in-the-loop gate
 ├── observability/     timeline() + instrument() — reads Run.events
 ├── eval/              expect(run) + run_evals() — same code path as prod
-└── cli/               `runa new`, `runa generate agent`
+└── cli/               `runa new`, `runa generate agent`, `runa eval`, `runa runs show`
 ```
 
 Every layer is defined in terms of the `Run`: persistence stores it, background execution changes when it advances, observability reads its event log, evaluation replays and scores it. See [`docs/architecture.md`](docs/architecture.md) for the full layer-by-layer breakdown.
@@ -104,6 +104,8 @@ myapp/
 
 `runa generate agent Research` adds `app/agents/research_agent.py` with the `Agent` subclass skeleton. `main.py` is a plain script the developer runs (`python main.py`), not an import-time side effect of the `app` package — a `Provider` can do real work in `__init__` (e.g. `OpenAIProvider` builds a client that fails fast without credentials), so auto-configuring on `import app` would break importing an agent or tool module for anyone without a key set. Explicit beats implicit here (manifesto §7).
 
+`runa eval` imports `main.py` (so `configure()` runs) and every module under `app/evaluations/` — each must define module-level `agent` and `cases` — and runs them through `run_evals()`, printing a PASS/FAIL line per case (manifesto §12). `runa runs show <id>` looks the id up in the app's configured `RunStore` and prints `timeline(run)` (manifesto §11); it only finds runs across process boundaries once the app passes a durable store to `configure(provider=..., run_store=SQLiteRunStore(...))` — the default is in-memory.
+
 ## Project Status
 
 ✅ **MVP complete**
@@ -118,7 +120,7 @@ All layers described in [`docs/architecture.md`](docs/architecture.md) are imple
 * `background/` + `approval.py` — `run_later`, `Queue` (`InlineQueue`, `ThreadQueue`), `approve`/`deny`
 * `observability/` — `timeline()`, `instrument()`
 * `eval/` — `expect(run)`, `run_evals()`
-* `cli/` — `runa new`, `runa generate agent`
+* `cli/` — `runa new`, `runa generate agent`, `runa eval`, `runa runs show`
 
 The core API is stable enough to build against, but Runa is still young — expect the surface to keep growing (durable/remote persistence backends, richer strategies, additional providers) without changing these foundations.
 
