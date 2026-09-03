@@ -31,6 +31,12 @@ RUBRIC_NOT_HALLUCINATE = (
     "is unsupported by the transcript's tool results or by general "
     "knowledge — it does not invent details, sources, or outcomes."
 )
+RUBRIC_GOAL = (
+    "The run actually accomplishes what the input asked for: any tool "
+    "calls needed to satisfy the request were made and succeeded, and the "
+    "final result reflects a completed goal rather than a plausible-"
+    "sounding response that stops short of it."
+)
 
 _JUDGE_PROMPT = """You are grading a single AI agent run against one criterion.
 

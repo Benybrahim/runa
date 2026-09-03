@@ -10,8 +10,9 @@ share one vocabulary.
 `to_have_result`, `to_contain`, and `to_have_called` verify invariants —
 deterministic facts about the Run's shape, cheap enough for `test`-style
 checks. `to_satisfy` and its named rubrics (`to_be_helpful`, `to_be_factual`,
-`not_to_hallucinate`, see `eval/judge.py`) measure behavior — a real,
-non-deterministic model call grading what the agent actually did.
+`not_to_hallucinate`, `to_meet_the_goal`, see `eval/judge.py`) measure
+behavior — a real, non-deterministic model call grading what the agent
+actually did.
 """
 
 from collections.abc import Callable
@@ -23,6 +24,7 @@ from runa.config import default_provider
 from runa.core import Run, RunStatus
 from runa.eval.judge import (
     RUBRIC_FACTUAL,
+    RUBRIC_GOAL,
     RUBRIC_HELPFUL,
     RUBRIC_NOT_HALLUCINATE,
     Judge,
@@ -93,6 +95,9 @@ class Expectation:
 
     def not_to_hallucinate(self, *, judge: Judge | None = None) -> "Expectation":
         return self.to_satisfy(RUBRIC_NOT_HALLUCINATE, judge=judge)
+
+    def to_meet_the_goal(self, *, judge: Judge | None = None) -> "Expectation":
+        return self.to_satisfy(RUBRIC_GOAL, judge=judge)
 
 
 def expect(run: Run) -> Expectation:

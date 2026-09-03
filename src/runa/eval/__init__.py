@@ -8,6 +8,7 @@ from runa.eval.harness import (
 )
 from runa.eval.judge import (
     RUBRIC_FACTUAL,
+    RUBRIC_GOAL,
     RUBRIC_HELPFUL,
     RUBRIC_NOT_HALLUCINATE,
     Judge,
@@ -17,6 +18,7 @@ from runa.eval.judge import (
 
 __all__ = [
     "RUBRIC_FACTUAL",
+    "RUBRIC_GOAL",
     "RUBRIC_HELPFUL",
     "RUBRIC_NOT_HALLUCINATE",
     "EvalCase",

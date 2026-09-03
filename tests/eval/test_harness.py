@@ -3,6 +3,7 @@ import pytest
 from runa.agent import Agent
 from runa.core import Message, Role, Run, ToolCall
 from runa.eval import (
+    RUBRIC_GOAL,
     RUBRIC_HELPFUL,
     EvalCase,
     ExpectationFailed,
@@ -130,6 +131,31 @@ def test_to_be_helpful_grades_against_the_helpful_rubric():
     expect(run).to_be_helpful(judge=Judge(provider))
 
     assert RUBRIC_HELPFUL in provider.calls[0]["messages"][0].content
+
+
+def test_to_meet_the_goal_grades_against_the_goal_rubric():
+    run = Run(input="what's the capital of France?")
+    run.add_message(Message(role=Role.ASSISTANT, content="Paris."))
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="PASS")])
+
+    expect(run).to_meet_the_goal(judge=Judge(provider))
+
+    assert RUBRIC_GOAL in provider.calls[0]["messages"][0].content
+
+
+def test_to_meet_the_goal_fails_when_the_judge_returns_fail():
+    run = Run(input="book me a flight to Tokyo")
+    run.add_message(Message(role=Role.ASSISTANT, content="I can help with that!"))
+    judge = Judge(
+        FakeProvider(
+            responses=[
+                Message(role=Role.ASSISTANT, content="FAIL\nno flight was booked")
+            ]
+        )
+    )
+
+    with pytest.raises(ExpectationFailed, match="no flight was booked"):
+        expect(run).to_meet_the_goal(judge=judge)
 
 
 def test_run_evals_runs_every_case_even_after_a_failure():

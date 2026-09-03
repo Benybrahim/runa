@@ -40,6 +40,7 @@ from runa.core import (
 )
 from runa.eval import (
     RUBRIC_FACTUAL,
+    RUBRIC_GOAL,
     RUBRIC_HELPFUL,
     RUBRIC_NOT_HALLUCINATE,
     EvalCase,
@@ -137,6 +138,7 @@ __all__ = [
     "ProviderNotConfigured",
     "Queue",
     "RUBRIC_FACTUAL",
+    "RUBRIC_GOAL",
     "RUBRIC_HELPFUL",
     "RUBRIC_NOT_HALLUCINATE",
     "RetryStrategy",
