@@ -9,7 +9,6 @@ Read [RUNA.md](./RUNA.md) before making architectural or implementation decision
 - `make install` — uv sync
 - `make format` — ruff format
 - `make lint` / `make lint-fix` — ruff check
-- `make typecheck` — pyright
 - `make test` — pytest
 - `make check` — format + lint + test
 - `make hello` — run `examples/hello.py`
