@@ -25,6 +25,7 @@ from runa.runtime.strategy import (
     Fail,
     Strategy,
 )
+from runa.tool import ParentRunAware
 
 if TYPE_CHECKING:
     # Agent.run()/.run_later() construct an Executor, so a runtime import here
@@ -180,6 +181,8 @@ class Executor:
                 "AsyncExecutor instead of Executor"
             )
         tool_call.idempotent = tool.idempotent
+        if isinstance(tool, ParentRunAware):
+            tool.bind_parent_run_id(run.id)
         run.emit(EventType.TOOL_CALLED, tool=tool_call.name, tool_call_id=tool_call.id)
         tool_call.attempts += 1
 

@@ -307,6 +307,8 @@ def test_a_parent_agent_can_delegate_to_a_sub_agent():
     assert research_tool.last_run.result == "Fusion is promising."
     # the sub-agent's own Run carries its own identity, not the parent's
     assert research_tool.last_run.agent_name == "ResearchAgent"
+    # ...but records which Run delegated to it (architecture.md §15)
+    assert research_tool.last_run.parent_run_id == run.id
 
 
 def test_a_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
@@ -392,6 +394,7 @@ def test_a_parent_agent_can_delegate_to_a_sub_agent_via_async_executor():
     # stays reachable for direct inspection (manifesto §15)
     assert research_tool.last_run.status == RunStatus.COMPLETED
     assert research_tool.last_run.result == "Fusion is promising."
+    assert research_tool.last_run.parent_run_id == run.id
 
 
 def test_an_async_delegated_run_that_fails_surfaces_as_a_failed_tool_call():

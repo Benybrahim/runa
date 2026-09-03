@@ -78,6 +78,18 @@ def test_list_filters_by_agent_name():
     assert store.list(agent_name="ResearchAgent") == [research]
 
 
+def test_list_filters_by_parent_run_id():
+    store = InMemoryRunStore()
+    parent = Run(input="parent")
+    child = Run(input="child", parent_run_id=parent.id)
+    other = Run(input="unrelated")
+    store.save(parent)
+    store.save(child)
+    store.save(other)
+
+    assert store.list(parent_run_id=parent.id) == [child]
+
+
 def test_list_combines_status_and_since_filters():
     store = InMemoryRunStore()
     old_failed = Run(input="old", created_at=datetime.now(UTC) - timedelta(days=1))

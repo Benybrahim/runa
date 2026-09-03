@@ -3,8 +3,8 @@
 Same protocol as InMemoryRunStore — swapping one for the other is a
 one-line change at the call site (manifesto: real backends are swapped in
 via configuration, not code changes). A Run is stored as a single JSON blob
-per row; `status` is pulled out into its own column so it can be filtered
-without deserializing every row.
+per row; `status`, `agent_name`, and `parent_run_id` are pulled out into
+their own columns so `list()` can filter without deserializing every row.
 """
 
 import sqlite3
@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS runs (
     status TEXT NOT NULL,
     created_at TEXT NOT NULL,
     agent_name TEXT,
+    parent_run_id TEXT,
     data TEXT NOT NULL
 )
 """
@@ -34,16 +35,18 @@ class SQLiteRunStore:
 
     def save(self, run: Run) -> None:
         self._connection.execute(
-            "INSERT INTO runs (id, status, created_at, agent_name, data) "
-            "VALUES (?, ?, ?, ?, ?) "
+            "INSERT INTO runs "
+            "(id, status, created_at, agent_name, parent_run_id, data) "
+            "VALUES (?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(id) DO UPDATE SET status = excluded.status, "
             "created_at = excluded.created_at, agent_name = excluded.agent_name, "
-            "data = excluded.data",
+            "parent_run_id = excluded.parent_run_id, data = excluded.data",
             (
                 run.id,
                 run.status.value,
                 run.created_at.isoformat(),
                 run.agent_name,
+                run.parent_run_id,
                 run_to_json(run),
             ),
         )
@@ -61,6 +64,7 @@ class SQLiteRunStore:
         status: RunStatus | None = None,
         since: datetime | None = None,
         agent_name: str | None = None,
+        parent_run_id: str | None = None,
     ) -> list[Run]:
         query = "SELECT data FROM runs"
         clauses: list[str] = []
@@ -74,6 +78,9 @@ class SQLiteRunStore:
         if agent_name is not None:
             clauses.append("agent_name = ?")
             params.append(agent_name)
+        if parent_run_id is not None:
+            clauses.append("parent_run_id = ?")
+            params.append(parent_run_id)
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         rows = self._connection.execute(query, params).fetchall()

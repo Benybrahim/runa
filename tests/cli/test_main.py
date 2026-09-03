@@ -170,6 +170,32 @@ def test_runs_list_filters_by_agent_name(tmp_path, capsys):
     assert support.id not in output
 
 
+def test_runs_list_filters_by_parent_run_id(tmp_path, capsys):
+    project_dir = tmp_path / "acme"
+    main(["new", "acme"], cwd=tmp_path)
+    db_path = str(tmp_path / "runs.db")
+    (project_dir / "main.py").write_text(
+        "from runa import configure\n"
+        "from runa.persistence import SQLiteRunStore\n"
+        "from tests.fakes import FakeProvider\n\n"
+        "configure(provider=FakeProvider(responses=[]), "
+        f"run_store=SQLiteRunStore({db_path!r}))\n"
+    )
+    store = SQLiteRunStore(db_path)
+    parent = Run(input="parent")
+    child = Run(input="child", parent_run_id=parent.id)
+    store.save(parent)
+    store.save(child)
+    store.close()
+
+    exit_code = main(["runs", "list", "--parent-run-id", parent.id], cwd=project_dir)
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert child.id in output
+    assert parent.id not in output
+
+
 def test_runs_requires_an_action():
     with pytest.raises(SystemExit):
         main(["runs"])

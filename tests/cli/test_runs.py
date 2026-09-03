@@ -49,6 +49,24 @@ def test_show_run_renders_a_saved_runs_timeline(tmp_path):
     assert "run completed" in output
 
 
+def test_show_run_notes_delegation_when_the_run_has_a_parent(tmp_path):
+    project_dir, db_path = _scaffold_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    parent = Run(input="parent")
+    parent.start()
+    parent.complete(result="done")
+    child = Run(input="child", parent_run_id=parent.id)
+    child.start()
+    child.complete(result="done")
+    store.save(parent)
+    store.save(child)
+    store.close()
+
+    output = show_run(child.id, root=project_dir)
+
+    assert parent.id in output
+
+
 def test_show_run_raises_for_an_unknown_id(tmp_path):
     project_dir, _ = _scaffold_with_store(tmp_path)
 
@@ -103,6 +121,24 @@ def test_list_runs_filters_by_agent_name(tmp_path):
 
     assert research.id in output
     assert support.id not in output
+
+
+def test_list_runs_filters_by_parent_run_id(tmp_path):
+    project_dir, db_path = _scaffold_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    parent = Run(input="parent")
+    child = Run(input="child", parent_run_id=parent.id)
+    other = Run(input="unrelated")
+    store.save(parent)
+    store.save(child)
+    store.save(other)
+    store.close()
+
+    output = list_runs(root=project_dir, parent_run_id=parent.id)
+
+    assert child.id in output
+    assert other.id not in output
+    assert parent.id not in output
 
 
 def test_list_runs_filters_by_since(tmp_path):

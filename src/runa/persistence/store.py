@@ -20,6 +20,7 @@ class RunStore(Protocol):
         status: RunStatus | None = None,
         since: datetime | None = None,
         agent_name: str | None = None,
+        parent_run_id: str | None = None,
     ) -> list[Run]: ...
 
 
@@ -46,6 +47,7 @@ class InMemoryRunStore:
         status: RunStatus | None = None,
         since: datetime | None = None,
         agent_name: str | None = None,
+        parent_run_id: str | None = None,
     ) -> list[Run]:
         return [
             run
@@ -53,4 +55,5 @@ class InMemoryRunStore:
             if (status is None or run.status == status)
             and (since is None or run.created_at >= since)
             and (agent_name is None or run.agent_name == agent_name)
+            and (parent_run_id is None or run.parent_run_id == parent_run_id)
         ]

@@ -33,6 +33,7 @@ from runa.runtime.strategy import (
     Fail,
     Strategy,
 )
+from runa.tool import ParentRunAware
 
 if TYPE_CHECKING:
     # Agent.run_async() constructs an AsyncExecutor, so a runtime import here
@@ -193,6 +194,8 @@ class AsyncExecutor:
         """Run one tool call — see `Executor._call_tool` for the Artifact dispatch."""
         tool = agent.resolved_tools()[tool_call.name]
         tool_call.idempotent = tool.idempotent
+        if isinstance(tool, ParentRunAware):
+            tool.bind_parent_run_id(run.id)
         run.emit(EventType.TOOL_CALLED, tool=tool_call.name, tool_call_id=tool_call.id)
         tool_call.attempts += 1
 

@@ -491,3 +491,36 @@ def test_strategy_protocol_is_satisfiable_without_inheritance():
 
     assert result.status == RunStatus.COMPLETED
     assert result.result == "done"
+
+
+def test_parent_run_aware_tool_is_bound_before_it_is_called():
+    class RecordsParent(Tool):
+        def __init__(self) -> None:
+            self.seen_parent_run_id: str | None = None
+
+        def bind_parent_run_id(self, run_id: str) -> None:
+            self.seen_parent_run_id = run_id
+
+        def call(self) -> str:
+            return self.seen_parent_run_id or "unbound"
+
+    recorder = RecordsParent()
+
+    class RecordingAgent(Agent):
+        tools = [recorder]
+
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="RecordsParent", arguments={})],
+            ),
+            Message(role=Role.ASSISTANT, content="done"),
+        ]
+    )
+    run = Run(input="x")
+
+    result = Executor(provider).run(RecordingAgent(), run)
+
+    assert result.status == RunStatus.COMPLETED
+    assert recorder.seen_parent_run_id == run.id

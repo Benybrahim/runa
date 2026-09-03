@@ -5,7 +5,15 @@ import enum
 import inspect
 import types
 from collections.abc import Callable
-from typing import Any, Union, get_args, get_origin, get_type_hints
+from typing import (
+    Any,
+    Protocol,
+    Union,
+    get_args,
+    get_origin,
+    get_type_hints,
+    runtime_checkable,
+)
 
 _JSON_TYPES: dict[type, str] = {
     str: "string",
@@ -92,6 +100,28 @@ def _schema_from_signature(
             required.append(param_name)
 
     return {"type": "object", "properties": properties, "required": required}
+
+
+@runtime_checkable
+class ParentRunAware(Protocol):
+    """A Tool that wants to know which Run it's being called from.
+
+    A separate, optional protocol — like `StreamingProvider`/`DurableQueue`
+    elsewhere in Runa — not a method every Tool must implement. The Executor
+    calls `bind_parent_run_id()` right before `call()` for any Tool that
+    satisfies this, structurally, with no base class to opt into.
+    `DelegateTool`/`AsyncDelegateTool` (see agent.py) use it to stamp the
+    sub-agent's Run with `parent_run_id`, so delegation lineage
+    (architecture.md §15) survives being written to a RunStore and read back
+    later — not just while the parent tool instance stays in memory.
+
+    Deliberately narrower than handing a Tool the whole parent `Run`: a
+    delegate only needs the parent's id for lineage, not read access to its
+    state or messages (manifesto §8, "intelligence does not imply
+    authority").
+    """
+
+    def bind_parent_run_id(self, run_id: str) -> None: ...
 
 
 class Tool:

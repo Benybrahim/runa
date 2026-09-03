@@ -122,6 +122,32 @@ def test_list_filters_by_agent_name():
     assert [run.id for run in matches] == [research.id]
 
 
+def test_round_trips_parent_run_id():
+    store = SQLiteRunStore(":memory:")
+    parent = Run(input="parent")
+    child = Run(input="child", parent_run_id=parent.id)
+
+    store.save(parent)
+    store.save(child)
+    loaded = store.get(child.id)
+
+    assert loaded.parent_run_id == parent.id
+
+
+def test_list_filters_by_parent_run_id():
+    store = SQLiteRunStore(":memory:")
+    parent = Run(input="parent")
+    child = Run(input="child", parent_run_id=parent.id)
+    other = Run(input="unrelated")
+    store.save(parent)
+    store.save(child)
+    store.save(other)
+
+    matches = store.list(parent_run_id=parent.id)
+
+    assert [run.id for run in matches] == [child.id]
+
+
 def test_list_filters_by_status():
     store = SQLiteRunStore(":memory:")
     completed = Run(input="one")

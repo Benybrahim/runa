@@ -237,6 +237,9 @@ class DelegateTool(Tool):
     — the two are separate executions — but it stays reachable on
     `self.last_run` after each call, as the escape hatch for inspecting a
     delegated run directly (manifesto §15), e.g. `timeline(tool.last_run)`.
+    Its `parent_run_id` also records the parent Run's id (architecture.md
+    §15), so the lineage survives being persisted and read back later, not
+    just while `self` stays in memory — see `ParentRunAware`.
     """
 
     def __init__(
@@ -252,10 +255,16 @@ class DelegateTool(Tool):
         self.description = description or agent_cls.instructions
         self._executor = executor
         self.last_run: Run | None = None
+        self._parent_run_id: str | None = None
+
+    def bind_parent_run_id(self, run_id: str) -> None:
+        self._parent_run_id = run_id
 
     def call(self, input: str) -> Any:
         executor = self._executor or Executor(provider=default_provider())
-        run = executor.run(self._agent_cls(), Run(input=input))
+        run = executor.run(
+            self._agent_cls(), Run(input=input, parent_run_id=self._parent_run_id)
+        )
         self.last_run = run
         if run.status != RunStatus.COMPLETED:
             raise RuntimeError(
@@ -280,7 +289,8 @@ class AsyncDelegateTool(Tool):
     Otherwise identical to `DelegateTool`: `run.result` becomes the tool's
     output, a non-completed sub-run raises (surfacing as an ordinary
     `TOOL_FAILED` event on the parent), and the sub-agent's own `Run` stays
-    reachable on `self.last_run` for direct inspection (manifesto §15).
+    reachable on `self.last_run` for direct inspection (manifesto §15), with
+    `parent_run_id` recording the lineage (see `DelegateTool`).
     """
 
     def __init__(
@@ -296,10 +306,16 @@ class AsyncDelegateTool(Tool):
         self.description = description or agent_cls.instructions
         self._executor = executor
         self.last_run: Run | None = None
+        self._parent_run_id: str | None = None
+
+    def bind_parent_run_id(self, run_id: str) -> None:
+        self._parent_run_id = run_id
 
     async def call(self, input: str) -> Any:
         executor = self._executor or AsyncExecutor(provider=default_async_provider())
-        run = await executor.run(self._agent_cls(), Run(input=input))
+        run = await executor.run(
+            self._agent_cls(), Run(input=input, parent_run_id=self._parent_run_id)
+        )
         self.last_run = run
         if run.status != RunStatus.COMPLETED:
             raise RuntimeError(
