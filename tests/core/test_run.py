@@ -17,6 +17,12 @@ def test_new_run_starts_created():
     assert run.events == []
 
 
+def test_new_run_has_no_agent_provenance_until_stamped():
+    run = Run(input="hello")
+    assert run.agent_id is None
+    assert run.agent_version is None
+
+
 def test_start_transitions_to_running_and_emits_event():
     run = Run(input="hello")
     run.start()

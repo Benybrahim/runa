@@ -68,6 +68,16 @@ def test_list_filters_by_since():
     assert store.list(since=datetime.now(UTC) - timedelta(hours=1)) == [recent]
 
 
+def test_list_filters_by_agent_id():
+    store = InMemoryRunStore()
+    research = Run(input="one", agent_id="ResearchAgent")
+    support = Run(input="two", agent_id="SupportAgent")
+    store.save(research)
+    store.save(support)
+
+    assert store.list(agent_id="ResearchAgent") == [research]
+
+
 def test_list_combines_status_and_since_filters():
     store = InMemoryRunStore()
     old_failed = Run(input="old", created_at=datetime.now(UTC) - timedelta(days=1))

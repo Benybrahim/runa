@@ -117,6 +117,49 @@ def test_run_uses_the_app_default_provider_when_no_executor_is_given():
     assert run.result == "hi"
 
 
+def test_agent_name_defaults_to_the_class_name():
+    class ResearchAgent(Agent):
+        pass
+
+    assert ResearchAgent.agent_name() == "ResearchAgent"
+
+
+def test_agent_name_can_be_overridden():
+    class ResearchAgent(Agent):
+        name = "researcher-v2"
+
+    assert ResearchAgent.agent_name() == "researcher-v2"
+
+
+def test_run_is_stamped_with_agent_identity_and_version():
+    class ResearchAgent(Agent):
+        version = "1.2.0"
+
+    provider = FakeProvider([Message(role=Role.ASSISTANT, content="hi")])
+
+    run = ResearchAgent.run("hello", executor=Executor(provider=provider))
+
+    assert run.agent_id == "ResearchAgent"
+    assert run.agent_version == "1.2.0"
+
+
+def test_run_async_and_run_later_also_stamp_agent_identity():
+    class ResearchAgent(Agent):
+        pass
+
+    configure(provider=FakeProvider([Message(role=Role.ASSISTANT, content="hi")]))
+    later = ResearchAgent.run_later("hello")
+    assert later.agent_id == "ResearchAgent"
+
+    async_provider = FakeAsyncProvider([Message(role=Role.ASSISTANT, content="hi")])
+    async_run = asyncio.run(
+        ResearchAgent.run_async(
+            "hello", executor=AsyncExecutor(provider=async_provider)
+        )
+    )
+    assert async_run.agent_id == "ResearchAgent"
+
+
 def test_run_raises_if_no_default_provider_and_no_executor(monkeypatch):
     monkeypatch.setattr("runa.config._default_provider", None)
 
@@ -262,6 +305,8 @@ def test_a_parent_agent_can_delegate_to_a_sub_agent():
     # stays reachable for direct inspection (manifesto §15)
     assert research_tool.last_run.status == RunStatus.COMPLETED
     assert research_tool.last_run.result == "Fusion is promising."
+    # the sub-agent's own Run carries its own identity, not the parent's
+    assert research_tool.last_run.agent_id == "ResearchAgent"
 
 
 def test_a_delegated_run_that_fails_surfaces_as_a_failed_tool_call():

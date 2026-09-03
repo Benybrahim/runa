@@ -50,13 +50,16 @@ def _build_parser() -> argparse.ArgumentParser:
     runs_show_parser.add_argument("run_id")
 
     runs_list_parser = runs_subparsers.add_parser(
-        "list", help="List Runs, optionally filtered by status/since"
+        "list", help="List Runs, optionally filtered by status/since/agent-id"
     )
     runs_list_parser.add_argument(
         "--status", default=None, help="e.g. completed, failed, awaiting_approval"
     )
     runs_list_parser.add_argument(
         "--since", default=None, help="ISO 8601 timestamp; only Runs at or after it"
+    )
+    runs_list_parser.add_argument(
+        "--agent-id", default=None, help="e.g. ResearchAgent — see Agent.name"
     )
 
     runs_subparsers.add_parser("pending", help="List Runs paused awaiting approval")
@@ -114,7 +117,14 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
         return 0
 
     if args.action == "list":
-        print(list_runs(root=cwd, status=args.status, since=args.since))
+        print(
+            list_runs(
+                root=cwd,
+                status=args.status,
+                since=args.since,
+                agent_id=args.agent_id,
+            )
+        )
         return 0
 
     if args.action == "pending":

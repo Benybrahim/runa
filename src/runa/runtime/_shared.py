@@ -14,6 +14,12 @@ if TYPE_CHECKING:
 
 
 def seed_run(agent: "Agent", run: Run) -> None:
+    # Stamped here, not in Agent.run()/run_later()/DelegateTool, so every
+    # Run gets provenance (architecture.md §14) regardless of how it was
+    # constructed — including a Run driven straight through Executor as
+    # an escape hatch, and a sub-agent's own Run under delegation.
+    run.agent_id = agent.agent_name()
+    run.agent_version = agent.version
     if agent.instructions:
         run.add_message(Message(role=Role.SYSTEM, content=agent.instructions))
     if run.conversation is not None:

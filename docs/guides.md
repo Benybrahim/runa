@@ -270,8 +270,7 @@ For actions that may be retried, define idempotency semantics in the tool:
 class ChargeCard(Tool):
     idempotent = True  # safe to call again with the same arguments
 
-    def call(self, order_id: str, amount: float) -> str:
-        ...
+    def call(self, order_id: str, amount: float) -> str: ...
 ```
 
 A tool call that raises leaves its effect unknown — there is no way to tell whether the side effect happened before the exception did. `RetryStrategy` only retries a failed call when its tool opts in with `idempotent = True`; otherwise it fails on the first error rather than risking a duplicate charge or a duplicate email.

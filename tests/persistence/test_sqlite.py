@@ -99,6 +99,29 @@ def test_round_trips_messages_tool_calls_artifacts_and_events():
     assert isinstance(loaded.events[0], Event)
 
 
+def test_round_trips_agent_identity_and_version():
+    store = SQLiteRunStore(":memory:")
+    run = Run(input="hi", agent_id="ResearchAgent", agent_version="1.2.0")
+
+    store.save(run)
+    loaded = store.get(run.id)
+
+    assert loaded.agent_id == "ResearchAgent"
+    assert loaded.agent_version == "1.2.0"
+
+
+def test_list_filters_by_agent_id():
+    store = SQLiteRunStore(":memory:")
+    research = Run(input="one", agent_id="ResearchAgent")
+    support = Run(input="two", agent_id="SupportAgent")
+    store.save(research)
+    store.save(support)
+
+    matches = store.list(agent_id="ResearchAgent")
+
+    assert [run.id for run in matches] == [research.id]
+
+
 def test_list_filters_by_status():
     store = SQLiteRunStore(":memory:")
     completed = Run(input="one")

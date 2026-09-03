@@ -88,6 +88,8 @@ def run_to_dict(run: Run) -> dict[str, Any]:
 
     return {
         "id": run.id,
+        "agent_id": run.agent_id,
+        "agent_version": run.agent_version,
         "input": run.input,
         "context": run.context,
         "state": dict(run.state),
@@ -137,6 +139,8 @@ def run_from_dict(data: dict[str, Any]) -> Run:
 
     return Run(
         id=data["id"],
+        agent_id=data["agent_id"],
+        agent_version=data["agent_version"],
         input=data["input"],
         context=data["context"],
         state=RunState(data["state"]),

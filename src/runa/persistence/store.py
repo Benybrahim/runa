@@ -15,7 +15,11 @@ class RunStore(Protocol):
     def save(self, run: Run) -> None: ...
     def get(self, run_id: str) -> Run | None: ...
     def list(
-        self, *, status: RunStatus | None = None, since: datetime | None = None
+        self,
+        *,
+        status: RunStatus | None = None,
+        since: datetime | None = None,
+        agent_id: str | None = None,
     ) -> list[Run]: ...
 
 
@@ -37,11 +41,16 @@ class InMemoryRunStore:
         return self._runs.get(run_id)
 
     def list(
-        self, *, status: RunStatus | None = None, since: datetime | None = None
+        self,
+        *,
+        status: RunStatus | None = None,
+        since: datetime | None = None,
+        agent_id: str | None = None,
     ) -> list[Run]:
         return [
             run
             for run in self._runs.values()
             if (status is None or run.status == status)
             and (since is None or run.created_at >= since)
+            and (agent_id is None or run.agent_id == agent_id)
         ]

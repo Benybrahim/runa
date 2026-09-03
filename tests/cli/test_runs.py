@@ -90,6 +90,21 @@ def test_list_runs_filters_by_status(tmp_path):
     assert completed.id not in output
 
 
+def test_list_runs_filters_by_agent_id(tmp_path):
+    project_dir, db_path = _scaffold_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    research = Run(input="one", agent_id="ResearchAgent")
+    support = Run(input="two", agent_id="SupportAgent")
+    store.save(research)
+    store.save(support)
+    store.close()
+
+    output = list_runs(root=project_dir, agent_id="ResearchAgent")
+
+    assert research.id in output
+    assert support.id not in output
+
+
 def test_list_runs_filters_by_since(tmp_path):
     project_dir, db_path = _scaffold_with_store(tmp_path)
     store = SQLiteRunStore(db_path)

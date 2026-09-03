@@ -48,10 +48,23 @@ class Agent:
     tools: ClassVar[list[ToolEntry]] = []
     requires_approval: ClassVar[list[ToolEntry]] = []
     model: ClassVar[str | None] = None
+    name: ClassVar[str | None] = None
+    version: ClassVar[str | None] = None
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         cls.approval_tool_names()  # resolved eagerly so mistakes surface at import time
+
+    @classmethod
+    def agent_name(cls) -> str:
+        """Stable identity stamped onto every Run this Agent produces.
+
+        Defaults to the class name — same fallback `Tool.tool_name()` uses
+        — so provenance (architecture.md §14) works without any
+        configuration; override `name` when the class name isn't the
+        identity you want persisted (e.g. across a rename).
+        """
+        return cls.name or cls.__name__
 
     @classmethod
     def resolved_tools(cls) -> dict[str, Tool]:
