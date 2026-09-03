@@ -9,6 +9,7 @@ from runa.runtime.async_executor import AsyncExecutor
 from runa.runtime.executor import Executor
 from runa.runtime.provider import StreamChunk
 from runa.runtime.retry import RetryStrategy
+from runa.runtime.strategy import CallModel
 from runa.tool import Tool
 from tests.fakes import (
     FakeAsyncProvider,
@@ -93,6 +94,22 @@ def test_async_executor_records_an_artifact_a_tool_returns():
     assert isinstance(artifact, DataArtifact)
     tool_message = next(m for m in run.messages if m.role == Role.TOOL)
     assert tool_message.content == artifact.summary()
+
+
+def test_async_timeout_fails_the_run_instead_of_hanging_forever():
+    class NeverEndingStrategy:
+        def step(self, run):
+            return CallModel()
+
+    provider = FakeAsyncProvider(
+        responses=[Message(role=Role.ASSISTANT, content="ignored")] * 100
+    )
+    executor = AsyncExecutor(provider, strategy=NeverEndingStrategy(), timeout=0.0)
+
+    run = asyncio.run(executor.run(WeatherAgent(), Run(input="loop forever")))
+
+    assert run.status == RunStatus.FAILED
+    assert "timeout" in run.events[-1].data["error"]
 
 
 def test_cancel_requested_before_the_loop_starts_stops_the_run_immediately():

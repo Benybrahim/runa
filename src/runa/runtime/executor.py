@@ -1,6 +1,7 @@
 """Executor: drives a Strategy against a Run, emitting Events as it acts."""
 
 import inspect
+import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -48,6 +49,13 @@ class Executor:
     rather than mid-call; see `Run.request_cancel()` for why that flag, and
     not calling `run.cancel()` directly, is the safe way to ask.
 
+    `timeout`, like `max_steps`, is a per-call budget checked at that same
+    step boundary — not a preemptive, mid-call deadline. It bounds one
+    `run()` call's wall-clock time (from when this call starts driving the
+    Run, not from `Run.created_at`), so a Run resumed later after a long
+    pause (background handoff, approval) gets a fresh budget rather than
+    inheriting elapsed wait time. `None` (the default) means no timeout.
+
     Agent hooks fire in one fixed order: `before_run` and `plan` once, before
     the first Strategy step; `review` once, when the Strategy decides to
     Complete — its return value replaces the Strategy's draft result unless
@@ -68,10 +76,12 @@ class Executor:
         strategy: Strategy | None = None,
         *,
         max_steps: int = 50,
+        timeout: float | None = None,
     ) -> None:
         self.provider = provider
         self.strategy = strategy or DefaultStrategy()
         self.max_steps = max_steps
+        self.timeout = timeout
 
     def run(
         self,
@@ -97,6 +107,8 @@ class Executor:
         elif run.status in (RunStatus.PAUSED, RunStatus.AWAITING_APPROVAL):
             run.resume()
 
+        deadline = None if self.timeout is None else time.monotonic() + self.timeout
+
         steps = 0
         while run.status == RunStatus.RUNNING:
             if run.cancel_requested:
@@ -104,6 +116,9 @@ class Executor:
                 break
             if steps >= self.max_steps:
                 run.fail(error=f"exceeded max_steps ({self.max_steps})")
+                break
+            if deadline is not None and time.monotonic() >= deadline:
+                run.fail(error=f"exceeded timeout ({self.timeout}s)")
                 break
             steps += 1
 

@@ -8,6 +8,7 @@ of one at a time.
 
 import asyncio
 import inspect
+import time
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
@@ -61,7 +62,8 @@ class AsyncExecutor:
     async tool outright rather than silently mishandling it.
 
     Also checks `run.cancel_requested` once per step, exactly like
-    `Executor` — see `Run.request_cancel()`.
+    `Executor` — see `Run.request_cancel()`. `timeout` is the same per-call,
+    step-boundary wall-clock budget as `Executor.timeout` — see there.
     """
 
     def __init__(
@@ -70,10 +72,12 @@ class AsyncExecutor:
         strategy: Strategy | None = None,
         *,
         max_steps: int = 50,
+        timeout: float | None = None,
     ) -> None:
         self.provider = provider
         self.strategy = strategy or DefaultStrategy()
         self.max_steps = max_steps
+        self.timeout = timeout
 
     async def run(
         self,
@@ -96,6 +100,8 @@ class AsyncExecutor:
         elif run.status in (RunStatus.PAUSED, RunStatus.AWAITING_APPROVAL):
             run.resume()
 
+        deadline = None if self.timeout is None else time.monotonic() + self.timeout
+
         steps = 0
         while run.status == RunStatus.RUNNING:
             if run.cancel_requested:
@@ -103,6 +109,9 @@ class AsyncExecutor:
                 break
             if steps >= self.max_steps:
                 run.fail(error=f"exceeded max_steps ({self.max_steps})")
+                break
+            if deadline is not None and time.monotonic() >= deadline:
+                run.fail(error=f"exceeded timeout ({self.timeout}s)")
                 break
             steps += 1
 

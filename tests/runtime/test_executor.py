@@ -230,6 +230,33 @@ def test_max_steps_fails_the_run_instead_of_looping_forever():
     assert "max_steps" in result.events[-1].data["error"]
 
 
+def test_timeout_fails_the_run_instead_of_hanging_forever():
+    class NeverEndingStrategy:
+        def step(self, run):
+            return CallModel()
+
+    provider = FakeProvider(
+        responses=[Message(role=Role.ASSISTANT, content="ignored")] * 100
+    )
+    executor = Executor(provider, strategy=NeverEndingStrategy(), timeout=0.0)
+    run = Run(input="loop forever")
+
+    result = executor.run(WeatherAgent(), run)
+
+    assert result.status == RunStatus.FAILED
+    assert "timeout" in result.events[-1].data["error"]
+
+
+def test_timeout_does_not_interfere_with_a_normal_run():
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
+    executor = Executor(provider, timeout=60)
+
+    result = executor.run(WeatherAgent(), Run(input="hi"))
+
+    assert result.status == RunStatus.COMPLETED
+    assert result.result == "ok"
+
+
 def test_cancel_requested_before_the_loop_starts_stops_the_run_immediately():
     class CancellingAgent(WeatherAgent):
         def before_run(self, run):

@@ -300,6 +300,20 @@ runa runs cancel <run_id>
 
 ---
 
+# Bounding a Run's Wall-Clock Time
+
+`max_steps` bounds how many steps a Run can take; `timeout` bounds how long a single `run()` call may take:
+
+```python
+executor = Executor(provider, timeout=30)  # seconds
+```
+
+Like `max_steps`, this is checked at the step boundary, not preemptively — a slow model or tool call already in flight still finishes before the next check can fail the Run. A Run that exceeds either bound fails with a clear error rather than hanging or looping forever.
+
+The budget is per `run()` call, not per Run: resuming a paused Run (background handoff, approval) starts a fresh timeout rather than counting time spent waiting.
+
+---
+
 # Making External Actions Safe
 
 When an Agent can change the world, make the boundary explicit.

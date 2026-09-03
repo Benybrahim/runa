@@ -170,6 +170,8 @@ Every `Run` moves through the same state machine — `Created → Queued → Run
 
 Cancellation follows the same rule but needs one more step: only the thread actually driving a Run may call `run.cancel()` safely, since it's also mutating `.status`/`.events`. `run.request_cancel()` sets a plain flag any thread can set anytime; `Executor`/`AsyncExecutor` check it once per step and cancel the Run themselves, at the next step boundary. A Run with no live Executor (paused, awaiting approval, or still queued in a `RunStore`) has no thread to race, so `run.cancel()` — or `runa runs cancel <id>` — works directly there.
 
+`Executor(provider, timeout=30)`/`AsyncExecutor(provider, timeout=30)` bound a `run()` call's wall-clock time the same way `max_steps` bounds its step count — checked at that same step boundary, not preemptively, so a slow call already in flight still finishes before the next check can fail the Run. The budget is per `run()` call: resuming a paused Run starts fresh rather than counting time spent waiting.
+
 ### Policy runs before approval
 
 `requires_approval` always defers to a human. `Agent.policies` is the earlier, programmatic check for rules the application can decide on its own — a plain `(run, tool_call) -> bool` — so a call can be denied outright without ever pausing a Run for a person:
