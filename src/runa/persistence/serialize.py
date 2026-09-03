@@ -84,6 +84,15 @@ def _json_safe(value: Any) -> Any:
     return value
 
 
+def _json_safe_dict(mapping: dict[str, Any]) -> dict[str, Any]:
+    """`_json_safe` applied per value — for State/Context, the other places
+    the docs invite application code to put an arbitrary object (e.g.
+    `run.state.findings`, `run.context.resources`). One bad value falls back
+    to its `str()`; the rest of the mapping still round-trips normally.
+    """
+    return {key: _json_safe(value) for key, value in mapping.items()}
+
+
 def _tool_call_to_dict(tool_call: ToolCall) -> dict[str, Any]:
     return {
         "id": tool_call.id,
@@ -112,8 +121,8 @@ def run_to_dict(run: Run) -> dict[str, Any]:
         "agent_version": run.agent_version,
         "parent_run_id": run.parent_run_id,
         "input": run.input,
-        "context": dict(run.context),
-        "state": dict(run.state),
+        "context": _json_safe_dict(run.context),
+        "state": _json_safe_dict(run.state),
         "messages": [
             {
                 "id": message.id,
@@ -198,7 +207,7 @@ def conversation_to_dict(conversation: Conversation) -> dict[str, Any]:
     """Convert a Conversation into a plain, JSON-serializable dict."""
     return {
         "id": conversation.id,
-        "state": dict(conversation.state),
+        "state": _json_safe_dict(conversation.state),
         "messages": [
             {
                 "id": message.id,

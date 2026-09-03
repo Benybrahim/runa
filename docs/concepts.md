@@ -147,9 +147,15 @@ run.context.policies = ["no refunds over $500 without approval"]
 
 In Runa's implementation, `Run.context` is a `Context` — the same
 attribute-accessible container `RunState`/`ConversationState` use for
-State (see below), populated explicitly by application code today. Runa
-does not yet auto-assemble it from Conversation/Resources/Policies/Run
-state; that remains an application-level pattern, not framework machinery.
+State (see below), populated explicitly by application code. Runa does not
+auto-assemble it from Conversation/Resources/Policies/Run state; that
+remains an application-level pattern, not framework machinery.
+
+A non-empty `Context` does reach the Agent, though: it's rendered as a
+second system message, right after `Agent.instructions`, before every Run
+— a generic listing of whatever keys the application set, since Context is
+free-form and no key name is treated specially. An empty `Context` (the
+default) adds nothing to what the Agent sees.
 
 ---
 

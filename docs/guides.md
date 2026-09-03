@@ -63,6 +63,26 @@ Do not turn durable application concepts into “agent memory” merely because 
 
 ---
 
+# Giving the Agent Context
+
+Populate `run.context` before running the Agent when it needs information the application already has:
+
+```python
+run = Run(input="What's the refund policy on order A123?")
+run.context.resources = [kb_article]
+run.context.policies = ["no refunds over $500 without approval"]
+
+ResearchAgent.run(run.input, executor=Executor(provider=..., ...))
+```
+
+A non-empty Context reaches the Agent as a second system message, right after `Agent.instructions` — a plain listing of whatever keys are set. No key name is treated specially; Context stays free-form, the same way Run State and Conversation State do.
+
+An empty Context (the default) adds nothing — most simple agents never need one.
+
+If a different shape belongs in the prompt than the default listing gives, don't populate `run.context`; build the message directly in `before_run`/`plan` instead.
+
+---
+
 # Sharing State Across Runs
 
 Create a Conversation when multiple Runs belong to the same interaction:

@@ -1,4 +1,4 @@
-from runa.core import Conversation, Message, Role, ToolCall
+from runa.core import Conversation, Message, Role, TextArtifact, ToolCall
 from runa.persistence import SQLiteConversationStore
 
 
@@ -13,6 +13,18 @@ def test_save_and_get_round_trips_a_conversation():
     assert loaded is not conversation
     assert loaded.id == conversation.id
     assert loaded.state.topic == "refunds"
+
+
+def test_round_trips_state_with_a_non_json_safe_value():
+    store = SQLiteConversationStore(":memory:")
+    conversation = Conversation()
+    artifact = TextArtifact(text="a finding")
+    conversation.state.findings = [artifact]
+
+    store.save(conversation)
+    loaded = store.get(conversation.id)
+
+    assert loaded.state.findings == str([artifact])
 
 
 def test_get_missing_conversation_returns_none():

@@ -127,6 +127,22 @@ def test_round_trips_a_tool_calls_non_json_safe_result_as_a_string():
     assert loaded.tool_calls[0].result == str(artifact)
 
 
+def test_round_trips_state_and_context_with_a_non_json_safe_value():
+    # Same concern as ToolCall.result, but for the other places the docs
+    # invite an arbitrary object into: run.state and run.context.
+    store = SQLiteRunStore(":memory:")
+    run = Run(input="hi")
+    artifact = TextArtifact(text="a finding")
+    run.state.findings = [artifact]
+    run.context.resources = ["a plain string"]
+
+    store.save(run)
+    loaded = store.get(run.id)
+
+    assert loaded.state.findings == str([artifact])
+    assert loaded.context.resources == ["a plain string"]
+
+
 def test_round_trips_agent_nameentity_and_version():
     store = SQLiteRunStore(":memory:")
     run = Run(input="hi", agent_name="ResearchAgent", agent_version="1.2.0")

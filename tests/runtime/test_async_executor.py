@@ -58,6 +58,20 @@ def test_async_executor_runs_a_full_tool_use_loop():
     ]
 
 
+def test_async_populated_context_is_seeded_as_a_system_message():
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
+    executor = AsyncExecutor(provider)
+    agent = WeatherAgent()
+    run = Run(input="hello")
+    run.context.resources = ["policy: refunds within 30 days"]
+
+    result = asyncio.run(executor.run(agent, run))
+
+    system_messages = [m.content for m in result.messages if m.role == Role.SYSTEM]
+    assert system_messages[0] == "Answer weather questions."
+    assert "resources: ['policy: refunds within 30 days']" in system_messages[1]
+
+
 def test_async_executor_answers_directly_without_tools():
     provider = FakeAsyncProvider(
         responses=[Message(role=Role.ASSISTANT, content="No tools needed.")]

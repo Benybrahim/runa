@@ -148,6 +148,18 @@ class ExtractInvoiceData(Tool):
 
 The model still sees a plain-text tool result — `Artifact.summary()` renders it (each subclass overrides it sensibly; override it yourself on a custom Artifact for custom wording).
 
+### Context reaches the Agent automatically
+
+State is what the application owns; Context is what the Agent is given (manifesto §7). Populate `run.context` before running, and it's seeded as a second system message — right after `Agent.instructions` — before the model ever sees the input:
+
+```python
+run = Run(input="What's the refund policy on order A123?")
+run.context.resources = [kb_article]
+run.context.policies = ["no refunds over $500 without approval"]
+```
+
+Context is deliberately free-form — every key reaches the Agent the same generic way, with nothing in the framework interpreting specific key names. An empty Context (the default) adds nothing, so the common case is unchanged; an application whose Context needs a different shape in the prompt keeps the escape hatch of building the message directly in `before_run`/`plan` instead.
+
 ### Planning and reflection are hooks, not a new subsystem
 
 Manifesto §6 lists `before_run`, `plan`, `review`, and `after_run` as opt-in `Agent` hooks without prescribing what they do — "the framework standardizes execution without standardizing thought." `plan()` runs once before the tool-use loop starts and can freely mutate `run.state`/`run.messages`, so whatever it adds is visible to every step that follows. `review()` runs once when the Strategy is about to complete the Run, and its return value — if not `None` — replaces the Strategy's draft result, which is what makes it useful for reflection rather than just observation:

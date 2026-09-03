@@ -109,6 +109,36 @@ def test_executor_runs_every_tool_call_requested_in_a_single_turn():
     assert len(provider.calls) == 2
 
 
+def test_populated_context_is_seeded_as_a_system_message():
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
+    executor = Executor(provider)
+    agent = WeatherAgent()
+    run = Run(input="hello")
+    run.context.resources = ["policy: refunds within 30 days"]
+
+    result = executor.run(agent, run)
+
+    # instructions, then context, as separate system messages — both reach
+    # the model (the fake provider just records whatever it was given)
+    system_messages = [m.content for m in result.messages if m.role == Role.SYSTEM]
+    assert system_messages[0] == "Answer weather questions."
+    assert "resources: ['policy: refunds within 30 days']" in system_messages[1]
+
+
+def test_empty_context_adds_no_extra_message():
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
+    executor = Executor(provider)
+    agent = WeatherAgent()
+    run = Run(input="hello")
+
+    result = executor.run(agent, run)
+
+    # exactly one SYSTEM message (instructions) — no second one for context
+    system_messages = [m for m in result.messages if m.role == Role.SYSTEM]
+    assert len(system_messages) == 1
+    assert system_messages[0].content == "Answer weather questions."
+
+
 def test_executor_answers_directly_without_tools():
     provider = FakeProvider(
         responses=[Message(role=Role.ASSISTANT, content="No tools needed.")]
