@@ -13,7 +13,7 @@ import pytest
 
 from runa import Executor, Judge, Run, RunStatus, approve, configure, run_evals
 from runa.core import Message, Role, ToolCall
-from tests.fakes import FakeProvider
+from tests.fakes import FakeProvider, FakeStreamingProvider
 
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 
@@ -168,6 +168,30 @@ def test_plan_and_review_example():
     assert run.result == "revised answer"
     assert run.state.plan == "1. search\n2. summarize"
     assert len(run.artifacts) == 1
+
+
+def test_streaming_example():
+    streaming = _load("streaming")
+    provider = FakeStreamingProvider(
+        [
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="get_weather", arguments={"city": "Tokyo"})],
+            ),
+            Message(role=Role.ASSISTANT, content="Tokyo is sunny."),
+        ]
+    )
+    seen: list[str] = []
+
+    run = Executor(provider).run(
+        streaming.WeatherAgent(),
+        Run(input="What's the weather in Tokyo?"),
+        on_chunk=lambda chunk: seen.append(chunk.delta),
+    )
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "Tokyo is sunny."
+    assert "".join(seen) == "Tokyo is sunny."
 
 
 def test_delegate_example():

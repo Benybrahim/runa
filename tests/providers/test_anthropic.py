@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 from runa.core import Message, Role, ToolCall
 from runa.providers.anthropic import (
+    AnthropicProvider,
     AsyncAnthropicProvider,
     from_wire_message,
     to_wire_messages,
@@ -147,4 +148,104 @@ def test_async_anthropic_provider_awaits_the_async_client():
     )
 
     assert message.content == "hi"
+    assert client.messages.kwargs["model"] == "claude-sonnet-5"
+
+
+class _FakeVendorMessageStream:
+    def __init__(self, text_chunks: list[str], final_message: SimpleNamespace) -> None:
+        self.text_stream = iter(text_chunks)
+        self._final_message = final_message
+
+    def get_final_message(self) -> SimpleNamespace:
+        return self._final_message
+
+
+class _FakeVendorStreamManager:
+    def __init__(self, text_chunks: list[str], final_message: SimpleNamespace) -> None:
+        self._stream = _FakeVendorMessageStream(text_chunks, final_message)
+
+    def __enter__(self) -> _FakeVendorMessageStream:
+        return self._stream
+
+    def __exit__(self, *exc: object) -> bool:
+        return False
+
+
+def test_anthropic_provider_stream_yields_chunks_and_sets_the_final_message():
+    final = SimpleNamespace(
+        content=[SimpleNamespace(type="text", text="Let me check.")]
+    )
+
+    class FakeMessages:
+        def stream(self, **kwargs):
+            self.kwargs = kwargs
+            return _FakeVendorStreamManager(["Let", " me", " check."], final)
+
+    class FakeClient:
+        def __init__(self):
+            self.messages = FakeMessages()
+
+    client = FakeClient()
+    provider = AnthropicProvider(client=client)
+
+    stream = provider.stream(
+        messages=[Message(role=Role.USER, content="hi")], tools=[], model=None
+    )
+    chunks = [chunk.delta for chunk in stream]
+
+    assert chunks == ["Let", " me", " check."]
+    assert stream.message.content == "Let me check."
+    assert client.messages.kwargs["model"] == "claude-sonnet-5"
+
+
+class _FakeAsyncVendorMessageStream:
+    def __init__(self, text_chunks: list[str], final_message: SimpleNamespace) -> None:
+        self._text_chunks = text_chunks
+        self._final_message = final_message
+
+    @property
+    async def text_stream(self):
+        for text in self._text_chunks:
+            yield text
+
+    async def get_final_message(self) -> SimpleNamespace:
+        return self._final_message
+
+
+class _FakeAsyncVendorStreamManager:
+    def __init__(self, text_chunks: list[str], final_message: SimpleNamespace) -> None:
+        self._stream = _FakeAsyncVendorMessageStream(text_chunks, final_message)
+
+    async def __aenter__(self) -> _FakeAsyncVendorMessageStream:
+        return self._stream
+
+    async def __aexit__(self, *exc: object) -> bool:
+        return False
+
+
+def test_async_anthropic_provider_stream_yields_chunks_and_sets_the_final_message():
+    final = SimpleNamespace(content=[SimpleNamespace(type="text", text="hi there")])
+
+    class FakeMessages:
+        def stream(self, **kwargs):
+            self.kwargs = kwargs
+            return _FakeAsyncVendorStreamManager(["hi", " there"], final)
+
+    class FakeAsyncClient:
+        def __init__(self):
+            self.messages = FakeMessages()
+
+    client = FakeAsyncClient()
+    provider = AsyncAnthropicProvider(client=client)
+    stream = provider.stream(
+        messages=[Message(role=Role.USER, content="hi")], tools=[], model=None
+    )
+
+    async def collect() -> list[str]:
+        return [chunk.delta async for chunk in stream]
+
+    chunks = asyncio.run(collect())
+
+    assert chunks == ["hi", " there"]
+    assert stream.message.content == "hi there"
     assert client.messages.kwargs["model"] == "claude-sonnet-5"

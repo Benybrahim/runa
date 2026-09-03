@@ -1,11 +1,14 @@
 """OpenAIProvider: a thin adapter between core.Message and OpenAI's API."""
 
 import json
+from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
 import openai
 
 from runa.core import Message, Role, ToolCall
+from runa.runtime.async_provider import AsyncStream
+from runa.runtime.provider import Stream, StreamChunk
 
 DEFAULT_MODEL = "gpt-5-nano"
 
@@ -103,6 +106,30 @@ class OpenAIProvider:
         )
         return from_wire_message(response)
 
+    def stream(
+        self,
+        *,
+        messages: list[Message],
+        tools: list[dict[str, Any]],
+        model: str | None,
+    ) -> Stream:
+        """Satisfies `StreamingProvider` structurally. Lazy: the request
+        only fires once the returned `Stream` is iterated."""
+
+        def generate() -> Iterator[StreamChunk]:
+            with self.client.chat.completions.stream(
+                model=model or DEFAULT_MODEL,
+                messages=to_wire_messages(messages),
+                tools=to_wire_tools(tools) if tools else openai.NOT_GIVEN,
+            ) as vendor_stream:
+                for event in vendor_stream:
+                    if event.type == "content.delta" and event.delta:
+                        yield StreamChunk(delta=event.delta)
+                result.message = from_wire_message(vendor_stream.get_final_completion())
+
+        result = Stream(generate())
+        return result
+
 
 class AsyncOpenAIProvider:
     """The async counterpart to `OpenAIProvider`.
@@ -128,3 +155,30 @@ class AsyncOpenAIProvider:
             tools=to_wire_tools(tools) if tools else openai.NOT_GIVEN,
         )
         return from_wire_message(response)
+
+    def stream(
+        self,
+        *,
+        messages: list[Message],
+        tools: list[dict[str, Any]],
+        model: str | None,
+    ) -> AsyncStream:
+        """Satisfies `AsyncStreamingProvider` structurally. Not `async def`
+        itself — the request only fires once the returned `AsyncStream` is
+        async-iterated."""
+
+        async def generate() -> AsyncIterator[StreamChunk]:
+            async with self.client.chat.completions.stream(
+                model=model or DEFAULT_MODEL,
+                messages=to_wire_messages(messages),
+                tools=to_wire_tools(tools) if tools else openai.NOT_GIVEN,
+            ) as vendor_stream:
+                async for event in vendor_stream:
+                    if event.type == "content.delta" and event.delta:
+                        yield StreamChunk(delta=event.delta)
+                result.message = from_wire_message(
+                    await vendor_stream.get_final_completion()
+                )
+
+        result = AsyncStream(generate())
+        return result

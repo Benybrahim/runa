@@ -57,6 +57,8 @@ from runa.runtime import (
     Action,
     AsyncExecutor,
     AsyncProvider,
+    AsyncStream,
+    AsyncStreamingProvider,
     CallModel,
     CallTool,
     Complete,
@@ -66,6 +68,9 @@ from runa.runtime import (
     Provider,
     RetryStrategy,
     Strategy,
+    Stream,
+    StreamChunk,
+    StreamingProvider,
 )
 from runa.tool import FunctionTool, Tool, tool
 
@@ -80,6 +85,8 @@ __all__ = [
     "AsyncOpenAIProvider",
     "AsyncProvider",
     "AsyncProviderNotConfigured",
+    "AsyncStream",
+    "AsyncStreamingProvider",
     "CallModel",
     "CallTool",
     "CitationSetArtifact",
@@ -125,6 +132,9 @@ __all__ = [
     "SQLiteConversationStore",
     "SQLiteRunStore",
     "Strategy",
+    "Stream",
+    "StreamChunk",
+    "StreamingProvider",
     "TextArtifact",
     "ThreadQueue",
     "TimelineEntry",

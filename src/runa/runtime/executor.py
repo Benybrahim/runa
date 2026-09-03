@@ -1,11 +1,12 @@
 """Executor: drives a Strategy against a Run, emitting Events as it acts."""
 
 import inspect
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from runa.core import Artifact, EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime._shared import seed_run, tool_schemas
-from runa.runtime.provider import Provider
+from runa.runtime.provider import Provider, StreamChunk, StreamingProvider
 from runa.runtime.strategy import (
     Action,
     CallModel,
@@ -56,7 +57,22 @@ class Executor:
         self.strategy = strategy or DefaultStrategy()
         self.max_steps = max_steps
 
-    def run(self, agent: "Agent", run: Run) -> Run:
+    def run(
+        self,
+        agent: "Agent",
+        run: Run,
+        *,
+        on_chunk: Callable[[StreamChunk], None] | None = None,
+    ) -> Run:
+        """Drive `run` to completion. See the class docstring for the hook order.
+
+        Pass `on_chunk` to receive `StreamChunk` text deltas as each model
+        call streams in, instead of only seeing the whole `Message` once
+        it's done — the Run's messages, events, and final state end up
+        identical either way; `on_chunk` only changes what's observed while
+        a CallModel step is in flight. Requires `self.provider` to satisfy
+        `StreamingProvider`; raises `TypeError` otherwise.
+        """
         if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
             seed_run(agent, run)
             run.start()
@@ -74,7 +90,7 @@ class Executor:
 
             try:
                 action = self.strategy.step(run)
-                self._apply(agent, run, action)
+                self._apply(agent, run, action, on_chunk)
             except Exception as exc:  # convert into a failed Run, not a crash
                 run.fail(error=str(exc))
                 break
@@ -85,9 +101,15 @@ class Executor:
                 run.conversation.record(run)
         return run
 
-    def _apply(self, agent: "Agent", run: Run, action: Action) -> None:
+    def _apply(
+        self,
+        agent: "Agent",
+        run: Run,
+        action: Action,
+        on_chunk: Callable[[StreamChunk], None] | None,
+    ) -> None:
         if isinstance(action, CallModel):
-            self._call_model(agent, run)
+            self._call_model(agent, run, on_chunk)
         elif isinstance(action, CallTool):
             self._call_tool(agent, run, action.tool_call)
         elif isinstance(action, Complete):
@@ -98,12 +120,31 @@ class Executor:
         else:
             raise TypeError(f"unknown action: {action!r}")
 
-    def _call_model(self, agent: "Agent", run: Run) -> None:
+    def _call_model(
+        self,
+        agent: "Agent",
+        run: Run,
+        on_chunk: Callable[[StreamChunk], None] | None,
+    ) -> None:
         run.emit(EventType.MODEL_CALLED)
         schemas = tool_schemas(agent)
-        message = self.provider.complete(
-            messages=run.messages, tools=schemas, model=agent.model
-        )
+        if on_chunk is None:
+            message = self.provider.complete(
+                messages=run.messages, tools=schemas, model=agent.model
+            )
+        else:
+            if not isinstance(self.provider, StreamingProvider):
+                raise TypeError(
+                    f"{type(self.provider).__name__} does not implement "
+                    "StreamingProvider.stream() — on_chunk requires a "
+                    "streaming-capable Provider"
+                )
+            stream = self.provider.stream(
+                messages=run.messages, tools=schemas, model=agent.model
+            )
+            for chunk in stream:
+                on_chunk(chunk)
+            message = stream.drain()
         run.add_message(message)
         run.emit(EventType.MODEL_RESPONDED)
 

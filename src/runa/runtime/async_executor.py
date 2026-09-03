@@ -8,11 +8,13 @@ of one at a time.
 
 import asyncio
 import inspect
-from typing import TYPE_CHECKING
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 
 from runa.core import Artifact, EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime._shared import seed_run, tool_schemas
-from runa.runtime.async_provider import AsyncProvider
+from runa.runtime.async_provider import AsyncProvider, AsyncStreamingProvider
+from runa.runtime.provider import StreamChunk
 from runa.runtime.strategy import (
     Action,
     CallModel,
@@ -60,7 +62,19 @@ class AsyncExecutor:
         self.strategy = strategy or DefaultStrategy()
         self.max_steps = max_steps
 
-    async def run(self, agent: "Agent", run: Run) -> Run:
+    async def run(
+        self,
+        agent: "Agent",
+        run: Run,
+        *,
+        on_chunk: Callable[[StreamChunk], Any | Awaitable[Any]] | None = None,
+    ) -> Run:
+        """Drive `run` to completion. See `Executor.run` for `on_chunk` — same
+        contract here, except `on_chunk` may itself be `async def`; a plain
+        callable works too, and its return value (if any) is ignored.
+        Requires `self.provider` to satisfy `AsyncStreamingProvider`; raises
+        `TypeError` otherwise.
+        """
         if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
             seed_run(agent, run)
             run.start()
@@ -78,7 +92,7 @@ class AsyncExecutor:
 
             try:
                 action = self.strategy.step(run)
-                await self._apply(agent, run, action)
+                await self._apply(agent, run, action, on_chunk)
             except Exception as exc:  # convert into a failed Run, not a crash
                 run.fail(error=str(exc))
                 break
@@ -89,9 +103,15 @@ class AsyncExecutor:
                 run.conversation.record(run)
         return run
 
-    async def _apply(self, agent: "Agent", run: Run, action: Action) -> None:
+    async def _apply(
+        self,
+        agent: "Agent",
+        run: Run,
+        action: Action,
+        on_chunk: Callable[[StreamChunk], Any] | None,
+    ) -> None:
         if isinstance(action, CallModel):
-            await self._call_model(agent, run)
+            await self._call_model(agent, run, on_chunk)
         elif isinstance(action, CallTool):
             await self._call_tools(agent, run, action.tool_call)
         elif isinstance(action, Complete):
@@ -102,12 +122,33 @@ class AsyncExecutor:
         else:
             raise TypeError(f"unknown action: {action!r}")
 
-    async def _call_model(self, agent: "Agent", run: Run) -> None:
+    async def _call_model(
+        self,
+        agent: "Agent",
+        run: Run,
+        on_chunk: Callable[[StreamChunk], Any] | None,
+    ) -> None:
         run.emit(EventType.MODEL_CALLED)
         schemas = tool_schemas(agent)
-        message = await self.provider.complete(
-            messages=run.messages, tools=schemas, model=agent.model
-        )
+        if on_chunk is None:
+            message = await self.provider.complete(
+                messages=run.messages, tools=schemas, model=agent.model
+            )
+        else:
+            if not isinstance(self.provider, AsyncStreamingProvider):
+                raise TypeError(
+                    f"{type(self.provider).__name__} does not implement "
+                    "AsyncStreamingProvider.stream() — on_chunk requires a "
+                    "streaming-capable Provider"
+                )
+            stream = self.provider.stream(
+                messages=run.messages, tools=schemas, model=agent.model
+            )
+            async for chunk in stream:
+                result = on_chunk(chunk)
+                if inspect.isawaitable(result):
+                    await result
+            message = await stream.drain()
         run.add_message(message)
         run.emit(EventType.MODEL_RESPONDED)
 

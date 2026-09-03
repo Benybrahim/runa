@@ -72,6 +72,22 @@ Every layer is defined in terms of the `Run`: persistence stores it, background 
 
 Runa keeps the underlying model provider replaceable. A `Provider` is a small protocol (`complete(messages, tools, model) -> Message`); `AnthropicProvider` and `OpenAIProvider` are thin, one-directional adapters to that protocol, and nothing outside `providers/` ever branches on which one is active.
 
+### Streaming is an opt-in callback, not a second execution path
+
+`complete()` always returns one whole `Message` — fine for most agent code, but a chat-shaped consumer often wants to show text as it's generated. `Executor.run(agent, run, on_chunk=...)` is that opt-in: pass a callback and it receives a `StreamChunk` for every text delta as each model call streams in, while the Run's messages, events, and final state end up identical to the non-streaming path — `on_chunk` only changes what's observed while a `CallModel` step is in flight, so it composes with tools, retries, and approval automatically, with no separate streaming-aware Strategy or Run type.
+
+```python
+def on_chunk(chunk: StreamChunk) -> None:
+    print(chunk.delta, end="", flush=True)
+
+
+run = Executor(OpenAIProvider()).run(
+    WeatherAgent(), Run(input="..."), on_chunk=on_chunk
+)
+```
+
+This requires a `StreamingProvider` — `AnthropicProvider` and `OpenAIProvider` both implement `stream()` alongside `complete()`, returning a `Stream` (or, on the async side, an `AsyncStream`) that's lazy: the request only fires once it's actually iterated. Passing `on_chunk` to a Provider that doesn't implement `stream()` fails the Run with a clear error, the same way any other bad configuration does, rather than silently falling back to `complete()`. See `examples/streaming.py` for a complete runnable version.
+
 ### Async is a parallel path, not a rewrite
 
 `Agent.run_async()` drives an `AsyncExecutor` against an `AsyncProvider` (`AsyncAnthropicProvider`, `AsyncOpenAIProvider`) — same `Run`/`Strategy` contract as the sync path, so persistence, observability, and eval all work identically either way. It buys two things the sync path can't: I/O-bound tools/providers that don't tie up a thread, and independent tool calls from one model turn running concurrently via `asyncio.gather` instead of one at a time. A `Tool.call` may be `async def` or a plain function — `AsyncExecutor` awaits one and runs the other through `asyncio.to_thread`; the sync `Executor` raises a clear error if handed an async-only tool rather than mishandling it silently.
@@ -175,8 +191,8 @@ All layers described in [`docs/architecture.md`](docs/architecture.md) are imple
 
 * `core/` — `Run`, `Message`, `Event`, `Artifact` (auto-recorded when a Tool returns one), `State`, `Conversation`
 * `Agent` + `Tool` — the declarative surface, including `Agent.as_tool()` for delegation
-* `runtime/` — `Strategy` protocol, `DefaultStrategy`, `RetryStrategy`, `Executor`, `AsyncExecutor`
-* `providers/` — `AnthropicProvider`, `OpenAIProvider`, `AsyncAnthropicProvider`, `AsyncOpenAIProvider`
+* `runtime/` — `Strategy` protocol, `DefaultStrategy`, `RetryStrategy`, `Executor`, `AsyncExecutor`, `on_chunk` streaming via `StreamingProvider`/`AsyncStreamingProvider`
+* `providers/` — `AnthropicProvider`, `OpenAIProvider`, `AsyncAnthropicProvider`, `AsyncOpenAIProvider`, each also implementing `stream()`
 * `persistence/` — `RunStore`, `InMemoryRunStore`, `SQLiteRunStore`, `ConversationStore`, `InMemoryConversationStore`
 * `background/` + `approval.py` — `run_later`, `Queue` (`InlineQueue`, `ThreadQueue`), `approve`/`deny`
 * `observability/` — `timeline()`, `instrument()`

@@ -2,10 +2,11 @@ from runa.agent import Agent
 from runa.approval import approve
 from runa.core import DataArtifact, EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime.executor import Executor
+from runa.runtime.provider import StreamChunk
 from runa.runtime.retry import RetryStrategy
 from runa.runtime.strategy import CallModel, Complete, Fail, Strategy
 from runa.tool import Tool
-from tests.fakes import FakeProvider
+from tests.fakes import FakeProvider, FakeStreamingProvider
 
 
 class GetWeather(Tool):
@@ -383,6 +384,54 @@ def test_tool_returning_an_artifact_records_it_on_the_run():
     assert tool_message.content == artifact.summary()
 
     assert EventType.ARTIFACT_CREATED in [e.type for e in result.events]
+
+
+def test_on_chunk_receives_deltas_and_the_run_completes_normally():
+    provider = FakeStreamingProvider(
+        responses=[Message(role=Role.ASSISTANT, content="hi there")]
+    )
+    chunks: list[StreamChunk] = []
+
+    result = Executor(provider).run(
+        WeatherAgent(), Run(input="hello"), on_chunk=chunks.append
+    )
+
+    assert "".join(c.delta for c in chunks) == "hi there"
+    assert result.status == RunStatus.COMPLETED
+    assert result.result == "hi there"
+
+
+def test_on_chunk_streams_every_model_call_in_a_tool_use_loop():
+    provider = FakeStreamingProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="GetWeather", arguments={"city": "Tokyo"})],
+            ),
+            Message(role=Role.ASSISTANT, content="Tokyo is sunny."),
+        ]
+    )
+    chunks: list[StreamChunk] = []
+
+    result = Executor(provider).run(
+        WeatherAgent(), Run(input="weather in Tokyo?"), on_chunk=chunks.append
+    )
+
+    assert "".join(c.delta for c in chunks) == "Tokyo is sunny."
+    assert result.result == "Tokyo is sunny."
+
+
+def test_on_chunk_requires_a_streaming_capable_provider():
+    # like any other exception raised while applying an action, this is
+    # caught and turned into a failed Run rather than propagating.
+    provider = FakeProvider(responses=[])
+
+    result = Executor(provider).run(
+        WeatherAgent(), Run(input="hi"), on_chunk=lambda c: None
+    )
+
+    assert result.status == RunStatus.FAILED
+    assert "StreamingProvider" in result.events[-1].data["error"]
 
 
 def test_strategy_protocol_is_satisfiable_without_inheritance():

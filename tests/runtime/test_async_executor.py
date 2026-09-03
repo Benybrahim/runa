@@ -7,9 +7,14 @@ from runa.config import configure
 from runa.core import DataArtifact, EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime.async_executor import AsyncExecutor
 from runa.runtime.executor import Executor
+from runa.runtime.provider import StreamChunk
 from runa.runtime.retry import RetryStrategy
 from runa.tool import Tool
-from tests.fakes import FakeAsyncProvider, FakeProvider
+from tests.fakes import (
+    FakeAsyncProvider,
+    FakeAsyncStreamingProvider,
+    FakeProvider,
+)
 
 
 class GetWeather(Tool):
@@ -102,6 +107,54 @@ def test_async_executor_review_hook_can_revise_the_result():
     run = asyncio.run(AsyncExecutor(provider).run(ReviewingAgent(), Run(input="hi")))
 
     assert run.result == "revised: draft"
+
+
+def test_async_on_chunk_receives_deltas_and_the_run_completes_normally():
+    provider = FakeAsyncStreamingProvider(
+        responses=[Message(role=Role.ASSISTANT, content="hi there")]
+    )
+    chunks: list[StreamChunk] = []
+
+    run = asyncio.run(
+        AsyncExecutor(provider).run(
+            WeatherAgent(), Run(input="hello"), on_chunk=chunks.append
+        )
+    )
+
+    assert "".join(c.delta for c in chunks) == "hi there"
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "hi there"
+
+
+def test_async_on_chunk_accepts_an_async_callback():
+    provider = FakeAsyncStreamingProvider(
+        responses=[Message(role=Role.ASSISTANT, content="hi")]
+    )
+    chunks: list[StreamChunk] = []
+
+    async def on_chunk(chunk: StreamChunk) -> None:
+        await asyncio.sleep(0)
+        chunks.append(chunk)
+
+    run = asyncio.run(
+        AsyncExecutor(provider).run(WeatherAgent(), Run(input="hi"), on_chunk=on_chunk)
+    )
+
+    assert "".join(c.delta for c in chunks) == "hi"
+    assert run.result == "hi"
+
+
+def test_async_on_chunk_requires_a_streaming_capable_provider():
+    provider = FakeAsyncProvider(responses=[])
+
+    run = asyncio.run(
+        AsyncExecutor(provider).run(
+            WeatherAgent(), Run(input="hi"), on_chunk=lambda c: None
+        )
+    )
+
+    assert run.status == RunStatus.FAILED
+    assert "AsyncStreamingProvider" in run.events[-1].data["error"]
 
 
 def test_independent_tool_calls_run_concurrently():
