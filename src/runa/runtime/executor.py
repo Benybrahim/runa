@@ -98,7 +98,16 @@ class Executor:
         identical either way; `on_chunk` only changes what's observed while
         a CallModel step is in flight. Requires `self.provider` to satisfy
         `StreamingProvider`; raises `TypeError` otherwise.
+
+        A no-op if `run` is already terminal — there's nothing left to
+        drive, so `before_run`/`plan`/`after_run` don't fire again and
+        `run.conversation` isn't re-recorded. Without this check, calling
+        `run()` a second time on an already-completed Run would silently
+        re-invoke `after_run` (see `Run.is_terminal`).
         """
+        if run.is_terminal:
+            return run
+
         if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
             seed_run(agent, run)
             run.start()

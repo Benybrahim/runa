@@ -127,6 +127,29 @@ def test_cancel_requested_before_the_loop_starts_stops_the_run_immediately():
     assert provider.calls == []
 
 
+def test_running_an_already_terminal_run_again_is_a_no_op():
+    calls = []
+
+    class HookedAgent(Agent):
+        def after_run(self, run):
+            calls.append("after_run")
+
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
+    executor = AsyncExecutor(provider)
+    agent = HookedAgent()
+    run = Run(input="hi")
+
+    asyncio.run(executor.run(agent, run))
+    assert calls == ["after_run"]
+    assert len(provider.calls) == 1
+
+    result = asyncio.run(executor.run(agent, run))
+
+    assert result is run
+    assert calls == ["after_run"]
+    assert len(provider.calls) == 1
+
+
 def test_async_executor_review_hook_can_revise_the_result():
     class ReviewingAgent(Agent):
         def review(self, run):

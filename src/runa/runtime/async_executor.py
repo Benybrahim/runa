@@ -91,7 +91,12 @@ class AsyncExecutor:
         callable works too, and its return value (if any) is ignored.
         Requires `self.provider` to satisfy `AsyncStreamingProvider`; raises
         `TypeError` otherwise.
+
+        A no-op if `run` is already terminal — see `Executor.run`.
         """
+        if run.is_terminal:
+            return run
+
         if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
             seed_run(agent, run)
             run.start()

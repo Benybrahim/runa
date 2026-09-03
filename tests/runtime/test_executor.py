@@ -324,6 +324,29 @@ def test_agent_hooks_are_called_around_execution():
     assert calls == ["before_run", "plan", "review", "after_run"]
 
 
+def test_running_an_already_terminal_run_again_is_a_no_op():
+    calls = []
+
+    class HookedAgent(Agent):
+        def after_run(self, run):
+            calls.append("after_run")
+
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
+    executor = Executor(provider)
+    agent = HookedAgent()
+    run = Run(input="hi")
+
+    executor.run(agent, run)
+    assert calls == ["after_run"]
+    assert len(provider.calls) == 1
+
+    result = executor.run(agent, run)
+
+    assert result is run
+    assert calls == ["after_run"]  # not called again
+    assert len(provider.calls) == 1  # no second model call either
+
+
 def test_review_hook_is_skipped_when_the_run_fails_instead_of_completing():
     calls = []
 
