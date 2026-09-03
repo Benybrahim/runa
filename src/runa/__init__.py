@@ -38,6 +38,7 @@ from runa.persistence import (
     InMemoryConversationStore,
     InMemoryRunStore,
     RunStore,
+    SQLiteConversationStore,
     SQLiteRunStore,
 )
 from runa.providers import (
@@ -110,6 +111,7 @@ __all__ = [
     "RunState",
     "RunStatus",
     "RunStore",
+    "SQLiteConversationStore",
     "SQLiteRunStore",
     "Strategy",
     "TextArtifact",

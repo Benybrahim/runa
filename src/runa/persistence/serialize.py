@@ -1,4 +1,5 @@
-"""Explicit Run <-> JSON conversion, for RunStore backends that need bytes.
+"""Explicit Run/Conversation <-> JSON conversion, for store backends that
+need bytes.
 
 Not a generic `dataclasses.asdict`/`**data` round-trip: Artifact is
 polymorphic (five concrete subclasses), and a `ToolCall` is shared by
@@ -6,6 +7,10 @@ identity between `Run.tool_calls` and the assistant `Message` that produced
 it — `approve()`/`deny()` mutate the copy in `Run.tool_calls` and rely on
 the same object showing up in the message the Strategy inspects next. Both
 of those need explicit handling that a generic round-trip can't recover.
+
+`Conversation` has neither concern — its messages aren't examined for
+identity the way a Run's are — so its (de)serialization is a plain nested
+walk that reuses `_tool_call_to_dict`/`_tool_call_from_dict` below.
 """
 
 import json
@@ -16,6 +21,7 @@ from runa.core import (
     ActionArtifact,
     Artifact,
     CitationSetArtifact,
+    Conversation,
     DataArtifact,
     Event,
     EventType,
@@ -28,7 +34,7 @@ from runa.core import (
     TextArtifact,
     ToolCall,
 )
-from runa.core.state import RunState
+from runa.core.state import ConversationState, RunState
 
 _ARTIFACT_TYPES: dict[str, type[Artifact]] = {
     "text": TextArtifact,
@@ -155,3 +161,47 @@ def run_to_json(run: Run) -> str:
 
 def run_from_json(raw: str) -> Run:
     return run_from_dict(json.loads(raw))
+
+
+def conversation_to_dict(conversation: Conversation) -> dict[str, Any]:
+    """Convert a Conversation into a plain, JSON-serializable dict."""
+    return {
+        "id": conversation.id,
+        "state": dict(conversation.state),
+        "messages": [
+            {
+                "id": message.id,
+                "role": message.role.value,
+                "content": message.content,
+                "tool_calls": [_tool_call_to_dict(tc) for tc in message.tool_calls],
+                "tool_call_id": message.tool_call_id,
+            }
+            for message in conversation.messages
+        ],
+    }
+
+
+def conversation_from_dict(data: dict[str, Any]) -> Conversation:
+    """Reconstruct a Conversation from a dict produced by `conversation_to_dict`."""
+    return Conversation(
+        id=data["id"],
+        state=ConversationState(data["state"]),
+        messages=[
+            Message(
+                id=m["id"],
+                role=Role(m["role"]),
+                content=m["content"],
+                tool_calls=[_tool_call_from_dict(tc) for tc in m["tool_calls"]],
+                tool_call_id=m["tool_call_id"],
+            )
+            for m in data["messages"]
+        ],
+    )
+
+
+def conversation_to_json(conversation: Conversation) -> str:
+    return json.dumps(conversation_to_dict(conversation))
+
+
+def conversation_from_json(raw: str) -> Conversation:
+    return conversation_from_dict(json.loads(raw))

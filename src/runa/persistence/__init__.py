@@ -5,6 +5,7 @@ from runa.persistence.conversation_store import (
     InMemoryConversationStore,
 )
 from runa.persistence.sqlite import SQLiteRunStore
+from runa.persistence.sqlite_conversation import SQLiteConversationStore
 from runa.persistence.store import InMemoryRunStore, RunStore
 
 __all__ = [
@@ -12,5 +13,6 @@ __all__ = [
     "InMemoryConversationStore",
     "InMemoryRunStore",
     "RunStore",
+    "SQLiteConversationStore",
     "SQLiteRunStore",
 ]
