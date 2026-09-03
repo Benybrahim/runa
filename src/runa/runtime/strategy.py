@@ -9,7 +9,7 @@ Strategy only when the loop's shape itself must change.
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from runa.core import Role, Run, ToolCall
+from runa.core import Message, Role, Run, ToolCall
 
 
 @dataclass
@@ -45,6 +45,22 @@ class Strategy(Protocol):
     def step(self, run: Run) -> Action: ...
 
 
+def last_assistant_message(run: Run) -> Message | None:
+    """The most recent assistant message, wherever it sits in `run.messages`.
+
+    Not necessarily `run.messages[-1]`: once any of a turn's tool_calls have
+    been executed, their TOOL-role result messages get appended after it. A
+    turn with more than one tool_call needs this to keep finding the turn's
+    still-pending calls after the first result comes back — using
+    `run.messages[-1]` directly would see a TOOL message where an ASSISTANT
+    one was expected and wrongly conclude the turn has no pending work left,
+    calling the model again mid-turn and silently abandoning the rest of the
+    batch (`AsyncExecutor._call_tools` makes the same lookup, for the same
+    reason).
+    """
+    return next((m for m in reversed(run.messages) if m.role == Role.ASSISTANT), None)
+
+
 class DefaultStrategy:
     """The plain tool-use loop.
 
@@ -55,18 +71,19 @@ class DefaultStrategy:
     """
 
     def step(self, run: Run) -> Action:
-        if not run.messages:
+        last_assistant = last_assistant_message(run)
+        if last_assistant is None:
             return CallModel()
 
-        last = run.messages[-1]
-
-        if last.role != Role.ASSISTANT:
-            return CallModel()
-
-        pending = next((tc for tc in last.tool_calls if not tc.completed), None)
+        pending = next(
+            (tc for tc in last_assistant.tool_calls if not tc.completed), None
+        )
         if pending is not None:
             if pending.error is not None:
                 return Fail(error=pending.error)
             return CallTool(tool_call=pending)
 
-        return Complete(result=last.content)
+        if run.messages[-1] is last_assistant:
+            return Complete(result=last_assistant.content)
+
+        return CallModel()

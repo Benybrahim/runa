@@ -42,7 +42,17 @@ class ToolCall:
 
     @property
     def completed(self) -> bool:
-        return self.result is not None
+        """Whether this call has been attempted and succeeded.
+
+        Not `self.result is not None` — a Tool can legitimately return
+        `None` as its actual result (a call with no meaningful return
+        value), which that check would misread as "never ran," leaving the
+        Strategy to attempt it again forever. `attempts > 0` marks it as
+        attempted; `error is None` distinguishes a successful attempt from
+        a failed one still pending a Fail/retry decision (see `strategy.py`,
+        `retry.py`).
+        """
+        return self.attempts > 0 and self.error is None
 
 
 @dataclass

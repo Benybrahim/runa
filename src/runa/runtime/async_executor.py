@@ -33,6 +33,7 @@ from runa.runtime.strategy import (
     DefaultStrategy,
     Fail,
     Strategy,
+    last_assistant_message,
 )
 from runa.tool import ParentRunAware
 
@@ -191,8 +192,18 @@ class AsyncExecutor:
         step (honoring e.g. RetryStrategy's per-call attempt gating). A
         sibling only joins the batch if it's never been attempted — a
         sibling already mid-retry gets its own vetting on a later step.
+
+        Siblings come from the turn's assistant message via
+        `last_assistant_message`, not `run.messages[-1]` directly — once any
+        sibling in this turn has already executed (e.g. one batch ran, an
+        approval gate paused the rest, and the run was then resumed),
+        `run.messages[-1]` is that sibling's TOOL-role result message, not
+        the assistant message the still-pending calls actually live on. See
+        `last_assistant_message`'s docstring.
         """
-        pending = [tc for tc in run.messages[-1].tool_calls if not tc.completed]
+        # named_tool_call came from this same lookup, so it's never None here.
+        last_assistant = last_assistant_message(run)
+        pending = [tc for tc in last_assistant.tool_calls if not tc.completed]
         candidates = [tc for tc in pending if tc is named_tool_call or tc.error is None]
 
         approval_names = agent.approval_tool_names()

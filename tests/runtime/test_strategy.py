@@ -27,7 +27,9 @@ def test_assistant_with_pending_tool_call_calls_tool():
 
 def test_assistant_with_completed_tool_call_completes():
     run = Run(input="hi")
-    call = ToolCall(name="get_weather", arguments={"city": "Tokyo"}, result="sunny")
+    call = ToolCall(
+        name="get_weather", arguments={"city": "Tokyo"}, result="sunny", attempts=1
+    )
     run.add_message(Message(role=Role.ASSISTANT, content="", tool_calls=[call]))
 
     assert isinstance(strategy.step(run), Complete)
@@ -54,8 +56,23 @@ def test_assistant_with_errored_tool_call_fails():
 
 def test_tool_result_message_calls_model_again():
     run = Run(input="hi")
-    call = ToolCall(name="get_weather", result="sunny")
+    call = ToolCall(name="get_weather", result="sunny", attempts=1)
     run.add_message(Message(role=Role.ASSISTANT, tool_calls=[call]))
     run.add_message(Message(role=Role.TOOL, content="sunny", tool_call_id=call.id))
 
     assert isinstance(strategy.step(run), CallModel)
+
+
+def test_second_tool_call_in_one_turn_is_found_after_the_first_ones_result():
+    run = Run(input="hi")
+    first = ToolCall(
+        name="get_weather", arguments={"city": "Tokyo"}, result="sunny", attempts=1
+    )
+    second = ToolCall(name="get_weather", arguments={"city": "Osaka"})
+    run.add_message(Message(role=Role.ASSISTANT, tool_calls=[first, second]))
+    run.add_message(Message(role=Role.TOOL, content="sunny", tool_call_id=first.id))
+
+    action = strategy.step(run)
+
+    assert isinstance(action, CallTool)
+    assert action.tool_call is second

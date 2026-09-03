@@ -414,6 +414,54 @@ def test_approving_a_gated_tool_call_lets_the_run_finish():
     assert run.result == "Email sent."
 
 
+def test_approving_gated_calls_one_at_a_time_eventually_runs_them_all():
+    class SendEmail(Tool):
+        requires_approval = True
+
+        async def call(self, to: str) -> str:
+            return f"emailed {to}"
+
+    class SendSms(Tool):
+        requires_approval = True
+
+        async def call(self, to: str) -> str:
+            return f"texted {to}"
+
+    class SupportAgent(Agent):
+        tools = [SendEmail, SendSms]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(name="SendEmail", arguments={"to": "a@b.com"}),
+                    ToolCall(name="SendSms", arguments={"to": "555"}),
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="done"),
+        ]
+    )
+    executor = AsyncExecutor(provider)
+    agent = SupportAgent()
+    run = asyncio.run(executor.run(agent, Run(input="notify someone")))
+    assert run.status == RunStatus.AWAITING_APPROVAL
+
+    email_call = next(tc for tc in run.tool_calls if tc.name == "SendEmail")
+    approve(run, email_call.id)
+    run = asyncio.run(executor.run(agent, run))
+    assert run.status == RunStatus.AWAITING_APPROVAL  # SendSms still gated
+
+    sms_call = next(tc for tc in run.tool_calls if tc.name == "SendSms")
+    approve(run, sms_call.id)
+    run = asyncio.run(executor.run(agent, run))
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "done"
+    assert email_call.completed and email_call.result == "emailed a@b.com"
+    assert sms_call.completed and sms_call.result == "texted 555"
+
+
 def test_sync_executor_rejects_a_tool_with_an_async_call():
     class AsyncOnlyTool(Tool):
         async def call(self) -> str:

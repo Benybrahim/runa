@@ -71,6 +71,44 @@ def test_executor_runs_a_full_tool_use_loop():
     ]
 
 
+def test_executor_runs_every_tool_call_requested_in_a_single_turn():
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(name="GetWeather", arguments={"city": "Tokyo"}),
+                    ToolCall(name="GetWeather", arguments={"city": "Osaka"}),
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="Both are sunny."),
+        ]
+    )
+    executor = Executor(provider)
+    agent = WeatherAgent()
+    run = Run(input="What's the weather in Tokyo and Osaka?")
+
+    result = executor.run(agent, run)
+
+    assert result.status == RunStatus.COMPLETED
+    assert result.result == "Both are sunny."
+    tokyo, osaka = result.tool_calls
+    assert tokyo.completed and tokyo.result == "Tokyo: sunny"
+    assert osaka.completed and osaka.result == "Osaka: sunny"
+
+    # both tool results are fed back before the model is asked again
+    roles = [message.role for message in result.messages]
+    assert roles == [
+        Role.SYSTEM,
+        Role.USER,
+        Role.ASSISTANT,
+        Role.TOOL,
+        Role.TOOL,
+        Role.ASSISTANT,
+    ]
+    assert len(provider.calls) == 2
+
+
 def test_executor_answers_directly_without_tools():
     provider = FakeProvider(
         responses=[Message(role=Role.ASSISTANT, content="No tools needed.")]

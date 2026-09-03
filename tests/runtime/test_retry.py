@@ -50,3 +50,16 @@ def test_successful_tool_call_is_not_retried():
     run.add_message(Message(role=Role.ASSISTANT, content="", tool_calls=[call]))
 
     assert isinstance(RetryStrategy().step(run), Complete)
+
+
+def test_second_tool_call_in_one_turn_is_found_after_the_first_ones_result():
+    run = Run(input="hi")
+    first = ToolCall(name="flaky", result="ok", attempts=1)
+    second = ToolCall(name="flaky")
+    run.add_message(Message(role=Role.ASSISTANT, tool_calls=[first, second]))
+    run.add_message(Message(role=Role.TOOL, content="ok", tool_call_id=first.id))
+
+    action = RetryStrategy().step(run)
+
+    assert isinstance(action, CallTool)
+    assert action.tool_call is second

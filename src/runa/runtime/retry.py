@@ -7,8 +7,15 @@ run on the first tool error, `RetryStrategy` re-attempts the same call in
 place first.
 """
 
-from runa.core import Role, Run
-from runa.runtime.strategy import Action, CallModel, CallTool, Complete, Fail
+from runa.core import Run
+from runa.runtime.strategy import (
+    Action,
+    CallModel,
+    CallTool,
+    Complete,
+    Fail,
+    last_assistant_message,
+)
 
 
 class RetryStrategy:
@@ -33,19 +40,20 @@ class RetryStrategy:
         self.max_retries = max_retries
 
     def step(self, run: Run) -> Action:
-        if not run.messages:
+        last_assistant = last_assistant_message(run)
+        if last_assistant is None:
             return CallModel()
 
-        last = run.messages[-1]
-
-        if last.role != Role.ASSISTANT:
-            return CallModel()
-
-        pending = next((tc for tc in last.tool_calls if not tc.completed), None)
+        pending = next(
+            (tc for tc in last_assistant.tool_calls if not tc.completed), None
+        )
         if pending is not None:
             if pending.error is not None:
                 if not pending.idempotent or pending.attempts > self.max_retries:
                     return Fail(error=pending.error)
             return CallTool(tool_call=pending)
 
-        return Complete(result=last.content)
+        if run.messages[-1] is last_assistant:
+            return Complete(result=last_assistant.content)
+
+        return CallModel()
