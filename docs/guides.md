@@ -276,6 +276,30 @@ The Run is the application-level unit of work.
 
 ---
 
+# Cancelling a Run
+
+A Run being driven in-process — for example by a `ThreadQueue` job — should
+be cancelled by requesting it, not by mutating the Run directly:
+
+```python
+run.request_cancel()
+```
+
+The owning `Executor`/`AsyncExecutor` checks this once per step and performs
+the actual cancellation itself, at the next step boundary. Calling
+`run.cancel()` directly from a different thread than the one driving the Run
+races that loop and can raise `IllegalTransition`.
+
+A Run with no live Executor driving it — one saved to a `RunStore` while
+`CREATED`, `QUEUED`, `PAUSED`, or `AWAITING_APPROVAL` — has no owning thread
+to race, so it can be cancelled directly:
+
+```bash
+runa runs cancel <run_id>
+```
+
+---
+
 # Making External Actions Safe
 
 When an Agent can change the world, make the boundary explicit.

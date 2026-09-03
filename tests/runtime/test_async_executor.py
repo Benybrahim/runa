@@ -95,6 +95,21 @@ def test_async_executor_records_an_artifact_a_tool_returns():
     assert tool_message.content == artifact.summary()
 
 
+def test_cancel_requested_before_the_loop_starts_stops_the_run_immediately():
+    class CancellingAgent(WeatherAgent):
+        def before_run(self, run):
+            run.request_cancel()
+
+    provider = FakeAsyncProvider(responses=[])
+    executor = AsyncExecutor(provider)
+
+    run = asyncio.run(executor.run(CancellingAgent(), Run(input="hi")))
+
+    assert run.status == RunStatus.CANCELLED
+    assert run.events[-1].type == EventType.RUN_CANCELLED
+    assert provider.calls == []
+
+
 def test_async_executor_review_hook_can_revise_the_result():
     class ReviewingAgent(Agent):
         def review(self, run):

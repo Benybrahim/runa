@@ -267,3 +267,23 @@ def test_runs_deny_fails_a_run(tmp_path, capsys):
     saved = store.get(run.id)
     store.close()
     assert saved.status == RunStatus.FAILED
+
+
+def test_runs_cancel_cancels_a_paused_run(tmp_path, capsys):
+    project_dir, db_path = _new_project_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    run = Run(input="research something")
+    run.start()
+    run.pause()
+    store.save(run)
+    store.close()
+
+    exit_code = main(["runs", "cancel", run.id], cwd=project_dir)
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "cancelled" in output
+
+    store = SQLiteRunStore(db_path)
+    saved = store.get(run.id)
+    store.close()
+    assert saved.status == RunStatus.CANCELLED

@@ -168,6 +168,8 @@ See `examples/plan_and_review.py` for a complete version that calls the model fr
 
 Every `Run` moves through the same state machine — `Created → Queued → Running → Paused / AwaitingApproval → Completed / Failed / Cancelled`. Background execution (`run_later`) and human approval (`requires_approval`, `approve`/`deny`) aren't separate systems; they're alternate transitions through that same machine, so persistence, observability, and evaluation all work identically regardless of how a Run got where it is.
 
+Cancellation follows the same rule but needs one more step: only the thread actually driving a Run may call `run.cancel()` safely, since it's also mutating `.status`/`.events`. `run.request_cancel()` sets a plain flag any thread can set anytime; `Executor`/`AsyncExecutor` check it once per step and cancel the Run themselves, at the next step boundary. A Run with no live Executor (paused, awaiting approval, or still queued in a `RunStore`) has no thread to race, so `run.cancel()` — or `runa runs cancel <id>` — works directly there.
+
 ### Policy runs before approval
 
 `requires_approval` always defers to a human. `Agent.policies` is the earlier, programmatic check for rules the application can decide on its own — a plain `(run, tool_call) -> bool` — so a call can be denied outright without ever pausing a Run for a person:
@@ -221,10 +223,10 @@ All layers described in [`docs/architecture.md`](docs/architecture.md) are imple
 * `runtime/` — `Strategy` protocol, `DefaultStrategy`, `RetryStrategy`, `Executor`, `AsyncExecutor`, `on_chunk` streaming via `StreamingProvider`/`AsyncStreamingProvider`
 * `providers/` — `AnthropicProvider`, `OpenAIProvider`, `AsyncAnthropicProvider`, `AsyncOpenAIProvider`, each also implementing `stream()`
 * `persistence/` — `RunStore`, `InMemoryRunStore`, `SQLiteRunStore`, `ConversationStore`, `InMemoryConversationStore`
-* `background/` + `approval.py` — `run_later`, `Queue` (`InlineQueue`, `ThreadQueue`, `SQLiteQueue`), `DurableQueue`/`recover_pending()` for crash recovery, `approve`/`deny`
+* `background/` + `approval.py` — `run_later`, `Queue` (`InlineQueue`, `ThreadQueue`, `SQLiteQueue`), `DurableQueue`/`recover_pending()` for crash recovery, `approve`/`deny`, `Run.request_cancel()` for cooperative cancellation
 * `observability/` — `timeline()`, `instrument()`
 * `eval/` — `expect(run)`, `run_evals()`, `Judge` (LLM-graded `to_be_helpful()`/`to_be_factual()`/`not_to_hallucinate()`/`to_meet_the_goal()`)
-* `cli/` — `runa new`, `runa generate agent`, `runa eval`, `runa test`, `runa runs show`/`list`/`pending`/`approve`/`deny`
+* `cli/` — `runa new`, `runa generate agent`, `runa eval`, `runa test`, `runa runs show`/`list`/`pending`/`approve`/`deny`/`cancel`
 
 The core API is stable enough to build against, but Runa is still young — expect the surface to keep growing (durable/remote persistence backends, richer strategies, additional providers) without changing these foundations.
 

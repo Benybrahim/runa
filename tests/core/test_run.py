@@ -88,6 +88,16 @@ def test_terminal_run_cannot_transition_again():
         run.start()
 
 
+def test_request_cancel_sets_the_flag_without_transitioning():
+    run = Run(input="hello")
+    run.start()
+
+    run.request_cancel()
+
+    assert run.cancel_requested is True
+    assert run.status == RunStatus.RUNNING  # transition is the Executor's job
+
+
 def test_add_message_and_artifact():
     run = Run(input="hello")
     run.add_message(Message(role=Role.USER, content="hi"))

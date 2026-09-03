@@ -59,6 +59,9 @@ class AsyncExecutor:
     awaits async tools directly and runs sync ones via `asyncio.to_thread`
     so they can't block the event loop. `Executor` (the sync one) rejects an
     async tool outright rather than silently mishandling it.
+
+    Also checks `run.cancel_requested` once per step, exactly like
+    `Executor` — see `Run.request_cancel()`.
     """
 
     def __init__(
@@ -95,6 +98,9 @@ class AsyncExecutor:
 
         steps = 0
         while run.status == RunStatus.RUNNING:
+            if run.cancel_requested:
+                run.cancel()
+                break
             if steps >= self.max_steps:
                 run.fail(error=f"exceeded max_steps ({self.max_steps})")
                 break

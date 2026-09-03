@@ -42,6 +42,12 @@ class Executor:
     or an approval gate (see `background/` and `approval.py`). Calling `run`
     again on a paused Run resumes it from where it left off.
 
+    Checks `run.cancel_requested` once per step, alongside `max_steps` — a
+    Run cancelled from another thread via `run.request_cancel()` (e.g. one
+    being driven by a `ThreadQueue` job) stops at the next step boundary
+    rather than mid-call; see `Run.request_cancel()` for why that flag, and
+    not calling `run.cancel()` directly, is the safe way to ask.
+
     Agent hooks fire in one fixed order: `before_run` and `plan` once, before
     the first Strategy step; `review` once, when the Strategy decides to
     Complete — its return value replaces the Strategy's draft result unless
@@ -93,6 +99,9 @@ class Executor:
 
         steps = 0
         while run.status == RunStatus.RUNNING:
+            if run.cancel_requested:
+                run.cancel()
+                break
             if steps >= self.max_steps:
                 run.fail(error=f"exceeded max_steps ({self.max_steps})")
                 break

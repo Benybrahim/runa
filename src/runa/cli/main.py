@@ -4,8 +4,9 @@
 following the app/ convention and never touch the runtime. `eval`, `test`,
 and `runs` do touch it, but only by calling existing library functions
 (`run_project_evals()`, `run_project_tests()`, `timeline()`,
-`approval.approve()`/`deny()`) against the app in `cwd` — no logic lives
-here that doesn't already exist elsewhere (manifesto §11, §12, §14).
+`approval.approve()`/`deny()`, `Run.cancel()`) against the app in `cwd` — no
+logic lives here that doesn't already exist elsewhere (manifesto §11, §12,
+§14).
 """
 
 import argparse
@@ -16,6 +17,7 @@ from runa.cli.generate import generate_agent
 from runa.cli.new import scaffold_project
 from runa.cli.runs import (
     approve_run,
+    cancel_run,
     deny_run,
     list_pending_runs,
     list_runs,
@@ -81,6 +83,11 @@ def _build_parser() -> argparse.ArgumentParser:
     runs_deny_parser.add_argument("tool_call_id")
     runs_deny_parser.add_argument("--reason", default="")
 
+    runs_cancel_parser = runs_subparsers.add_parser(
+        "cancel", help="Cancel a saved Run that isn't currently being driven"
+    )
+    runs_cancel_parser.add_argument("run_id")
+
     return parser
 
 
@@ -140,5 +147,9 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
         print(approve_run(args.run_id, args.tool_call_id, root=cwd))
         return 0
 
-    print(deny_run(args.run_id, args.tool_call_id, root=cwd, reason=args.reason))
+    if args.action == "deny":
+        print(deny_run(args.run_id, args.tool_call_id, root=cwd, reason=args.reason))
+        return 0
+
+    print(cancel_run(args.run_id, root=cwd))
     return 0

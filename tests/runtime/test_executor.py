@@ -230,6 +230,51 @@ def test_max_steps_fails_the_run_instead_of_looping_forever():
     assert "max_steps" in result.events[-1].data["error"]
 
 
+def test_cancel_requested_before_the_loop_starts_stops_the_run_immediately():
+    class CancellingAgent(WeatherAgent):
+        def before_run(self, run):
+            run.request_cancel()
+
+    provider = FakeProvider(responses=[])
+    executor = Executor(provider)
+    run = Run(input="hi")
+
+    result = executor.run(CancellingAgent(), run)
+
+    assert result.status == RunStatus.CANCELLED
+    assert result.events[-1].type == EventType.RUN_CANCELLED
+    assert provider.calls == []
+
+
+def test_cancel_requested_mid_loop_stops_the_run_at_the_next_checkpoint():
+    class CancelOnSecondStep:
+        def __init__(self):
+            self.calls = 0
+
+        def step(self, run):
+            self.calls += 1
+            if self.calls == 2:
+                run.request_cancel()
+            return CallModel()
+
+    provider = FakeProvider(
+        responses=[Message(role=Role.ASSISTANT, content="ignored")] * 5
+    )
+    strategy = CancelOnSecondStep()
+    executor = Executor(provider, strategy=strategy)
+    run = Run(input="hi")
+
+    result = executor.run(WeatherAgent(), run)
+
+    assert result.status == RunStatus.CANCELLED
+    assert result.events[-1].type == EventType.RUN_CANCELLED
+    # the step that requested cancellation still ran its own action to
+    # completion — cancellation is honored at the *next* checkpoint, not
+    # mid-action
+    assert len(provider.calls) == 2
+    assert strategy.calls == 2
+
+
 def test_agent_hooks_are_called_around_execution():
     calls = []
 

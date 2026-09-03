@@ -143,3 +143,22 @@ def deny_run(run_id: str, tool_call_id: str, *, root: Path, reason: str = "") ->
         deny(run, tool_call_id, reason=reason)
         store.save(run)
     return f"denied {tool_call_id} on run {run_id} — now {run.status.value}"
+
+
+def cancel_run(run_id: str, *, root: Path) -> str:
+    """Cancel a saved Run and persist its cancelled status.
+
+    Only meaningful for a Run with no live Executor driving it — one sitting
+    in the RunStore as CREATED, QUEUED, PAUSED, or AWAITING_APPROVAL (e.g.
+    idle in a background queue, or paused for approval). A Run currently
+    being driven in-process should be cancelled with `Run.request_cancel()`
+    instead, so the owning Executor performs the transition itself — see
+    `Run.request_cancel()`. Raises `IllegalTransition` (from `run.cancel()`)
+    if the saved Run has already reached a terminal status.
+    """
+    with loaded_app(root):
+        store = default_run_store()
+        run = _get_run(store, run_id)
+        run.cancel()
+        store.save(run)
+    return f"cancelled run {run_id}"

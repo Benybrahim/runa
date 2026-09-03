@@ -68,6 +68,7 @@ class Run:
     result: Any = None
     status: RunStatus = RunStatus.CREATED
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    cancel_requested: bool = False
 
     def emit(self, event_type: EventType, **data: Any) -> Event:
         event = Event(type=event_type, data=data)
@@ -119,6 +120,23 @@ class Run:
 
     def cancel(self) -> None:
         self.transition_to(RunStatus.CANCELLED, EventType.RUN_CANCELLED)
+
+    def request_cancel(self) -> None:
+        """Ask a Run being driven elsewhere to stop at its next checkpoint.
+
+        Only `Run.status`/`Run.events` mutation is owned by whichever thread
+        is actively driving the Run through `Executor.run()` — calling
+        `cancel()` directly from another thread would race that loop and can
+        raise `IllegalTransition` if it wins the race after the Run has
+        already reached a terminal status. Setting this flag is safe from
+        any thread at any time; `Executor.run()` checks it once per step and
+        performs the actual `cancel()` transition itself, on its own thread,
+        the same way `max_steps` already bounds the loop. A Run that isn't
+        currently being driven (CREATED/QUEUED/PAUSED/AWAITING_APPROVAL —
+        e.g. one sitting in a RunStore) has no owning thread to race, so
+        `cancel()` there works directly; see `runa runs cancel`.
+        """
+        self.cancel_requested = True
 
     @property
     def is_terminal(self) -> bool:

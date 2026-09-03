@@ -6,12 +6,13 @@ from runa.cli.new import scaffold_project
 from runa.cli.runs import (
     RunNotFound,
     approve_run,
+    cancel_run,
     deny_run,
     list_pending_runs,
     list_runs,
     show_run,
 )
-from runa.core import Message, Role, Run, RunStatus, ToolCall
+from runa.core import IllegalTransition, Message, Role, Run, RunStatus, ToolCall
 from runa.persistence import SQLiteRunStore
 
 _MAIN_PY_TEMPLATE = """
@@ -230,3 +231,38 @@ def test_approve_run_raises_for_an_unknown_id(tmp_path):
 
     with pytest.raises(RunNotFound):
         approve_run("does-not-exist", "some-call", root=project_dir)
+
+
+def test_cancel_run_cancels_and_persists_a_paused_run(tmp_path):
+    project_dir, db_path = _scaffold_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    run, _call = _save_awaiting_approval(store)
+    store.close()
+
+    output = cancel_run(run.id, root=project_dir)
+
+    assert "cancelled" in output
+    store = SQLiteRunStore(db_path)
+    saved = store.get(run.id)
+    store.close()
+    assert saved.status == RunStatus.CANCELLED
+
+
+def test_cancel_run_raises_for_an_unknown_id(tmp_path):
+    project_dir, _ = _scaffold_with_store(tmp_path)
+
+    with pytest.raises(RunNotFound):
+        cancel_run("does-not-exist", root=project_dir)
+
+
+def test_cancel_run_raises_for_an_already_terminal_run(tmp_path):
+    project_dir, db_path = _scaffold_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    run = Run(input="one")
+    run.start()
+    run.complete(result="done")
+    store.save(run)
+    store.close()
+
+    with pytest.raises(IllegalTransition):
+        cancel_run(run.id, root=project_dir)
