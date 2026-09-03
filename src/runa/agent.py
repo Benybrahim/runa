@@ -5,7 +5,7 @@ from typing import Any, ClassVar
 from runa.background import Queue
 from runa.background import run_later as _run_later
 from runa.config import default_provider
-from runa.core import Conversation, Run
+from runa.core import Conversation, Run, RunStatus
 from runa.runtime import Executor
 from runa.tool import Tool
 
@@ -141,3 +141,68 @@ class Agent:
         executor = executor or Executor(provider=default_provider())
         run = Run(input=input, conversation=conversation)
         return _run_later(cls(), run, executor, queue=queue)
+
+    @classmethod
+    def as_tool(
+        cls,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        executor: Executor | None = None,
+    ) -> Tool:
+        """Wrap this Agent as a Tool another Agent can call (manifesto §6).
+
+        A parent agent delegates by declaring the sub-agent as an ordinary
+        tool — `tools = [ResearchAgent.as_tool()]` — no new Strategy needed:
+        `DefaultStrategy`'s existing tool-use loop already covers it once an
+        Agent can be handed in as a Tool.
+        """
+        return DelegateTool(cls, name=name, description=description, executor=executor)
+
+
+class DelegateTool(Tool):
+    """Runs an Agent as a Tool call — the delegation strategy from manifesto §6.
+
+    `call()` runs the wrapped Agent synchronously against `input`, using the
+    app-wide default Provider (`runa.configure()`) unless an `executor` is
+    given, and returns its `Run.result` — the same value the sub-agent's own
+    `.run()` would return. A run that doesn't complete raises, which the
+    parent's `Executor` turns into an ordinary `TOOL_FAILED` event, so a
+    delegate's failure is visible the same way any other tool's is.
+
+    The sub-agent's own `Run` isn't threaded into the parent Run's event log
+    — the two are separate executions — but it stays reachable on
+    `self.last_run` after each call, as the escape hatch for inspecting a
+    delegated run directly (manifesto §15), e.g. `timeline(tool.last_run)`.
+    """
+
+    def __init__(
+        self,
+        agent_cls: type[Agent],
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        executor: Executor | None = None,
+    ) -> None:
+        self._agent_cls = agent_cls
+        self.name = name or agent_cls.__name__
+        self.description = description or agent_cls.instructions
+        self._executor = executor
+        self.last_run: Run | None = None
+
+    def call(self, input: str) -> Any:
+        executor = self._executor or Executor(provider=default_provider())
+        run = executor.run(self._agent_cls(), Run(input=input))
+        self.last_run = run
+        if run.status != RunStatus.COMPLETED:
+            raise RuntimeError(
+                f"delegated run to {self.tool_name()} did not complete: {run.status}"
+            )
+        return run.result
+
+    def schema(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {"input": {"type": "string"}},
+            "required": ["input"],
+        }

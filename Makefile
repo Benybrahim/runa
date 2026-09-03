@@ -32,6 +32,7 @@ examples:
 	uv run python examples/background.py
 	uv run python examples/approval.py
 	uv run python examples/eval.py
+	uv run python examples/delegate.py
 
 clean:
 	rm -rf .pytest_cache

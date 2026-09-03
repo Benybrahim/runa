@@ -118,3 +118,28 @@ def test_eval_example():
     assert all(result.passed for result in results), [
         (r.case.name, r.error) for r in results if not r.passed
     ]
+
+
+def test_delegate_example():
+    delegate = _load("delegate")
+    fake = FakeProvider(
+        [
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(
+                        name="ResearchAgent",
+                        arguments={"input": "fusion energy"},
+                    )
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="Fusion is making progress."),
+            Message(role=Role.ASSISTANT, content="Fusion is making progress."),
+        ]
+    )
+    configure(provider=fake)
+
+    run = delegate.LeadAgent.run("What's promising about fusion energy?")
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "Fusion is making progress."

@@ -1,8 +1,8 @@
 import pytest
 
-from runa.agent import Agent, DuplicateToolName, UnknownApprovalTool
+from runa.agent import Agent, DelegateTool, DuplicateToolName, UnknownApprovalTool
 from runa.config import ProviderNotConfigured, configure
-from runa.core import Conversation, Message, Role, RunStatus
+from runa.core import Conversation, Message, Role, RunStatus, ToolCall
 from runa.runtime import Executor
 from runa.tool import Tool
 from tests.fakes import FakeProvider
@@ -174,3 +174,98 @@ def test_run_with_a_conversation_carries_history_into_the_next_run():
         "And the temperature?",
     ]
     assert conversation.messages[-1].content == "22 degrees."
+
+
+def test_as_tool_defaults_name_and_description_from_the_agent():
+    class ResearchAgent(Agent):
+        instructions = "Research thoroughly."
+
+    tool = ResearchAgent.as_tool()
+
+    assert isinstance(tool, DelegateTool)
+    assert tool.tool_name() == "ResearchAgent"
+    assert tool.tool_description() == "Research thoroughly."
+
+
+def test_as_tool_accepts_name_and_description_overrides():
+    class ResearchAgent(Agent):
+        instructions = "Research thoroughly."
+
+    tool = ResearchAgent.as_tool(name="researcher", description="Looks things up.")
+
+    assert tool.tool_name() == "researcher"
+    assert tool.tool_description() == "Looks things up."
+
+
+def test_delegate_tool_schema_is_a_single_input_field():
+    class ResearchAgent(Agent):
+        pass
+
+    assert ResearchAgent.as_tool().schema() == {
+        "type": "object",
+        "properties": {"input": {"type": "string"}},
+        "required": ["input"],
+    }
+
+
+def test_a_parent_agent_can_delegate_to_a_sub_agent():
+    class ResearchAgent(Agent):
+        instructions = "Research."
+
+    provider = FakeProvider(
+        [
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(name="ResearchAgent", arguments={"input": "fusion energy"})
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="Fusion is promising."),
+            Message(role=Role.ASSISTANT, content="Fusion is promising, per research."),
+        ]
+    )
+    executor = Executor(provider=provider)
+    research_tool = ResearchAgent.as_tool(executor=executor)
+
+    class LeadAgent(Agent):
+        instructions = "Delegate research questions."
+        tools = [research_tool]
+
+    run = LeadAgent.run("What about fusion?", executor=executor)
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "Fusion is promising, per research."
+    # the sub-run isn't folded into the parent's own event log, but it
+    # stays reachable for direct inspection (manifesto §15)
+    assert research_tool.last_run.status == RunStatus.COMPLETED
+    assert research_tool.last_run.result == "Fusion is promising."
+
+
+def test_a_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
+    class ResearchAgent(Agent):
+        pass
+
+    provider = FakeProvider(
+        [
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="ResearchAgent", arguments={"input": "x"})],
+            ),
+        ]
+    )
+    executor = Executor(provider=provider)
+    # ResearchAgent's own model call has no scripted response, so its Run fails
+    research_tool = ResearchAgent.as_tool(executor=Executor(provider=FakeProvider([])))
+
+    class LeadAgent(Agent):
+        tools = [research_tool]
+
+    run = LeadAgent.run("delegate this", executor=executor)
+
+    # DefaultStrategy fails the parent run on the first tool error, same as
+    # any other failing tool call would (see RetryStrategy for retries)
+    assert run.status == RunStatus.FAILED
+    failed_call = next(tc for tc in run.tool_calls if tc.name == "ResearchAgent")
+    assert failed_call.error is not None
+    # still reachable for inspection even though the delegated run failed
+    assert research_tool.last_run.status == RunStatus.FAILED

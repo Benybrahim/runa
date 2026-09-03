@@ -1,6 +1,6 @@
 """Runa: the application framework for agentic AI."""
 
-from runa.agent import Agent, DuplicateToolName, UnknownApprovalTool
+from runa.agent import Agent, DelegateTool, DuplicateToolName, UnknownApprovalTool
 from runa.approval import UnknownToolCall, approve, deny
 from runa.background import InlineQueue, Queue, ThreadQueue, run_later
 from runa.config import ProviderNotConfigured, configure
@@ -70,6 +70,7 @@ __all__ = [
     "ConversationStore",
     "DataArtifact",
     "DefaultStrategy",
+    "DelegateTool",
     "DuplicateToolName",
     "EvalCase",
     "EvalResult",

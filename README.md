@@ -82,6 +82,22 @@ Runa keeps the underlying model provider replaceable. A `Provider` is a small pr
       OpenAI   Anthropic    Other
 ```
 
+### Delegation is just a tool
+
+Some agents delegate to other agents. Runa doesn't add a second orchestration layer for that — `Agent.as_tool()` wraps an agent as an ordinary `Tool`, so a parent agent declares it exactly like any other capability:
+
+```python
+class ResearchAgent(Agent):
+    instructions = "Answer research questions concisely."
+
+
+class LeadAgent(Agent):
+    instructions = "Delegate research questions to the ResearchAgent tool."
+    tools = [ResearchAgent.as_tool()]
+```
+
+The sub-agent runs to completion and its `run.result` comes back as the tool's output; a sub-run that fails surfaces as an ordinary failed tool call. `DefaultStrategy`'s existing tool-use loop handles it — delegation didn't need a new `Strategy`.
+
 ### One lifecycle, many transitions
 
 Every `Run` moves through the same state machine — `Created → Queued → Running → Paused / AwaitingApproval → Completed / Failed / Cancelled`. Background execution (`run_later`) and human approval (`requires_approval`, `approve`/`deny`) aren't separate systems; they're alternate transitions through that same machine, so persistence, observability, and evaluation all work identically regardless of how a Run got where it is.
@@ -113,7 +129,7 @@ myapp/
 All layers described in [`docs/architecture.md`](docs/architecture.md) are implemented and tested, in build order:
 
 * `core/` — `Run`, `Message`, `Event`, `Artifact`, `State`, `Conversation`
-* `Agent` + `Tool` — the declarative surface
+* `Agent` + `Tool` — the declarative surface, including `Agent.as_tool()` for delegation
 * `runtime/` — `Strategy` protocol, `DefaultStrategy`, `RetryStrategy`, `Executor`
 * `providers/` — `AnthropicProvider`, `OpenAIProvider`
 * `persistence/` — `RunStore`, `InMemoryRunStore`, `SQLiteRunStore`, `ConversationStore`, `InMemoryConversationStore`
