@@ -2,7 +2,14 @@
 
 from runa.agent import Agent, DelegateTool, DuplicateToolName, UnknownApprovalTool
 from runa.approval import UnknownToolCall, approve, deny
-from runa.background import InlineQueue, Queue, ThreadQueue, run_later
+from runa.background import (
+    DurableQueue,
+    InlineQueue,
+    Queue,
+    SQLiteQueue,
+    ThreadQueue,
+    run_later,
+)
 from runa.config import AsyncProviderNotConfigured, ProviderNotConfigured, configure
 from runa.core import (
     ActionArtifact,
@@ -98,6 +105,7 @@ __all__ = [
     "DefaultStrategy",
     "DelegateTool",
     "DuplicateToolName",
+    "DurableQueue",
     "EvalCase",
     "EvalResult",
     "Event",
@@ -130,6 +138,7 @@ __all__ = [
     "RunStatus",
     "RunStore",
     "SQLiteConversationStore",
+    "SQLiteQueue",
     "SQLiteRunStore",
     "Strategy",
     "Stream",
