@@ -53,13 +53,13 @@ Runa is built around one central object — the `Run` — and a small set of lay
 
 ```text
 runa/
-├── core/            Run, Message, Event, Artifact, State — pure data
-├── agent.py         Agent: declarative tools, instructions, approval, hooks
+├── core/            Run, Message, Event, Artifact, State, Context — pure data
+├── agent.py         Agent: declarative tools, instructions, policies, approval, hooks
 ├── tool.py          Tool base + @tool function adapter
 ├── runtime/         Strategy + Executor (sync and async) — drives a Run to completion
 ├── providers/       Thin adapters to model APIs (Anthropic, OpenAI; sync and async)
 ├── persistence/      RunStore — durable Run status
-├── background/       run_later() — background execution
+├── background/       run_later(), DurableQueue/recover_pending() — background execution + crash recovery
 ├── approval.py       requires_approval — human-in-the-loop gate
 ├── observability/     timeline() + instrument() — reads Run.events
 ├── eval/              expect(run) + run_evals() + Judge — same code path as prod
@@ -168,6 +168,23 @@ See `examples/plan_and_review.py` for a complete version that calls the model fr
 
 Every `Run` moves through the same state machine — `Created → Queued → Running → Paused / AwaitingApproval → Completed / Failed / Cancelled`. Background execution (`run_later`) and human approval (`requires_approval`, `approve`/`deny`) aren't separate systems; they're alternate transitions through that same machine, so persistence, observability, and evaluation all work identically regardless of how a Run got where it is.
 
+### Policy runs before approval
+
+`requires_approval` always defers to a human. `Agent.policies` is the earlier, programmatic check for rules the application can decide on its own — a plain `(run, tool_call) -> bool` — so a call can be denied outright without ever pausing a Run for a person:
+
+```python
+def block_large_transfers(run: Run, tool_call: ToolCall) -> bool:
+    return tool_call.arguments.get("amount", 0) <= 10_000
+
+
+class FinanceAgent(Agent):
+    tools = [TransferFunds]
+    policies = [block_large_transfers]  # denies on its own
+    requires_approval = [TransferFunds]  # everything else still needs a human
+```
+
+A denying policy fails the Run and emits a `POLICY_DENIED` event — the tool itself never runs.
+
 ### Application layout
 
 `runa new myapp` scaffolds a conventional project layout — structure, not configuration, carries the meaning (manifesto §2), the same way Rails' `app/models`/`app/controllers` do:
@@ -199,14 +216,14 @@ myapp/
 
 All layers described in [`docs/architecture.md`](docs/architecture.md) are implemented and tested, in build order:
 
-* `core/` — `Run`, `Message`, `Event`, `Artifact` (auto-recorded when a Tool returns one), `State`, `Conversation`
-* `Agent` + `Tool` — the declarative surface, including `Agent.as_tool()`/`as_async_tool()` for delegation
+* `core/` — `Run`, `Message`, `Event`, `Artifact` (auto-recorded when a Tool returns one), `State`, `Context`, `Conversation`
+* `Agent` + `Tool` — the declarative surface: `tools`, `policies`, `requires_approval`, hooks, and `Agent.as_tool()`/`as_async_tool()` for delegation
 * `runtime/` — `Strategy` protocol, `DefaultStrategy`, `RetryStrategy`, `Executor`, `AsyncExecutor`, `on_chunk` streaming via `StreamingProvider`/`AsyncStreamingProvider`
 * `providers/` — `AnthropicProvider`, `OpenAIProvider`, `AsyncAnthropicProvider`, `AsyncOpenAIProvider`, each also implementing `stream()`
 * `persistence/` — `RunStore`, `InMemoryRunStore`, `SQLiteRunStore`, `ConversationStore`, `InMemoryConversationStore`
-* `background/` + `approval.py` — `run_later`, `Queue` (`InlineQueue`, `ThreadQueue`), `approve`/`deny`
+* `background/` + `approval.py` — `run_later`, `Queue` (`InlineQueue`, `ThreadQueue`, `SQLiteQueue`), `DurableQueue`/`recover_pending()` for crash recovery, `approve`/`deny`
 * `observability/` — `timeline()`, `instrument()`
-* `eval/` — `expect(run)`, `run_evals()`, `Judge` (LLM-graded `to_be_helpful()`/`to_be_factual()`/`not_to_hallucinate()`)
+* `eval/` — `expect(run)`, `run_evals()`, `Judge` (LLM-graded `to_be_helpful()`/`to_be_factual()`/`not_to_hallucinate()`/`to_meet_the_goal()`)
 * `cli/` — `runa new`, `runa generate agent`, `runa eval`, `runa test`, `runa runs show`/`list`/`pending`/`approve`/`deny`
 
 The core API is stable enough to build against, but Runa is still young — expect the surface to keep growing (durable/remote persistence backends, richer strategies, additional providers) without changing these foundations.
