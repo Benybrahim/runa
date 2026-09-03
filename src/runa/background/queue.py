@@ -15,6 +15,7 @@ its own docstring.
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+from runa.config import default_run_store
 from runa.core import Run
 from runa.persistence import RunStore
 from runa.runtime import Executor
@@ -67,14 +68,33 @@ def run_later(
     With the default InlineQueue, the Run has already reached its next
     pause point (completion, failure, or an approval gate) by the time this
     returns. A real Queue defers that work elsewhere.
+
+    Stamps `agent_name`/`agent_version` before queuing rather than leaving
+    that to `Executor.run()`'s own seeding — a QUEUED Run is already durable
+    state once a `DurableQueue` has journaled it, and architecture.md §14
+    expects provenance to be attributable at that point, not only once
+    execution actually starts.
+
+    A `DurableQueue`'s journal only records *that* a run id is pending, not
+    the Run itself (`background/sqlite.py` — an Agent/Executor hold live
+    resources that don't survive a process boundary). So `recover_pending()`
+    resolves an orphaned id against a `RunStore` — meaning this Run must be
+    saved to `default_run_store()` before it's handed to the queue, or
+    there's nothing for recovery to find after a crash. Saved before
+    `queue.enqueue_run()`, not after, since a durable queue may start the
+    job on another thread the moment it's called — saving first avoids
+    racing that thread's own mutation of `run.events`/`run.messages`.
     """
     queue = queue or InlineQueue()
+    run.agent_name = agent.agent_name()
+    run.agent_version = agent.version
     run.queue()
 
     def job() -> None:
         executor.run(agent, run)
 
     if isinstance(queue, DurableQueue):
+        default_run_store().save(run)
         queue.enqueue_run(run.id, job)
     else:
         queue.enqueue(job)

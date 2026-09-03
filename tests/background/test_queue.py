@@ -88,6 +88,68 @@ def test_deferred_queue_leaves_the_run_queued_until_dispatched():
     assert run.status == RunStatus.COMPLETED
 
 
+def test_run_later_stamps_agent_provenance_before_the_job_runs():
+    class DeferredQueue:
+        def __init__(self):
+            self.jobs = []
+
+        def enqueue(self, job):
+            self.jobs.append(job)
+
+    provider = FakeProvider(responses=[])
+    executor = Executor(provider)
+    agent = GreeterAgent()
+    run = Run(input="hello")
+    queue = DeferredQueue()
+
+    run_later(agent, run, executor, queue=queue)
+
+    # provenance is set even though the job hasn't run yet
+    assert run.agent_name == "GreeterAgent"
+    assert queue.jobs  # sanity: the job really is still pending
+
+
+class DeferredDurableQueue:
+    """A DurableQueue whose `enqueue_run()` doesn't run the job immediately —
+    unlike `FakeDurableQueue` above — so a test can inspect state between
+    queuing and dispatch, the way a process crash would leave things.
+    """
+
+    def __init__(self) -> None:
+        self.enqueued: list[str] = []
+        self.jobs: dict[str, object] = {}
+
+    def enqueue(self, job):
+        self.jobs["_"] = job
+
+    def enqueue_run(self, run_id, job):
+        self.enqueued.append(run_id)
+        self.jobs[run_id] = job
+
+    def pending(self) -> list[str]:
+        return list(self.enqueued)
+
+
+def test_run_later_saves_to_the_default_run_store_before_a_durable_queue_dispatches(
+    monkeypatch,
+):
+    store = InMemoryRunStore()
+    monkeypatch.setattr("runa.config._default_run_store", store)
+    provider = FakeProvider(responses=[])
+    executor = Executor(provider)
+    agent = GreeterAgent()
+    run = Run(input="hello")
+    queue = DeferredDurableQueue()
+
+    run_later(agent, run, executor, queue=queue)
+
+    # saved while still QUEUED — the job hasn't run yet
+    saved = store.get(run.id)
+    assert saved is not None
+    assert saved.status == RunStatus.QUEUED
+    assert saved.agent_name == "GreeterAgent"
+
+
 def test_inline_queue_runs_the_job_immediately():
     calls = []
     InlineQueue().enqueue(lambda: calls.append("ran"))
