@@ -42,6 +42,17 @@ def test_complete_sets_result_and_status():
     assert run.status == RunStatus.COMPLETED
     assert run.result == "done"
     assert run.is_terminal
+    assert run.completed
+
+
+def test_completed_is_false_for_a_run_that_has_not_completed():
+    run = Run(input="hello")
+    assert not run.completed
+
+    run.start()
+    run.fail(error="boom")
+    assert run.is_terminal
+    assert not run.completed
 
 
 def test_pause_and_resume_round_trip():

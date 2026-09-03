@@ -122,3 +122,7 @@ class Run:
     @property
     def is_terminal(self) -> bool:
         return not _TRANSITIONS[self.status]
+
+    @property
+    def completed(self) -> bool:
+        return self.status == RunStatus.COMPLETED
