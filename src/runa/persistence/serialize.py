@@ -21,6 +21,7 @@ from runa.core import (
     ActionArtifact,
     Artifact,
     CitationSetArtifact,
+    Context,
     Conversation,
     DataArtifact,
     EffectStatus,
@@ -92,7 +93,7 @@ def run_to_dict(run: Run) -> dict[str, Any]:
         "agent_version": run.agent_version,
         "parent_run_id": run.parent_run_id,
         "input": run.input,
-        "context": run.context,
+        "context": dict(run.context),
         "state": dict(run.state),
         "messages": [
             {
@@ -144,7 +145,7 @@ def run_from_dict(data: dict[str, Any]) -> Run:
         agent_version=data["agent_version"],
         parent_run_id=data["parent_run_id"],
         input=data["input"],
-        context=data["context"],
+        context=Context(data["context"]),
         state=RunState(data["state"]),
         messages=messages,
         events=[

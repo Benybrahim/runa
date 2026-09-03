@@ -1,6 +1,19 @@
 import pytest
 
-from runa.core import ConversationState, RunState
+from runa.core import Context, ConversationState, Run, RunState
+
+
+def test_run_context_supports_attribute_access():
+    context = Context()
+    context.resources = ["kb-1"]
+    assert context.resources == ["kb-1"]
+    assert context["resources"] == ["kb-1"]
+
+
+def test_new_run_starts_with_an_empty_context():
+    run = Run(input="hello")
+    assert isinstance(run.context, Context)
+    assert dict(run.context) == {}
 
 
 def test_run_state_supports_attribute_access():

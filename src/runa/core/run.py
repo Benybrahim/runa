@@ -7,6 +7,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from runa.core.artifact import Artifact
+from runa.core.context import Context
 from runa.core.event import Event, EventType
 from runa.core.message import Message, ToolCall
 from runa.core.state import RunState
@@ -57,7 +58,7 @@ class Run:
     agent_name: str | None = None
     agent_version: str | None = None
     parent_run_id: str | None = None
-    context: dict[str, Any] = field(default_factory=dict)
+    context: Context = field(default_factory=Context)
     state: RunState = field(default_factory=RunState)
     messages: list[Message] = field(default_factory=list)
     events: list[Event] = field(default_factory=list)
