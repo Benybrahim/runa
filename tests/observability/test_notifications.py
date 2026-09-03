@@ -19,6 +19,15 @@ class WeatherAgent(Agent):
     tools = [GetWeather]
 
 
+class BrokenTool(Tool):
+    def call(self, city: str) -> str:
+        raise RuntimeError("boom")
+
+
+class BrokenAgent(Agent):
+    tools = [BrokenTool]
+
+
 def test_timeline_summarizes_events_in_order():
     provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     run = Executor(provider).run(GreeterAgent(), Run(input="hello"))
@@ -49,8 +58,26 @@ def test_timeline_summarizes_a_tool_call_with_its_arguments():
     run = Executor(provider).run(WeatherAgent(), Run(input="weather in Tokyo?"))
 
     called = next(e for e in timeline(run) if e.type == EventType.TOOL_CALLED)
+    completed = next(e for e in timeline(run) if e.type == EventType.TOOL_COMPLETED)
 
     assert called.summary == "tool called: GetWeather({'city': 'Tokyo'})"
+    assert completed.summary == "tool completed: GetWeather -> 'Tokyo: sunny'"
+
+
+def test_timeline_summarizes_a_failed_tool_call_with_its_arguments():
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="BrokenTool", arguments={"city": "Tokyo"})],
+            ),
+        ]
+    )
+    run = Executor(provider).run(BrokenAgent(), Run(input="weather in Tokyo?"))
+
+    failed = next(e for e in timeline(run) if e.type == EventType.TOOL_FAILED)
+
+    assert failed.summary == "tool failed: BrokenTool({'city': 'Tokyo'}): boom"
 
 
 def test_timeline_reflects_run_events_not_a_separate_copy():

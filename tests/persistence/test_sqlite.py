@@ -111,6 +111,22 @@ def test_round_trips_a_failed_runs_error():
     assert loaded.error == "boom"
 
 
+def test_round_trips_a_tool_calls_non_json_safe_result_as_a_string():
+    # A Tool may return an Artifact (or any object) — ToolCall.result holds
+    # it as-is, but persistence can't; it should fall back to str() rather
+    # than raise and lose the whole Run.
+    store = SQLiteRunStore(":memory:")
+    run = Run(input="hi")
+    artifact = TextArtifact(text="a report")
+    tool_call = ToolCall(name="MakeReport", result=artifact, attempts=1)
+    run.add_message(Message(role=Role.ASSISTANT, tool_calls=[tool_call]))
+
+    store.save(run)
+    loaded = store.get(run.id)
+
+    assert loaded.tool_calls[0].result == str(artifact)
+
+
 def test_round_trips_agent_nameentity_and_version():
     store = SQLiteRunStore(":memory:")
     run = Run(input="hi", agent_name="ResearchAgent", agent_version="1.2.0")

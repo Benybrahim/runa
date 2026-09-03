@@ -245,6 +245,7 @@ class Executor:
                 EventType.TOOL_FAILED,
                 tool=tool_call.name,
                 tool_call_id=tool_call.id,
+                arguments=tool_call.arguments,
                 error=str(exc),
                 effect=EffectStatus.UNKNOWN.value,
             )
@@ -264,5 +265,11 @@ class Executor:
             EventType.TOOL_COMPLETED,
             tool=tool_call.name,
             tool_call_id=tool_call.id,
+            # `content`, not the raw `tool_call.result` — a Tool may return
+            # an arbitrary object (e.g. an Artifact), which Event.data must
+            # stay JSON-serializable for (persistence, webhook export);
+            # `content` is the same already-stringified/summarized value
+            # the model itself was given.
+            result=content,
             effect=EffectStatus.OBSERVED.value,
         )

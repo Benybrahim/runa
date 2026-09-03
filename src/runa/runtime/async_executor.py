@@ -258,6 +258,7 @@ class AsyncExecutor:
                 EventType.TOOL_FAILED,
                 tool=tool_call.name,
                 tool_call_id=tool_call.id,
+                arguments=tool_call.arguments,
                 error=str(exc),
                 effect=EffectStatus.UNKNOWN.value,
             )
@@ -278,5 +279,8 @@ class AsyncExecutor:
             EventType.TOOL_COMPLETED,
             tool=tool_call.name,
             tool_call_id=tool_call.id,
+            # `content`, not the raw `tool_call.result` — see Executor's
+            # equivalent for why (Event.data must stay JSON-serializable).
+            result=content,
             effect=EffectStatus.OBSERVED.value,
         )

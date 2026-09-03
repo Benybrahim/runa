@@ -65,12 +65,31 @@ def _artifact_from_dict(data: dict[str, Any]) -> Artifact:
     return cls(**data)
 
 
+def _json_safe(value: Any) -> Any:
+    """`value` unchanged if it's already JSON-safe, else its `str()`.
+
+    A Tool's return value isn't constrained to be JSON-serializable — it may
+    be an `Artifact` or any other plain Python object — but `ToolCall.result`
+    holds whatever the Tool actually returned (application code inspects it
+    directly, e.g. to get the real Artifact back), so it can't be coerced at
+    the point of assignment. Persistence still needs *something* writable:
+    falling back to `str(value)` matches what the model itself was already
+    shown for this call (`content` in `Executor._call_tool`) rather than
+    raising and losing the whole Run to one non-serializable result.
+    """
+    try:
+        json.dumps(value)
+    except TypeError:
+        return str(value)
+    return value
+
+
 def _tool_call_to_dict(tool_call: ToolCall) -> dict[str, Any]:
     return {
         "id": tool_call.id,
         "name": tool_call.name,
         "arguments": tool_call.arguments,
-        "result": tool_call.result,
+        "result": _json_safe(tool_call.result),
         "approved": tool_call.approved,
         "error": tool_call.error,
         "attempts": tool_call.attempts,
