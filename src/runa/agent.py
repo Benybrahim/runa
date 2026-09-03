@@ -100,8 +100,15 @@ class Agent:
     def plan(self, run: Run) -> None:
         """Called to plan before acting. Override to customize."""
 
-    def review(self, run: Run) -> None:
-        """Called to review results before completion. Override to customize."""
+    def review(self, run: Run) -> Any | None:
+        """Called to review the draft result before completion.
+
+        Override to customize. Return a value to replace the Strategy's
+        draft result with it (manifesto §6's "reflection"); return `None`
+        (the default — an override that falls off the end returns `None`
+        automatically) to leave it as the Strategy decided.
+        """
+        return None
 
     def after_run(self, run: Run) -> None:
         """Called after execution completes. Override to customize."""

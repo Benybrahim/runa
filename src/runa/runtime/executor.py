@@ -33,9 +33,11 @@ class Executor:
 
     Agent hooks fire in one fixed order: `before_run` and `plan` once, before
     the first Strategy step; `review` once, when the Strategy decides to
-    Complete; `after_run` once the Run reaches a terminal status. Resuming a
-    paused Run skips `before_run`/`plan` — they're a start-of-run setup
-    phase, not re-run on every resume.
+    Complete — its return value replaces the Strategy's draft result unless
+    it returns `None` (manifesto §6's "reflection"); `after_run` once the
+    Run reaches a terminal status. Resuming a paused Run skips
+    `before_run`/`plan` — they're a start-of-run setup phase, not re-run on
+    every resume.
 
     If `run.conversation` is set, its history is seeded in ahead of this
     Run's own input, and this Run's messages are folded back into it once
@@ -89,8 +91,8 @@ class Executor:
         elif isinstance(action, CallTool):
             self._call_tool(agent, run, action.tool_call)
         elif isinstance(action, Complete):
-            agent.review(run)
-            run.complete(result=action.result)
+            revised = agent.review(run)
+            run.complete(result=action.result if revised is None else revised)
         elif isinstance(action, Fail):
             run.fail(error=action.error)
         else:

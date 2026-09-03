@@ -145,6 +145,31 @@ def test_eval_example():
     ]
 
 
+def test_plan_and_review_example():
+    plan_and_review = _load("plan_and_review")
+    fake = FakeProvider(
+        [
+            Message(role=Role.ASSISTANT, content="1. search\n2. summarize"),
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="search", arguments={"query": "fusion"})],
+            ),
+            Message(role=Role.ASSISTANT, content="draft answer"),
+            Message(role=Role.ASSISTANT, content="revised answer"),
+        ]
+    )
+    # plan()/review() close over the module's `provider` global directly, so
+    # it needs swapping the same way test_eval_example swaps `judge`.
+    plan_and_review.provider = fake
+
+    run = Executor(fake).run(plan_and_review.ResearchAgent(), Run(input="fusion?"))
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "revised answer"
+    assert run.state.plan == "1. search\n2. summarize"
+    assert len(run.artifacts) == 1
+
+
 def test_delegate_example():
     delegate = _load("delegate")
     fake = FakeProvider(

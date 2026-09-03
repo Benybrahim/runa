@@ -90,6 +90,20 @@ def test_async_executor_records_an_artifact_a_tool_returns():
     assert tool_message.content == artifact.summary()
 
 
+def test_async_executor_review_hook_can_revise_the_result():
+    class ReviewingAgent(Agent):
+        def review(self, run):
+            return f"revised: {run.messages[-1].content}"
+
+    provider = FakeAsyncProvider(
+        responses=[Message(role=Role.ASSISTANT, content="draft")]
+    )
+
+    run = asyncio.run(AsyncExecutor(provider).run(ReviewingAgent(), Run(input="hi")))
+
+    assert run.result == "revised: draft"
+
+
 def test_independent_tool_calls_run_concurrently():
     class SlowToolA(Tool):
         async def call(self) -> str:

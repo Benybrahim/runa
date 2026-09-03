@@ -225,6 +225,30 @@ def test_review_hook_is_skipped_when_the_run_fails_instead_of_completing():
     assert calls == ["after_run"]
 
 
+def test_review_hook_can_revise_the_result():
+    class ReviewingAgent(Agent):
+        def review(self, run):
+            return f"revised: {run.messages[-1].content}"
+
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="draft")])
+
+    result = Executor(provider).run(ReviewingAgent(), Run(input="hi"))
+
+    assert result.result == "revised: draft"
+
+
+def test_review_hook_returning_none_keeps_the_strategys_result():
+    class SilentReviewAgent(Agent):
+        def review(self, run):
+            pass  # falls off the end, i.e. returns None
+
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="draft")])
+
+    result = Executor(provider).run(SilentReviewAgent(), Run(input="hi"))
+
+    assert result.result == "draft"
+
+
 def test_plan_is_not_re_run_when_resuming_a_paused_run():
     calls = []
 

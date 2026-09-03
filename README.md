@@ -122,6 +122,22 @@ class ExtractInvoiceData(Tool):
 
 The model still sees a plain-text tool result — `Artifact.summary()` renders it (each subclass overrides it sensibly; override it yourself on a custom Artifact for custom wording).
 
+### Planning and reflection are hooks, not a new subsystem
+
+Manifesto §6 lists `before_run`, `plan`, `review`, and `after_run` as opt-in `Agent` hooks without prescribing what they do — "the framework standardizes execution without standardizing thought." `plan()` runs once before the tool-use loop starts and can freely mutate `run.state`/`run.messages`, so whatever it adds is visible to every step that follows. `review()` runs once when the Strategy is about to complete the Run, and its return value — if not `None` — replaces the Strategy's draft result, which is what makes it useful for reflection rather than just observation:
+
+```python
+class ResearchAgent(Agent):
+    def plan(self, run: Run) -> None:
+        run.state.plan = provider.complete(...).content
+
+    def review(self, run: Run) -> str | None:
+        draft = run.messages[-1].content
+        return provider.complete(...).content or draft  # None keeps the draft
+```
+
+See `examples/plan_and_review.py` for a complete version that calls the model from both hooks.
+
 ### One lifecycle, many transitions
 
 Every `Run` moves through the same state machine — `Created → Queued → Running → Paused / AwaitingApproval → Completed / Failed / Cancelled`. Background execution (`run_later`) and human approval (`requires_approval`, `approve`/`deny`) aren't separate systems; they're alternate transitions through that same machine, so persistence, observability, and evaluation all work identically regardless of how a Run got where it is.

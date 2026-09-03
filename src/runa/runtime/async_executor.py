@@ -95,8 +95,8 @@ class AsyncExecutor:
         elif isinstance(action, CallTool):
             await self._call_tools(agent, run, action.tool_call)
         elif isinstance(action, Complete):
-            agent.review(run)
-            run.complete(result=action.result)
+            revised = agent.review(run)
+            run.complete(result=action.result if revised is None else revised)
         elif isinstance(action, Fail):
             run.fail(error=action.error)
         else:
