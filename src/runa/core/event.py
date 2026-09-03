@@ -16,6 +16,7 @@ class EventType(StrEnum):
     RUN_FAILED = "run.failed"
     RUN_CANCELLED = "run.cancelled"
     APPROVAL_REQUIRED = "approval.required"
+    POLICY_DENIED = "policy.denied"
     MODEL_CALLED = "model.called"
     MODEL_RESPONDED = "model.responded"
     TOOL_CALLED = "tool.called"

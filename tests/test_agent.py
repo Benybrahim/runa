@@ -11,7 +11,7 @@ from runa.agent import (
     UnknownApprovalTool,
 )
 from runa.config import ProviderNotConfigured, configure
-from runa.core import Conversation, Message, Role, RunStatus, ToolCall
+from runa.core import Conversation, EventType, Message, Role, RunStatus, ToolCall
 from runa.runtime import AsyncExecutor, Executor
 from runa.tool import Tool
 from tests.fakes import FakeAsyncProvider, FakeProvider
@@ -481,3 +481,105 @@ def test_async_delegate_tools_run_concurrently_under_async_executor():
     assert run.status == RunStatus.COMPLETED
     # sequential delegation would take >= 0.4s; concurrent stays close to 0.2s
     assert elapsed < 0.35, f"delegate calls did not run concurrently (took {elapsed}s)"
+
+
+def test_a_denying_policy_fails_the_run_without_calling_the_tool_or_a_human():
+    calls = []
+
+    class TrackedTool(Tool):
+        def call(self) -> None:
+            calls.append("called")
+
+    def deny_everything(run, tool_call):
+        return False
+
+    class FinanceAgent(Agent):
+        tools = [TrackedTool]
+        policies = [deny_everything]
+
+    provider = FakeProvider(
+        [Message(role=Role.ASSISTANT, tool_calls=[ToolCall(name="TrackedTool")])]
+    )
+
+    run = FinanceAgent.run("do it", executor=Executor(provider=provider))
+
+    assert run.status == RunStatus.FAILED
+    assert not calls  # the tool itself never ran
+    assert EventType.POLICY_DENIED in [event.type for event in run.events]
+
+
+def test_a_policy_runs_before_approval_so_a_denied_call_never_pauses_for_a_human():
+    class TransferFunds(Tool):
+        def call(self, amount: float) -> None:
+            pass
+
+    def deny_large_transfers(run, tool_call):
+        return tool_call.arguments.get("amount", 0) <= 100
+
+    class FinanceAgent(Agent):
+        tools = [TransferFunds]
+        requires_approval = [TransferFunds]
+        policies = [deny_large_transfers]
+
+    provider = FakeProvider(
+        [
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(name="TransferFunds", arguments={"amount": 10_000})
+                ],
+            )
+        ]
+    )
+
+    run = FinanceAgent.run("transfer", executor=Executor(provider=provider))
+
+    assert run.status == RunStatus.FAILED  # denied outright, never AWAITING_APPROVAL
+
+
+def test_a_passing_policy_lets_the_tool_call_proceed():
+    class TrackedTool(Tool):
+        def call(self) -> None:
+            pass
+
+    class FinanceAgent(Agent):
+        tools = [TrackedTool]
+        policies = [lambda run, tool_call: True]
+
+    provider = FakeProvider(
+        [
+            Message(role=Role.ASSISTANT, tool_calls=[ToolCall(name="TrackedTool")]),
+            Message(role=Role.ASSISTANT, content="done"),
+        ]
+    )
+
+    run = FinanceAgent.run("do it", executor=Executor(provider=provider))
+
+    assert run.status == RunStatus.COMPLETED
+
+
+def test_a_denying_policy_fails_an_async_run_without_calling_the_tool():
+    calls = []
+
+    class TrackedTool(Tool):
+        async def call(self) -> None:
+            calls.append("called")
+
+    def deny_everything(run, tool_call):
+        return False
+
+    class FinanceAgent(Agent):
+        tools = [TrackedTool]
+        policies = [deny_everything]
+
+    provider = FakeAsyncProvider(
+        [Message(role=Role.ASSISTANT, tool_calls=[ToolCall(name="TrackedTool")])]
+    )
+
+    run = asyncio.run(
+        FinanceAgent.run_async("do it", executor=AsyncExecutor(provider=provider))
+    )
+
+    assert run.status == RunStatus.FAILED
+    assert not calls
+    assert EventType.POLICY_DENIED in [event.type for event in run.events]

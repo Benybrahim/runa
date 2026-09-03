@@ -1,15 +1,18 @@
 """Agent: a declarative object with behavior and capabilities."""
 
+from collections.abc import Callable
 from typing import Any, ClassVar
 
 from runa.background import Queue
 from runa.background import run_later as _run_later
 from runa.config import default_async_provider, default_provider
-from runa.core import Conversation, Run, RunStatus
+from runa.core import Conversation, Run, RunStatus, ToolCall
 from runa.runtime import AsyncExecutor, Executor
 from runa.tool import Tool
 
 ToolEntry = type[Tool] | Tool
+
+Policy = Callable[[Run, ToolCall], bool]
 
 
 class DuplicateToolName(Exception):
@@ -47,6 +50,7 @@ class Agent:
     instructions: ClassVar[str] = ""
     tools: ClassVar[list[ToolEntry]] = []
     requires_approval: ClassVar[list[ToolEntry]] = []
+    policies: ClassVar[list[Policy]] = []
     model: ClassVar[str | None] = None
     name: ClassVar[str | None] = None
     version: ClassVar[str | None] = None
@@ -106,6 +110,18 @@ class Agent:
         result = frozenset(names)
         cls._approval_tool_names = result
         return result
+
+    def check_policies(self, run: Run, tool_call: ToolCall) -> bool:
+        """Run declared policies against a pending tool call.
+
+        Returns False if any policy vetoes the call — a programmatic
+        allow/deny check the Executor runs before a gated call can even
+        reach approval, so a call can be blocked without ever routing to a
+        human (architecture.md §3's Decision -> Capability -> Policy ->
+        Approval -> Action -> Effect chain). Compare `requires_approval`,
+        which always defers to a human.
+        """
+        return all(policy(run, tool_call) for policy in type(self).policies)
 
     def before_run(self, run: Run) -> None:
         """Called before execution begins. Override to customize."""

@@ -167,6 +167,15 @@ class Executor:
         `str(result)` (manifesto §10: artifacts are a type of tool result,
         not a separate API).
         """
+        if not agent.check_policies(run, tool_call):
+            run.emit(
+                EventType.POLICY_DENIED,
+                tool=tool_call.name,
+                tool_call_id=tool_call.id,
+            )
+            run.fail(error=f"tool call {tool_call.name!r} denied by policy")
+            return
+
         if (
             tool_call.name in agent.approval_tool_names()
             and tool_call.approved is not True
