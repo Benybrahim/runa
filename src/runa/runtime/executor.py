@@ -3,7 +3,7 @@
 import inspect
 from typing import TYPE_CHECKING
 
-from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
+from runa.core import Artifact, EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime._shared import seed_run, tool_schemas
 from runa.runtime.provider import Provider
 from runa.runtime.strategy import (
@@ -106,6 +106,14 @@ class Executor:
         run.emit(EventType.MODEL_RESPONDED)
 
     def _call_tool(self, agent: "Agent", run: Run, tool_call: ToolCall) -> None:
+        """Run one tool call.
+
+        If `tool.call()` returns an `Artifact`, it's recorded on the Run via
+        `run.add_artifact()` and its `summary()` becomes the tool result the
+        model sees — a plain value keeps working exactly as before, via
+        `str(result)` (manifesto §10: artifacts are a type of tool result,
+        not a separate API).
+        """
         if (
             tool_call.name in agent.approval_tool_names()
             and tool_call.approved is not True
@@ -135,12 +143,13 @@ class Executor:
             return
 
         tool_call.error = None
+        if isinstance(tool_call.result, Artifact):
+            run.add_artifact(tool_call.result)
+            content = tool_call.result.summary()
+        else:
+            content = str(tool_call.result)
         run.add_message(
-            Message(
-                role=Role.TOOL,
-                content=str(tool_call.result),
-                tool_call_id=tool_call.id,
-            )
+            Message(role=Role.TOOL, content=content, tool_call_id=tool_call.id)
         )
         run.emit(
             EventType.TOOL_COMPLETED, tool=tool_call.name, tool_call_id=tool_call.id

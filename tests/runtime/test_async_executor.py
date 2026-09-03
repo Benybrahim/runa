@@ -4,7 +4,7 @@ import time
 from runa.agent import Agent
 from runa.approval import approve
 from runa.config import configure
-from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
+from runa.core import DataArtifact, EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime.async_executor import AsyncExecutor
 from runa.runtime.executor import Executor
 from runa.runtime.retry import RetryStrategy
@@ -61,6 +61,33 @@ def test_async_executor_answers_directly_without_tools():
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "No tools needed."
+
+
+def test_async_executor_records_an_artifact_a_tool_returns():
+    class ExtractData(Tool):
+        async def call(self) -> DataArtifact:
+            return DataArtifact(data={"score": 0.9})
+
+    class ExtractAgent(Agent):
+        tools = [ExtractData]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="ExtractData", arguments={})],
+            ),
+            Message(role=Role.ASSISTANT, content="Extracted the score."),
+        ]
+    )
+    executor = AsyncExecutor(provider)
+    run = asyncio.run(executor.run(ExtractAgent(), Run(input="extract the score")))
+
+    assert len(run.artifacts) == 1
+    artifact = run.artifacts[0]
+    assert isinstance(artifact, DataArtifact)
+    tool_message = next(m for m in run.messages if m.role == Role.TOOL)
+    assert tool_message.content == artifact.summary()
 
 
 def test_independent_tool_calls_run_concurrently():

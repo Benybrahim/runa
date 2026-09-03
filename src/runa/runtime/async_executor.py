@@ -10,7 +10,7 @@ import asyncio
 import inspect
 from typing import TYPE_CHECKING
 
-from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
+from runa.core import Artifact, EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime._shared import seed_run, tool_schemas
 from runa.runtime.async_provider import AsyncProvider
 from runa.runtime.strategy import (
@@ -140,6 +140,7 @@ class AsyncExecutor:
             run.require_approval(blocked[0].id)
 
     async def _call_tool(self, agent: "Agent", run: Run, tool_call: ToolCall) -> None:
+        """Run one tool call — see `Executor._call_tool` for the Artifact dispatch."""
         tool = agent.resolved_tools()[tool_call.name]
         run.emit(EventType.TOOL_CALLED, tool=tool_call.name, tool_call_id=tool_call.id)
         tool_call.attempts += 1
@@ -161,12 +162,13 @@ class AsyncExecutor:
 
         tool_call.error = None
         tool_call.result = result
+        if isinstance(tool_call.result, Artifact):
+            run.add_artifact(tool_call.result)
+            content = tool_call.result.summary()
+        else:
+            content = str(tool_call.result)
         run.add_message(
-            Message(
-                role=Role.TOOL,
-                content=str(tool_call.result),
-                tool_call_id=tool_call.id,
-            )
+            Message(role=Role.TOOL, content=content, tool_call_id=tool_call.id)
         )
         run.emit(
             EventType.TOOL_COMPLETED, tool=tool_call.name, tool_call_id=tool_call.id

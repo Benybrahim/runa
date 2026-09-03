@@ -110,6 +110,18 @@ class LeadAgent(Agent):
 
 The sub-agent runs to completion and its `run.result` comes back as the tool's output; a sub-run that fails surfaces as an ordinary failed tool call. `DefaultStrategy`'s existing tool-use loop handles it — delegation didn't need a new `Strategy`.
 
+### A Tool result can be an Artifact
+
+Agents produce more than text (manifesto §10) — reports, extracted data, files, plans. A `Tool.call()` that returns an `Artifact` (`TextArtifact`, `DataArtifact`, `FileArtifact`, `CitationSetArtifact`, `PlanArtifact`, `ActionArtifact`) has it recorded on `run.artifacts` automatically; a plain return value behaves exactly as before. No separate API to remember — the Executor dispatches on the result's type (manifesto §2: "types are configuration"):
+
+```python
+class ExtractInvoiceData(Tool):
+    def call(self, text: str) -> DataArtifact:
+        return DataArtifact(data={"total": 129.99, "vendor": "Acme Corp"})
+```
+
+The model still sees a plain-text tool result — `Artifact.summary()` renders it (each subclass overrides it sensibly; override it yourself on a custom Artifact for custom wording).
+
 ### One lifecycle, many transitions
 
 Every `Run` moves through the same state machine — `Created → Queued → Running → Paused / AwaitingApproval → Completed / Failed / Cancelled`. Background execution (`run_later`) and human approval (`requires_approval`, `approve`/`deny`) aren't separate systems; they're alternate transitions through that same machine, so persistence, observability, and evaluation all work identically regardless of how a Run got where it is.
@@ -145,7 +157,7 @@ myapp/
 
 All layers described in [`docs/architecture.md`](docs/architecture.md) are implemented and tested, in build order:
 
-* `core/` — `Run`, `Message`, `Event`, `Artifact`, `State`, `Conversation`
+* `core/` — `Run`, `Message`, `Event`, `Artifact` (auto-recorded when a Tool returns one), `State`, `Conversation`
 * `Agent` + `Tool` — the declarative surface, including `Agent.as_tool()` for delegation
 * `runtime/` — `Strategy` protocol, `DefaultStrategy`, `RetryStrategy`, `Executor`, `AsyncExecutor`
 * `providers/` — `AnthropicProvider`, `OpenAIProvider`, `AsyncAnthropicProvider`, `AsyncOpenAIProvider`

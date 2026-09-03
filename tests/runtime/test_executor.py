@@ -1,6 +1,6 @@
 from runa.agent import Agent
 from runa.approval import approve
-from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
+from runa.core import DataArtifact, EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime.executor import Executor
 from runa.runtime.retry import RetryStrategy
 from runa.runtime.strategy import CallModel, Complete, Fail, Strategy
@@ -325,6 +325,40 @@ def test_approving_a_gated_tool_call_lets_the_run_finish():
     assert result.status == RunStatus.COMPLETED
     assert result.result == "Email sent."
     assert result.tool_calls[0].result == "sent to a@b.com"
+
+
+def test_tool_returning_an_artifact_records_it_on_the_run():
+    class ExtractData(Tool):
+        def call(self) -> DataArtifact:
+            return DataArtifact(data={"score": 0.9})
+
+    class ExtractAgent(Agent):
+        tools = [ExtractData]
+
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="ExtractData", arguments={})],
+            ),
+            Message(role=Role.ASSISTANT, content="Extracted the score."),
+        ]
+    )
+    executor = Executor(provider)
+    run = Run(input="extract the score")
+
+    result = executor.run(ExtractAgent(), run)
+
+    assert result.status == RunStatus.COMPLETED
+    assert len(result.artifacts) == 1
+    artifact = result.artifacts[0]
+    assert isinstance(artifact, DataArtifact)
+    assert artifact.data == {"score": 0.9}
+
+    tool_message = next(m for m in result.messages if m.role == Role.TOOL)
+    assert tool_message.content == artifact.summary()
+
+    assert EventType.ARTIFACT_CREATED in [e.type for e in result.events]
 
 
 def test_strategy_protocol_is_satisfiable_without_inheritance():
