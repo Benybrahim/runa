@@ -28,6 +28,50 @@ class BrokenAgent(Agent):
     tools = [BrokenTool]
 
 
+class NamedModelAgent(Agent):
+    model = "claude-sonnet-5"
+
+
+def test_timeline_summarizes_a_direct_answer_with_the_model_and_content():
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    run = Executor(provider).run(NamedModelAgent(), Run(input="hello"))
+
+    called = next(e for e in timeline(run) if e.type == EventType.MODEL_CALLED)
+    responded = next(e for e in timeline(run) if e.type == EventType.MODEL_RESPONDED)
+
+    assert called.summary == "model called (claude-sonnet-5)"
+    assert responded.summary == "model responded: 'hi'"
+
+
+def test_timeline_summarizes_a_model_call_with_no_configured_model():
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    run = Executor(provider).run(GreeterAgent(), Run(input="hello"))
+
+    called = next(e for e in timeline(run) if e.type == EventType.MODEL_CALLED)
+
+    assert called.summary == "model called"
+
+
+def test_timeline_summarizes_a_tool_requesting_response_by_call_count():
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(name="GetWeather", arguments={"city": "Tokyo"}),
+                    ToolCall(name="GetWeather", arguments={"city": "Osaka"}),
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="Both sunny."),
+        ]
+    )
+    run = Executor(provider).run(WeatherAgent(), Run(input="weather?"))
+
+    responded = next(e for e in timeline(run) if e.type == EventType.MODEL_RESPONDED)
+
+    assert responded.summary == "model responded: requested 2 tool call(s)"
+
+
 def test_timeline_summarizes_events_in_order():
     provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     run = Executor(provider).run(GreeterAgent(), Run(input="hello"))

@@ -169,7 +169,7 @@ class Executor:
         run: Run,
         on_chunk: Callable[[StreamChunk], None] | None,
     ) -> None:
-        run.emit(EventType.MODEL_CALLED)
+        run.emit(EventType.MODEL_CALLED, model=agent.model)
         schemas = tool_schemas(agent)
         if on_chunk is None:
             message = self.provider.complete(
@@ -189,7 +189,11 @@ class Executor:
                 on_chunk(chunk)
             message = stream.drain()
         run.add_message(message)
-        run.emit(EventType.MODEL_RESPONDED)
+        run.emit(
+            EventType.MODEL_RESPONDED,
+            content=message.content,
+            tool_call_count=len(message.tool_calls),
+        )
 
     def _call_tool(self, agent: "Agent", run: Run, tool_call: ToolCall) -> None:
         """Run one tool call.

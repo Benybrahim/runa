@@ -159,7 +159,7 @@ class AsyncExecutor:
         run: Run,
         on_chunk: Callable[[StreamChunk], Any] | None,
     ) -> None:
-        run.emit(EventType.MODEL_CALLED)
+        run.emit(EventType.MODEL_CALLED, model=agent.model)
         schemas = tool_schemas(agent)
         if on_chunk is None:
             message = await self.provider.complete(
@@ -181,7 +181,11 @@ class AsyncExecutor:
                     await result
             message = await stream.drain()
         run.add_message(message)
-        run.emit(EventType.MODEL_RESPONDED)
+        run.emit(
+            EventType.MODEL_RESPONDED,
+            content=message.content,
+            tool_call_count=len(message.tool_calls),
+        )
 
     async def _call_tools(
         self, agent: "Agent", run: Run, named_tool_call: ToolCall

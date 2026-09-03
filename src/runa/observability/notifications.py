@@ -26,8 +26,16 @@ _SUMMARIES: dict[EventType, Callable[[dict[str, Any]], str]] = {
     EventType.APPROVAL_REQUIRED: (
         lambda d: f"approval required for tool call {d.get('tool_call_id', '')}"
     ),
-    EventType.MODEL_CALLED: lambda d: "model called",
-    EventType.MODEL_RESPONDED: lambda d: "model responded",
+    EventType.MODEL_CALLED: (
+        lambda d: f"model called ({d['model']})" if d.get("model") else "model called"
+    ),
+    EventType.MODEL_RESPONDED: (
+        lambda d: (
+            f"model responded: requested {d['tool_call_count']} tool call(s)"
+            if d.get("tool_call_count")
+            else f"model responded: {d.get('content', '')!r}"
+        )
+    ),
     EventType.TOOL_CALLED: (
         lambda d: f"tool called: {d.get('tool', '')}({d.get('arguments', {})})"
     ),
