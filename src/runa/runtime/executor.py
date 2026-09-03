@@ -4,7 +4,16 @@ import inspect
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from runa.core import Artifact, EventType, Message, Role, Run, RunStatus, ToolCall
+from runa.core import (
+    Artifact,
+    EffectStatus,
+    EventType,
+    Message,
+    Role,
+    Run,
+    RunStatus,
+    ToolCall,
+)
 from runa.runtime._shared import seed_run, tool_schemas
 from runa.runtime.provider import Provider, StreamChunk, StreamingProvider
 from runa.runtime.strategy import (
@@ -170,22 +179,29 @@ class Executor:
                 f"{tool.tool_name()!r} defines an async call() — run this Agent with "
                 "AsyncExecutor instead of Executor"
             )
+        tool_call.idempotent = tool.idempotent
         run.emit(EventType.TOOL_CALLED, tool=tool_call.name, tool_call_id=tool_call.id)
         tool_call.attempts += 1
 
         try:
             tool_call.result = tool.call(**tool_call.arguments)
         except Exception as exc:
+            # The exception doesn't say whether the underlying side effect
+            # fired before it was raised, so the effect is UNKNOWN, not
+            # NONE — see EffectStatus and RetryStrategy.
             tool_call.error = str(exc)
+            tool_call.effect = EffectStatus.UNKNOWN
             run.emit(
                 EventType.TOOL_FAILED,
                 tool=tool_call.name,
                 tool_call_id=tool_call.id,
                 error=str(exc),
+                effect=EffectStatus.UNKNOWN.value,
             )
             return
 
         tool_call.error = None
+        tool_call.effect = EffectStatus.OBSERVED
         if isinstance(tool_call.result, Artifact):
             run.add_artifact(tool_call.result)
             content = tool_call.result.summary()
@@ -195,5 +211,8 @@ class Executor:
             Message(role=Role.TOOL, content=content, tool_call_id=tool_call.id)
         )
         run.emit(
-            EventType.TOOL_COMPLETED, tool=tool_call.name, tool_call_id=tool_call.id
+            EventType.TOOL_COMPLETED,
+            tool=tool_call.name,
+            tool_call_id=tool_call.id,
+            effect=EffectStatus.OBSERVED.value,
         )

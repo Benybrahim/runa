@@ -19,6 +19,14 @@ class RetryStrategy:
     errors caused by bad arguments, which would just fail the same way every
     time. `max_retries` is retries *after* the first attempt, so a tool call
     gets `max_retries + 1` attempts in total before the run fails.
+
+    A failed call is only retried when its Tool declared `idempotent = True`.
+    An error leaves the call's effect UNKNOWN (see `EffectStatus`) — there's
+    no way to tell whether its side effect already happened — so repeating a
+    non-idempotent call risks duplicating that effect (a second charge, a
+    second email). Such a call fails on its very first error instead of
+    being retried, regardless of `max_retries` (architecture.md §13:
+    "retries must not blindly repeat side effects").
     """
 
     def __init__(self, max_retries: int = 3) -> None:
@@ -35,8 +43,9 @@ class RetryStrategy:
 
         pending = next((tc for tc in last.tool_calls if not tc.completed), None)
         if pending is not None:
-            if pending.error is not None and pending.attempts > self.max_retries:
-                return Fail(error=pending.error)
+            if pending.error is not None:
+                if not pending.idempotent or pending.attempts > self.max_retries:
+                    return Fail(error=pending.error)
             return CallTool(tool_call=pending)
 
         return Complete(result=last.content)

@@ -1,6 +1,15 @@
 from runa.agent import Agent
 from runa.approval import approve
-from runa.core import DataArtifact, EventType, Message, Role, Run, RunStatus, ToolCall
+from runa.core import (
+    DataArtifact,
+    EffectStatus,
+    EventType,
+    Message,
+    Role,
+    Run,
+    RunStatus,
+    ToolCall,
+)
 from runa.runtime.executor import Executor
 from runa.runtime.provider import StreamChunk
 from runa.runtime.retry import RetryStrategy
@@ -103,12 +112,15 @@ def test_tool_exception_fails_the_run():
 
     tool_failed = next(e for e in result.events if e.type == EventType.TOOL_FAILED)
     assert tool_failed.data["error"] == "boom"
+    assert tool_failed.data["effect"] == "unknown"
     assert result.tool_calls[0].error == "boom"
     assert result.tool_calls[0].attempts == 1
+    assert result.tool_calls[0].effect == EffectStatus.UNKNOWN
 
 
 def test_retry_strategy_retries_a_flaky_tool_before_succeeding():
     class FlakyTool(Tool):
+        idempotent = True
         calls = 0
 
         def call(self) -> str:
@@ -139,10 +151,13 @@ def test_retry_strategy_retries_a_flaky_tool_before_succeeding():
     assert FlakyTool.calls == 3
     assert result.tool_calls[0].attempts == 3
     assert result.tool_calls[0].error is None
+    assert result.tool_calls[0].effect == EffectStatus.OBSERVED
 
 
 def test_retry_strategy_fails_after_exhausting_retries():
     class AlwaysBroken(Tool):
+        idempotent = True
+
         def call(self) -> None:
             raise RuntimeError("nope")
 
@@ -165,6 +180,37 @@ def test_retry_strategy_fails_after_exhausting_retries():
     assert result.status == RunStatus.FAILED
     assert "nope" in result.events[-1].data["error"]
     assert result.tool_calls[0].attempts == 3
+
+
+def test_retry_strategy_does_not_retry_a_non_idempotent_tool():
+    class ChargeCard(Tool):
+        calls = 0
+
+        def call(self) -> None:
+            ChargeCard.calls += 1
+            raise RuntimeError("gateway timeout")
+
+    class BillingAgent(Agent):
+        tools = [ChargeCard]
+
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="ChargeCard", arguments={})],
+            )
+        ]
+    )
+    executor = Executor(provider, strategy=RetryStrategy(max_retries=3))
+    run = Run(input="charge the customer")
+
+    result = executor.run(BillingAgent(), run)
+
+    assert result.status == RunStatus.FAILED
+    assert "gateway timeout" in result.events[-1].data["error"]
+    assert ChargeCard.calls == 1
+    assert result.tool_calls[0].attempts == 1
+    assert result.tool_calls[0].effect == EffectStatus.UNKNOWN
 
 
 def test_max_steps_fails_the_run_instead_of_looping_forever():

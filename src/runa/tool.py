@@ -109,6 +109,7 @@ class Tool:
     name: str | None = None
     description: str = ""
     requires_approval: bool = False
+    idempotent: bool = False  # safe to retry on error — see runtime/retry.py
 
     def call(self, **kwargs: Any) -> Any:
         raise NotImplementedError
@@ -142,11 +143,13 @@ class FunctionTool(Tool):
         name: str | None = None,
         description: str | None = None,
         requires_approval: bool = False,
+        idempotent: bool = False,
     ) -> None:
         self._func = func
         self.name = name or func.__name__
         self.description = description or (inspect.getdoc(func) or "")
         self.requires_approval = requires_approval
+        self.idempotent = idempotent
         self._schema = _schema_from_signature(func, skip_self=False)
 
     def call(self, **kwargs: Any) -> Any:
@@ -162,6 +165,7 @@ def tool(
     name: str | None = None,
     description: str | None = None,
     requires_approval: bool = False,
+    idempotent: bool = False,
 ) -> FunctionTool | Callable[[Callable], FunctionTool]:
     """Turn a plain function into a Tool.
 
@@ -176,6 +180,7 @@ def tool(
             name=name,
             description=description,
             requires_approval=requires_approval,
+            idempotent=idempotent,
         )
 
     if func is not None:

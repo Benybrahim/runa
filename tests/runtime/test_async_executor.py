@@ -239,6 +239,7 @@ def result_error(run: Run) -> str:
 
 def test_retry_strategy_retries_a_flaky_tool_before_succeeding():
     class FlakyTool(Tool):
+        idempotent = True
         calls = 0
 
         async def call(self) -> str:

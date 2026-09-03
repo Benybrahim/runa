@@ -1,0 +1,296 @@
+# Getting Started
+
+Runa is designed so that an agent application can start with ordinary application code.
+
+The basic model is small:
+
+```text
+Agent
+  ↓
+Run
+  ↓
+Result
+```
+
+Runa supplies the machinery around the Run.
+
+---
+
+## 1. Create a Project
+
+Create a new Runa application:
+
+```bash
+runa new research_app
+cd research_app
+```
+
+A conventional project looks like:
+
+```text
+research_app/
+├── app/
+│   ├── agents/
+│   ├── tools/
+│   ├── resources/
+│   └── evaluations/
+├── main.py
+└── ...
+```
+
+The project structure is conventional on purpose.
+
+Structure carries meaning.
+
+---
+
+## 2. Configure the Application
+
+Runa keeps application-wide infrastructure in one place.
+
+A minimal `main.py` configures the model provider:
+
+```python
+from runa import configure
+from runa.providers.openai import OpenAIProvider
+
+configure(provider=OpenAIProvider())
+```
+
+The exact provider depends on the model service your application uses.
+
+Configuration should be application-level rather than repeated across every Agent.
+
+---
+
+## 3. Create an Agent
+
+Create an Agent:
+
+```python
+from runa import Agent
+
+
+class ResearchAgent(Agent):
+    instructions = """
+    Research questions carefully.
+    Prefer reliable sources.
+    Cite important claims.
+    """
+
+    tools = [WebSearch]
+```
+
+The Agent definition should make its responsibility and capabilities visible.
+
+A simple Agent does not require a graph, workflow, memory system, or custom execution engine.
+
+---
+
+## 4. Run the Agent
+
+Execute the Agent:
+
+```python
+run = ResearchAgent.run("What are the most promising approaches to fusion energy?")
+```
+
+The return value is a `Run`.
+
+The Run represents this execution from beginning to end.
+
+You can inspect its result:
+
+```python
+print(run.result)
+```
+
+And, when supported by the application:
+
+```python
+print(run.status)
+print(run.events)
+print(run.artifacts)
+```
+
+---
+
+## 5. Understand the Run
+
+A Run is more than a model response.
+
+Conceptually:
+
+```text
+Run
+├── Input
+├── Goal / intent
+├── Context
+├── State
+├── Events
+├── Actions
+├── Artifacts
+├── Result
+└── Status
+```
+
+This means the same execution can later be observed, persisted, evaluated, or resumed without changing the programming model.
+
+---
+
+## 6. Add a Tool
+
+An Agent becomes useful when it can interact with the application or the outside world.
+
+A simple function can become a Tool:
+
+```python
+from runa import Tool
+
+
+class WebSearch(Tool):
+    def call(self, query: str):
+        return search_web(query)
+```
+
+Then declare it on the Agent:
+
+```python
+class ResearchAgent(Agent):
+    instructions = """
+    Research questions carefully.
+    Prefer reliable sources.
+    """
+
+    tools = [WebSearch]
+```
+
+Tools should expose clear structured inputs and explicit outputs.
+
+---
+
+## 7. Use Application Objects
+
+Agents belong inside applications.
+
+Your application can contain ordinary domain objects:
+
+```python
+class Customer: ...
+
+
+class ResearchProject: ...
+```
+
+An Agent can operate on those objects without turning them into Agent-specific abstractions.
+
+This keeps the application domain separate from agent execution.
+
+---
+
+## 8. Use Conversation State
+
+A Conversation spans multiple Runs.
+
+Conceptually:
+
+```python
+conversation = Conversation()
+
+run1 = SupportAgent.run(
+    "My invoice is wrong.",
+    conversation=conversation,
+)
+
+run2 = SupportAgent.run(
+    "What should I do next?",
+    conversation=conversation,
+)
+```
+
+The Conversation survives across Runs.
+
+The Run remains the execution boundary.
+
+---
+
+## 9. Run in the Background
+
+The same Agent can execute later:
+
+```python
+run = ResearchAgent.run_later("Produce a detailed report on fusion energy.")
+```
+
+This is still a Run.
+
+The difference is when and where it advances.
+
+You do not need a separate job programming model for agent work.
+
+---
+
+## 10. Observe a Run
+
+Because execution produces Events, a Run can be inspected after execution.
+
+A typical timeline may contain:
+
+```text
+Run Started
+Model Called
+Tool Called: WebSearch
+Tool Completed
+Artifact Created: Report
+Run Completed
+```
+
+The goal is simple:
+
+> Understand what happened without adding tracing code to every Agent.
+
+---
+
+## 11. Evaluate an Agent
+
+Tests can verify application invariants:
+
+```python
+assert run.completed
+assert report_created
+```
+
+Evaluations measure probabilistic behavior:
+
+```python
+expect(run).to_be_factual()
+expect(run).to_meet_the_goal()
+```
+
+Evaluation should exercise the same Agent and Run semantics used by the application.
+
+---
+
+## 12. Customize Only When Needed
+
+The normal path should remain simple.
+
+Reach for custom runtime strategies, infrastructure adapters, or lower-level APIs only when the application actually needs them.
+
+Runa's defaults are the starting point, not the boundary of what the framework can do.
+
+# The Mental Model
+
+When building a Runa application, start with three questions:
+
+```text
+What should this Agent do?
+
+What should a Run accomplish?
+
+What capabilities does the Agent need?
+```
+
+Then let Runa handle the machinery around execution.
+
+> **Start with the application. Add infrastructure only when the application needs it.**

@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 from runa.core import (
+    EffectStatus,
     Event,
     EventType,
     Message,
@@ -75,7 +76,12 @@ def test_survives_reopening_the_same_database_file(tmp_path):
 def test_round_trips_messages_tool_calls_artifacts_and_events():
     store = SQLiteRunStore(":memory:")
     run = Run(input="refund order A123")
-    tool_call = ToolCall(name="send_refund", arguments={"order_id": "A123"})
+    tool_call = ToolCall(
+        name="send_refund",
+        arguments={"order_id": "A123"},
+        idempotent=True,
+        effect=EffectStatus.OBSERVED,
+    )
     run.add_message(Message(role=Role.ASSISTANT, content="", tool_calls=[tool_call]))
     run.add_artifact(TextArtifact(text="refunded"))
     run.emit(EventType.MODEL_CALLED, model="gpt-5-nano")
@@ -85,6 +91,8 @@ def test_round_trips_messages_tool_calls_artifacts_and_events():
 
     assert loaded.messages[0].role == Role.ASSISTANT
     assert loaded.messages[0].tool_calls[0].name == "send_refund"
+    assert loaded.messages[0].tool_calls[0].idempotent is True
+    assert loaded.messages[0].tool_calls[0].effect == EffectStatus.OBSERVED
     assert isinstance(loaded.artifacts[0], TextArtifact)
     assert loaded.artifacts[0].text == "refunded"
     assert any(e.type == EventType.MODEL_CALLED for e in loaded.events)

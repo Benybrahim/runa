@@ -67,6 +67,19 @@ def test_tool_decorator_accepts_overrides():
     assert get_weather.requires_approval is True
 
 
+def test_idempotent_defaults_to_false_on_class_and_function_tools():
+    assert WebSearch().idempotent is False
+    assert FunctionTool(lambda: None).idempotent is False
+
+
+def test_tool_decorator_accepts_idempotent():
+    @tool(idempotent=True)
+    def get_weather(city: str) -> str:
+        return f"{city}: sunny"
+
+    assert get_weather.idempotent is True
+
+
 def test_base_tool_call_not_implemented():
     with pytest.raises(NotImplementedError):
         Tool().call()

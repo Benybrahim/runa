@@ -11,7 +11,16 @@ import inspect
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
-from runa.core import Artifact, EventType, Message, Role, Run, RunStatus, ToolCall
+from runa.core import (
+    Artifact,
+    EffectStatus,
+    EventType,
+    Message,
+    Role,
+    Run,
+    RunStatus,
+    ToolCall,
+)
 from runa.runtime._shared import seed_run, tool_schemas
 from runa.runtime.async_provider import AsyncProvider, AsyncStreamingProvider
 from runa.runtime.provider import StreamChunk
@@ -183,6 +192,7 @@ class AsyncExecutor:
     async def _call_tool(self, agent: "Agent", run: Run, tool_call: ToolCall) -> None:
         """Run one tool call — see `Executor._call_tool` for the Artifact dispatch."""
         tool = agent.resolved_tools()[tool_call.name]
+        tool_call.idempotent = tool.idempotent
         run.emit(EventType.TOOL_CALLED, tool=tool_call.name, tool_call_id=tool_call.id)
         tool_call.attempts += 1
 
@@ -192,16 +202,22 @@ class AsyncExecutor:
             else:
                 result = await asyncio.to_thread(tool.call, **tool_call.arguments)
         except Exception as exc:
+            # The exception doesn't say whether the underlying side effect
+            # fired before it was raised, so the effect is UNKNOWN, not
+            # NONE — see EffectStatus and RetryStrategy.
             tool_call.error = str(exc)
+            tool_call.effect = EffectStatus.UNKNOWN
             run.emit(
                 EventType.TOOL_FAILED,
                 tool=tool_call.name,
                 tool_call_id=tool_call.id,
                 error=str(exc),
+                effect=EffectStatus.UNKNOWN.value,
             )
             return
 
         tool_call.error = None
+        tool_call.effect = EffectStatus.OBSERVED
         tool_call.result = result
         if isinstance(tool_call.result, Artifact):
             run.add_artifact(tool_call.result)
@@ -212,5 +228,8 @@ class AsyncExecutor:
             Message(role=Role.TOOL, content=content, tool_call_id=tool_call.id)
         )
         run.emit(
-            EventType.TOOL_COMPLETED, tool=tool_call.name, tool_call_id=tool_call.id
+            EventType.TOOL_COMPLETED,
+            tool=tool_call.name,
+            tool_call_id=tool_call.id,
+            effect=EffectStatus.OBSERVED.value,
         )

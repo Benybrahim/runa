@@ -23,6 +23,7 @@ from runa.core import (
     CitationSetArtifact,
     Conversation,
     DataArtifact,
+    EffectStatus,
     Event,
     EventType,
     FileArtifact,
@@ -72,11 +73,13 @@ def _tool_call_to_dict(tool_call: ToolCall) -> dict[str, Any]:
         "approved": tool_call.approved,
         "error": tool_call.error,
         "attempts": tool_call.attempts,
+        "idempotent": tool_call.idempotent,
+        "effect": tool_call.effect.value,
     }
 
 
 def _tool_call_from_dict(data: dict[str, Any]) -> ToolCall:
-    return ToolCall(**data)
+    return ToolCall(**{**data, "effect": EffectStatus(data["effect"])})
 
 
 def run_to_dict(run: Run) -> dict[str, Any]:

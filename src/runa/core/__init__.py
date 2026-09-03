@@ -15,7 +15,7 @@ from runa.core.artifact import (
 )
 from runa.core.conversation import Conversation
 from runa.core.event import Event, EventType
-from runa.core.message import Message, Role, ToolCall
+from runa.core.message import EffectStatus, Message, Role, ToolCall
 from runa.core.run import IllegalTransition, Run, RunStatus
 from runa.core.state import ConversationState, RunState
 
@@ -26,6 +26,7 @@ __all__ = [
     "Conversation",
     "ConversationState",
     "DataArtifact",
+    "EffectStatus",
     "Event",
     "EventType",
     "FileArtifact",
