@@ -28,6 +28,12 @@ class Executor:
     reached a terminal status, or because it paused for background handoff
     or an approval gate (see `background/` and `approval.py`). Calling `run`
     again on a paused Run resumes it from where it left off.
+
+    Agent hooks fire in one fixed order: `before_run` and `plan` once, before
+    the first Strategy step; `review` once, when the Strategy decides to
+    Complete; `after_run` once the Run reaches a terminal status. Resuming a
+    paused Run skips `before_run`/`plan` — they're a start-of-run setup
+    phase, not re-run on every resume.
     """
 
     def __init__(
@@ -46,6 +52,7 @@ class Executor:
             self._seed(agent, run)
             run.start()
             agent.before_run(run)
+            agent.plan(run)
         elif run.status in (RunStatus.PAUSED, RunStatus.AWAITING_APPROVAL):
             run.resume()
 
@@ -78,6 +85,7 @@ class Executor:
         elif isinstance(action, CallTool):
             self._call_tool(agent, run, action.tool_call)
         elif isinstance(action, Complete):
+            agent.review(run)
             run.complete(result=action.result)
         elif isinstance(action, Fail):
             run.fail(error=action.error)

@@ -3,7 +3,7 @@ from runa.approval import approve
 from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime.executor import Executor
 from runa.runtime.retry import RetryStrategy
-from runa.runtime.strategy import CallModel, Complete, Strategy
+from runa.runtime.strategy import CallModel, Complete, Fail, Strategy
 from runa.tool import Tool
 from tests.fakes import FakeProvider
 
@@ -190,13 +190,77 @@ def test_agent_hooks_are_called_around_execution():
         def before_run(self, run):
             calls.append("before_run")
 
+        def plan(self, run):
+            calls.append("plan")
+
+        def review(self, run):
+            calls.append("review")
+
         def after_run(self, run):
             calls.append("after_run")
 
     provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
     Executor(provider).run(HookedAgent(), Run(input="hi"))
 
-    assert calls == ["before_run", "after_run"]
+    assert calls == ["before_run", "plan", "review", "after_run"]
+
+
+def test_review_hook_is_skipped_when_the_run_fails_instead_of_completing():
+    calls = []
+
+    class HookedAgent(Agent):
+        def review(self, run):
+            calls.append("review")
+
+        def after_run(self, run):
+            calls.append("after_run")
+
+    class AlwaysFail:
+        def step(self, run):
+            return Fail(error="nope")
+
+    provider = FakeProvider(responses=[])
+    Executor(provider, strategy=AlwaysFail()).run(HookedAgent(), Run(input="hi"))
+
+    assert calls == ["after_run"]
+
+
+def test_plan_is_not_re_run_when_resuming_a_paused_run():
+    calls = []
+
+    class HookedAgent(Agent):
+        tools = []
+
+        def plan(self, run):
+            calls.append("plan")
+
+    class SendEmail(Tool):
+        requires_approval = True
+
+        def call(self, to: str) -> str:
+            return f"sent to {to}"
+
+    class SupportAgent(HookedAgent):
+        tools = [SendEmail]
+
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="SendEmail", arguments={"to": "a@b.com"})],
+            ),
+            Message(role=Role.ASSISTANT, content="Email sent."),
+        ]
+    )
+    executor = Executor(provider)
+    agent = SupportAgent()
+    run = Run(input="email someone")
+
+    executor.run(agent, run)
+    approve(run, run.tool_calls[0].id)
+    executor.run(agent, run)
+
+    assert calls == ["plan"]
 
 
 def test_gated_tool_call_pauses_the_run_for_approval():
