@@ -1,12 +1,22 @@
 from runa.agent import Agent
-from runa.core import EventType, Message, Role, Run
+from runa.core import EventType, Message, Role, Run, ToolCall
 from runa.observability import instrument, timeline
 from runa.runtime import Executor
+from runa.tool import Tool
 from tests.fakes import FakeProvider
 
 
 class GreeterAgent(Agent):
     instructions = "Say hello."
+
+
+class GetWeather(Tool):
+    def call(self, city: str) -> str:
+        return f"{city}: sunny"
+
+
+class WeatherAgent(Agent):
+    tools = [GetWeather]
 
 
 def test_timeline_summarizes_events_in_order():
@@ -24,6 +34,23 @@ def test_timeline_summarizes_events_in_order():
     assert entries[0].summary == "run started"
     assert entries[-1].summary == "run completed"
     assert all(entry.timestamp is not None for entry in entries)
+
+
+def test_timeline_summarizes_a_tool_call_with_its_arguments():
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="GetWeather", arguments={"city": "Tokyo"})],
+            ),
+            Message(role=Role.ASSISTANT, content="sunny"),
+        ]
+    )
+    run = Executor(provider).run(WeatherAgent(), Run(input="weather in Tokyo?"))
+
+    called = next(e for e in timeline(run) if e.type == EventType.TOOL_CALLED)
+
+    assert called.summary == "tool called: GetWeather({'city': 'Tokyo'})"
 
 
 def test_timeline_reflects_run_events_not_a_separate_copy():

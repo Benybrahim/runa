@@ -235,7 +235,12 @@ class AsyncExecutor:
         tool_call.idempotent = tool.idempotent
         if isinstance(tool, ParentRunAware):
             tool.bind_parent_run_id(run.id)
-        run.emit(EventType.TOOL_CALLED, tool=tool_call.name, tool_call_id=tool_call.id)
+        run.emit(
+            EventType.TOOL_CALLED,
+            tool=tool_call.name,
+            tool_call_id=tool_call.id,
+            arguments=tool_call.arguments,
+        )
         tool_call.attempts += 1
 
         try:
