@@ -110,11 +110,11 @@ myapp/
 
 All layers described in [`docs/architecture.md`](docs/architecture.md) are implemented and tested, in build order:
 
-* `core/` — `Run`, `Message`, `Event`, `Artifact`, `State`
+* `core/` — `Run`, `Message`, `Event`, `Artifact`, `State`, `Conversation`
 * `Agent` + `Tool` — the declarative surface
 * `runtime/` — `Strategy` protocol, `DefaultStrategy`, `RetryStrategy`, `Executor`
 * `providers/` — `AnthropicProvider`, `OpenAIProvider`
-* `persistence/` — `RunStore`, `InMemoryRunStore`, `SQLiteRunStore`
+* `persistence/` — `RunStore`, `InMemoryRunStore`, `SQLiteRunStore`, `ConversationStore`, `InMemoryConversationStore`
 * `background/` + `approval.py` — `run_later`, `Queue` (`InlineQueue`, `ThreadQueue`), `approve`/`deny`
 * `observability/` — `timeline()`, `instrument()`
 * `eval/` — `expect(run)`, `run_evals()`

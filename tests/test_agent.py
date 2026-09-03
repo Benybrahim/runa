@@ -2,7 +2,7 @@ import pytest
 
 from runa.agent import Agent, DuplicateToolName, UnknownApprovalTool
 from runa.config import ProviderNotConfigured, configure
-from runa.core import Message, Role, RunStatus
+from runa.core import Conversation, Message, Role, RunStatus
 from runa.runtime import Executor
 from runa.tool import Tool
 from tests.fakes import FakeProvider
@@ -140,3 +140,37 @@ def test_run_later_queues_and_runs_via_the_default_inline_queue():
     run = SimpleAgent.run_later("hello")
 
     assert run.status == RunStatus.COMPLETED
+
+
+def test_run_with_a_conversation_carries_history_into_the_next_run():
+    class SimpleAgent(Agent):
+        instructions = "Be terse."
+
+    provider = FakeProvider(
+        [
+            Message(role=Role.ASSISTANT, content="Tokyo is sunny."),
+            Message(role=Role.ASSISTANT, content="22 degrees."),
+        ]
+    )
+    executor = Executor(provider=provider)
+    conversation = Conversation()
+
+    first = SimpleAgent.run(
+        "What's the weather in Tokyo?", executor=executor, conversation=conversation
+    )
+    assert first.status == RunStatus.COMPLETED
+
+    second = SimpleAgent.run(
+        "And the temperature?", executor=executor, conversation=conversation
+    )
+
+    assert second.status == RunStatus.COMPLETED
+    # second call's messages: system, first user+assistant turn, new user turn
+    contents = [m.content for m in provider.calls[1]["messages"]]
+    assert contents == [
+        "Be terse.",
+        "What's the weather in Tokyo?",
+        "Tokyo is sunny.",
+        "And the temperature?",
+    ]
+    assert conversation.messages[-1].content == "22 degrees."

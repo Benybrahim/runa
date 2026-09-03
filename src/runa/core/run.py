@@ -4,12 +4,17 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from runa.core.artifact import Artifact
 from runa.core.event import Event, EventType
 from runa.core.message import Message, ToolCall
 from runa.core.state import RunState
+
+if TYPE_CHECKING:
+    # Only Executor._seed reads Run.conversation, and Conversation.record
+    # takes a Run — an unconditional import here would cycle.
+    from runa.core.conversation import Conversation
 
 
 class RunStatus(StrEnum):
@@ -55,6 +60,7 @@ class Run:
     events: list[Event] = field(default_factory=list)
     tool_calls: list[ToolCall] = field(default_factory=list)
     artifacts: list[Artifact] = field(default_factory=list)
+    conversation: "Conversation | None" = None
     result: Any = None
     status: RunStatus = RunStatus.CREATED
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))

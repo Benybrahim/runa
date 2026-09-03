@@ -5,7 +5,7 @@ from typing import Any, ClassVar
 from runa.background import Queue
 from runa.background import run_later as _run_later
 from runa.config import default_provider
-from runa.core import Run
+from runa.core import Conversation, Run
 from runa.runtime import Executor
 from runa.tool import Tool
 
@@ -107,15 +107,26 @@ class Agent:
         """Called after execution completes. Override to customize."""
 
     @classmethod
-    def run(cls, input: Any, *, executor: Executor | None = None) -> Run:
+    def run(
+        cls,
+        input: Any,
+        *,
+        executor: Executor | None = None,
+        conversation: Conversation | None = None,
+    ) -> Run:
         """Run this agent against `input` and return the completed Run.
 
         Uses the app-wide default Provider (see `runa.configure()`) unless
         an `Executor` is given explicitly — the escape hatch for an agent
         that needs a specific provider, strategy, or max_steps.
+
+        Pass `conversation` to continue a prior exchange: its history is
+        seeded ahead of `input`, and this Run's messages are folded back
+        into it once the Run completes, so the next `.run(..., conversation=
+        conversation)` call picks up where this one left off.
         """
         executor = executor or Executor(provider=default_provider())
-        return executor.run(cls(), Run(input=input))
+        return executor.run(cls(), Run(input=input, conversation=conversation))
 
     @classmethod
     def run_later(
@@ -124,7 +135,9 @@ class Agent:
         *,
         executor: Executor | None = None,
         queue: Queue | None = None,
+        conversation: Conversation | None = None,
     ) -> Run:
         """Queue this agent's run for background execution. See `Agent.run`."""
         executor = executor or Executor(provider=default_provider())
-        return _run_later(cls(), Run(input=input), executor, queue=queue)
+        run = Run(input=input, conversation=conversation)
+        return _run_later(cls(), run, executor, queue=queue)

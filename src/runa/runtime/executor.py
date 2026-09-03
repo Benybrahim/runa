@@ -34,6 +34,11 @@ class Executor:
     Complete; `after_run` once the Run reaches a terminal status. Resuming a
     paused Run skips `before_run`/`plan` — they're a start-of-run setup
     phase, not re-run on every resume.
+
+    If `run.conversation` is set, its history is seeded in ahead of this
+    Run's own input, and this Run's messages are folded back into it once
+    the Run reaches a terminal status — that's what lets a later Run pick
+    up the conversation where this one left off (see `Agent.run`).
     """
 
     def __init__(
@@ -72,11 +77,15 @@ class Executor:
 
         if run.is_terminal:
             agent.after_run(run)
+            if run.conversation is not None:
+                run.conversation.record(run)
         return run
 
     def _seed(self, agent: "Agent", run: Run) -> None:
         if agent.instructions:
             run.add_message(Message(role=Role.SYSTEM, content=agent.instructions))
+        if run.conversation is not None:
+            run.messages.extend(run.conversation.messages)
         run.add_message(Message(role=Role.USER, content=str(run.input)))
 
     def _apply(self, agent: "Agent", run: Run, action: Action) -> None:

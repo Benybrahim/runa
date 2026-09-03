@@ -13,6 +13,7 @@ from runa.core.artifact import (
     PlanArtifact,
     TextArtifact,
 )
+from runa.core.conversation import Conversation
 from runa.core.event import Event, EventType
 from runa.core.message import Message, Role, ToolCall
 from runa.core.run import IllegalTransition, Run, RunStatus
@@ -22,6 +23,7 @@ __all__ = [
     "ActionArtifact",
     "Artifact",
     "CitationSetArtifact",
+    "Conversation",
     "ConversationState",
     "DataArtifact",
     "Event",

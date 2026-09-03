@@ -8,6 +8,7 @@ from runa.core import (
     ActionArtifact,
     Artifact,
     CitationSetArtifact,
+    Conversation,
     ConversationState,
     DataArtifact,
     Event,
@@ -32,7 +33,13 @@ from runa.eval import (
     run_evals,
 )
 from runa.observability import TimelineEntry, instrument, timeline
-from runa.persistence import InMemoryRunStore, RunStore, SQLiteRunStore
+from runa.persistence import (
+    ConversationStore,
+    InMemoryConversationStore,
+    InMemoryRunStore,
+    RunStore,
+    SQLiteRunStore,
+)
 from runa.providers import AnthropicProvider, OpenAIProvider
 from runa.runtime import (
     Action,
@@ -58,7 +65,9 @@ __all__ = [
     "CallTool",
     "CitationSetArtifact",
     "Complete",
+    "Conversation",
     "ConversationState",
+    "ConversationStore",
     "DataArtifact",
     "DefaultStrategy",
     "DuplicateToolName",
@@ -73,6 +82,7 @@ __all__ = [
     "FileArtifact",
     "FunctionTool",
     "IllegalTransition",
+    "InMemoryConversationStore",
     "InMemoryRunStore",
     "InlineQueue",
     "Message",
