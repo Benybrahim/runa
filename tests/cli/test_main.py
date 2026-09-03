@@ -61,6 +61,33 @@ def test_eval_reports_pass_fail_and_exit_code(tmp_path, capsys):
     assert "1/1 passed" in output
 
 
+def test_test_reports_pass_fail_and_exit_code(tmp_path, capsys):
+    project_dir = tmp_path / "acme"
+    main(["new", "acme"], cwd=tmp_path)
+    (project_dir / "main.py").write_text(
+        "from runa import configure\n"
+        "from tests.fakes import FakeProvider\n"
+        "from runa.core import Message, Role\n\n"
+        "configure(provider=FakeProvider(responses=["
+        'Message(role=Role.ASSISTANT, content="hi")]))\n'
+    )
+    (project_dir / "app" / "tests" / "echo_test.py").write_text(
+        "from runa import Agent\n\n\n"
+        "class EchoAgent(Agent):\n"
+        '    instructions = "Echo."\n\n\n'
+        "def test_says_hi():\n"
+        '    run = EchoAgent.run("hi")\n'
+        '    assert run.result == "hi"\n'
+    )
+
+    exit_code = main(["test"], cwd=project_dir)
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "echo_test.test_says_hi: PASS" in output
+    assert "1/1 passed" in output
+
+
 def test_runs_show_renders_a_saved_runs_timeline(tmp_path, capsys):
     project_dir = tmp_path / "acme"
     main(["new", "acme"], cwd=tmp_path)

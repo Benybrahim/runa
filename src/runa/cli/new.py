@@ -1,13 +1,13 @@
 """cli/new.py: scaffold a new Runa application.
 
 Establishes the conventional `app/` layout (manifesto §2) so a fresh
-project has somewhere obvious to put agents, tools, resources, and eval
-cases without any configuration.
+project has somewhere obvious to put agents, tools, resources, eval cases,
+and tests without any configuration.
 """
 
 from pathlib import Path
 
-_SUBDIRS = ("agents", "tools", "resources", "evaluations")
+_SUBDIRS = ("agents", "tools", "resources", "evaluations", "tests")
 
 _PYPROJECT_TEMPLATE = """[project]
 name = "{name}"
@@ -49,7 +49,8 @@ A Runa application.
 - `app/agents/` — Agent subclasses
 - `app/tools/` — Tool subclasses
 - `app/resources/` — shared resources (clients, config)
-- `app/evaluations/` — eval cases
+- `app/evaluations/` — eval cases, run with `runa eval`
+- `app/tests/` — deterministic tests, run with `runa test`
 
 Generate a new agent with:
 

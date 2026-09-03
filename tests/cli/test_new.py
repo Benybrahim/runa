@@ -7,7 +7,7 @@ def test_scaffold_project_creates_the_conventional_layout(tmp_path):
     project_dir = scaffold_project("acme", root=tmp_path)
 
     assert project_dir == tmp_path / "acme"
-    for subdir in ("agents", "tools", "resources", "evaluations"):
+    for subdir in ("agents", "tools", "resources", "evaluations", "tests"):
         package_dir = project_dir / "app" / subdir
         assert package_dir.is_dir()
         assert (package_dir / "__init__.py").is_file()

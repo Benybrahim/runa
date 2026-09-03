@@ -1,11 +1,11 @@
 """cli/main.py: the `runa` command-line entry point.
 
 `new` and `generate` are scaffolding (manifesto §2, §9) — they write files
-following the app/ convention and never touch the runtime. `eval` and
-`runs` do touch it, but only by calling existing library functions
-(`run_evals()`, `timeline()`, `approval.approve()`/`deny()`) against the app
-in `cwd` — no logic lives here that doesn't already exist elsewhere
-(manifesto §11, §12, §14).
+following the app/ convention and never touch the runtime. `eval`, `test`,
+and `runs` do touch it, but only by calling existing library functions
+(`run_project_evals()`, `run_project_tests()`, `timeline()`,
+`approval.approve()`/`deny()`) against the app in `cwd` — no logic lives
+here that doesn't already exist elsewhere (manifesto §11, §12, §14).
 """
 
 import argparse
@@ -15,6 +15,7 @@ from runa.cli.eval import run_project_evals
 from runa.cli.generate import generate_agent
 from runa.cli.new import scaffold_project
 from runa.cli.runs import approve_run, deny_run, list_pending_runs, show_run
+from runa.cli.test import run_project_tests
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -34,6 +35,7 @@ def _build_parser() -> argparse.ArgumentParser:
     generate_agent_parser.add_argument("name")
 
     subparsers.add_parser("eval", help="Run this app's app/evaluations/ cases")
+    subparsers.add_parser("test", help="Run this app's app/tests/ test functions")
 
     runs_parser = subparsers.add_parser("runs", help="Inspect this app's Runs")
     runs_subparsers = runs_parser.add_subparsers(dest="action", required=True)
@@ -78,6 +80,15 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
         for result in results:
             status = "PASS" if result.passed else f"FAIL: {result.error}"
             print(f"{result.case.name}: {status}")
+        failed = sum(1 for result in results if not result.passed)
+        print(f"\n{len(results) - failed}/{len(results)} passed")
+        return 1 if failed else 0
+
+    if args.command == "test":
+        results = run_project_tests(cwd)
+        for result in results:
+            status = "PASS" if result.passed else f"FAIL: {result.error}"
+            print(f"{result.name}: {status}")
         failed = sum(1 for result in results if not result.passed)
         print(f"\n{len(results) - failed}/{len(results)} passed")
         return 1 if failed else 0
