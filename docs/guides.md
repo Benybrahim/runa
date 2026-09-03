@@ -101,6 +101,16 @@ For durable background execution, configure a persistent Run store and an approp
 
 Do not create a separate “job object” in application code just because execution happens later.
 
+If the queue is a `DurableQueue` (e.g. `SQLiteQueue`), it journals which Run
+is mid-flight, so work survives a process crash. Recover orphaned Runs once
+at startup:
+
+```python
+from runa import recover_pending
+
+recover_pending(queue, run_store, executor, agents=[ResearchAgent])
+```
+
 ---
 
 # Inspecting Runs
@@ -111,7 +121,14 @@ Use the Run timeline or CLI tooling to inspect execution:
 
 ```bash
 runa runs show <id>
+runa runs list --status failed --agent-name ResearchAgent
+runa runs pending
 ```
+
+`runs list` filters by `--status`, `--since`, `--agent-name`, and
+`--parent-run-id`. `runs pending` lists Runs paused in
+`AWAITING_APPROVAL` — see "Adding Human Approval" below for
+`runs approve`/`runs deny`.
 
 A useful inspection question is:
 
@@ -160,6 +177,13 @@ Keep evaluation on the same Agent and Run path used in production.
 
 Avoid creating a special mock architecture for evaluation unless a test specifically needs one.
 
+From the CLI:
+
+```bash
+runa test    # runs app/tests/
+runa eval    # runs app/evaluations/
+```
+
 ---
 
 # Adding Human Approval
@@ -190,6 +214,16 @@ Running
 The Run remains the same execution.
 
 Approval changes the lifecycle; it does not create a separate workflow model.
+
+From the CLI:
+
+```bash
+runa runs approve <run_id> <tool_call_id>
+runa runs deny <run_id> <tool_call_id> --reason "not authorized"
+```
+
+Or from application code, via `runa.approve()`/`runa.deny()` — see
+`approval.py`.
 
 ---
 
@@ -263,6 +297,25 @@ Effect
 ```
 
 over allowing a model response to directly perform an irreversible side effect.
+
+Declare Policy checks on the Agent for rules the application can decide on
+its own, without a human:
+
+```python
+def block_large_transfers(run, tool_call) -> bool:
+    return tool_call.arguments.get("amount", 0) <= 10_000
+
+
+class FinanceAgent(Agent):
+    tools = [TransferFunds]
+    policies = [block_large_transfers]
+    requires_approval = [TransferFunds]  # still gate the rest on a human
+```
+
+A Policy that returns `False` fails the Run outright, before it can ever
+reach approval. Use Policy for rules that are always true regardless of who
+is watching; use `requires_approval` for the calls that should always get
+a human decision.
 
 For actions that may be retried, define idempotency semantics in the tool:
 

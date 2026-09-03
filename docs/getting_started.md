@@ -33,7 +33,8 @@ research_app/
 │   ├── agents/
 │   ├── tools/
 │   ├── resources/
-│   └── evaluations/
+│   ├── evaluations/
+│   └── tests/
 ├── main.py
 └── ...
 ```
@@ -41,6 +42,9 @@ research_app/
 The project structure is conventional on purpose.
 
 Structure carries meaning.
+
+`runa generate agent <Name>` scaffolds a new agent module under `app/agents/`
+following that same convention.
 
 ---
 
@@ -268,6 +272,20 @@ expect(run).to_meet_the_goal()
 ```
 
 Evaluation should exercise the same Agent and Run semantics used by the application.
+
+The generated project wires both into the CLI:
+
+```bash
+runa test    # app/tests/ — deterministic invariants
+runa eval    # app/evaluations/ — probabilistic behavior
+```
+
+You can also inspect any Run's execution directly:
+
+```bash
+runa runs show <id>
+runa runs list --status failed
+```
 
 ---
 

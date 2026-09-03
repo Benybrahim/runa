@@ -388,9 +388,10 @@ Runa can do the same:
 ```text
 runa new
 runa generate agent
-runa generate tool
-runa generate evaluation
 ```
+
+`runa generate tool` and `runa generate evaluation` are natural next
+generators in the same spirit but are not implemented yet.
 
 Generators are not merely productivity features.
 

@@ -140,6 +140,17 @@ Context should remain inspectable.
 
 The goal is to understand what information was available when a decision was made.
 
+```python
+run.context.resources = [kb_article]
+run.context.policies = ["no refunds over $500 without approval"]
+```
+
+In Runa's implementation, `Run.context` is a `Context` — the same
+attribute-accessible container `RunState`/`ConversationState` use for
+State (see below), populated explicitly by application code today. Runa
+does not yet auto-assemble it from Conversation/Resources/Policies/Run
+state; that remains an application-level pattern, not framework machinery.
+
 ---
 
 # State
@@ -199,13 +210,23 @@ Tool
 
 Capabilities should be visible from the Agent definition.
 
+In Runa's implementation, a `Tool` declared on `Agent.tools` *is* the
+capability declaration — `Tool.tool_name()` already carries the identity
+this diagram calls Capability. There is no separate `Capability` class
+between Agent and Tool; one would only rename `Tool` without adding
+behavior.
+
 An Agent can also delegate to another Agent through a capability:
 
 ```python
-ResearchAgent.as_tool()
+ResearchAgent.as_tool()  # for a parent driven by Executor/run()
+ResearchAgent.as_async_tool()  # for a parent driven by AsyncExecutor/run_async()
 ```
 
 This keeps composition within the same programming model.
+
+The delegated Agent's Run records the parent Run's id as `parent_run_id`,
+so delegation lineage survives being persisted and read back later.
 
 ---
 
@@ -237,6 +258,12 @@ Action: refund(customer=123, amount=50)
 
 An Action may require policy checks or approval before execution.
 
+In Runa's implementation, `ToolCall` (`core/message.py`) is this invocation
+record: `.attempts` counts how many times it's been tried, `.idempotent`
+says whether retrying it is safe, and `.error` records what went wrong.
+There is no separate `Action` class — `ToolCall` already carries what an
+Action needs to be retried safely.
+
 ---
 
 # Effect
@@ -261,6 +288,14 @@ Effect: refund successfully created
 An Action and its Effect should not be treated as the same thing.
 
 This distinction matters for retries, failures, idempotency, auditing, and approval.
+
+In Runa's implementation, `ToolCall.effect: EffectStatus` (`NONE` /
+`OBSERVED` / `UNKNOWN`) is this — a typed field on the same `ToolCall`
+rather than a separate object, since an Action and its Effect share one
+identity and lifecycle. A call that raises leaves its effect `UNKNOWN`, not
+`NONE`: the exception doesn't say whether the side effect fired before it
+was raised, which is exactly why `RetryStrategy` only retries a call whose
+tool opts in with `idempotent = True`.
 
 ---
 
@@ -292,25 +327,52 @@ Use model intelligence for judgment.
 
 Use application code for guarantees.
 
+In Runa's implementation, `Agent.policies` declares a list of programmatic
+allow/deny checks, run before a tool call can reach approval:
+
+```python
+def block_large_transfers(run, tool_call) -> bool:
+    return tool_call.arguments.get("amount", 0) <= 10_000
+
+
+class FinanceAgent(Agent):
+    tools = [TransferFunds]
+    policies = [block_large_transfers]
+```
+
+A Policy can veto a call outright — the Run fails without ever routing to
+a human. This is deliberately separate from `requires_approval`, which
+always defers to a human: Policy is for rules the application can decide
+on its own; approval is for decisions that need a person.
+
 ---
 
 # Event
 
 An Event records a meaningful occurrence during a Run.
 
-Examples:
+Examples (the full set is `EventType` in `core/event.py`):
 
 ```text
+RunQueued
 RunStarted
-ModelCalled
-ToolCalled
-ToolCompleted
-ActionProposed
-ApprovalRequested
-ArtifactCreated
+RunPaused
+RunResumed
 RunCompleted
 RunFailed
+RunCancelled
+ModelCalled
+ModelResponded
+ToolCalled
+ToolCompleted
+ToolFailed
+ApprovalRequired
+PolicyDenied
+ArtifactCreated
 ```
+
+There is no separate `ActionProposed` event — `ToolCalled` already fires
+before a tool executes, which is what that would have recorded.
 
 The event history answers:
 
@@ -409,14 +471,17 @@ Created
 Queued
   ↓
 Running
-  ├── Waiting
-  ├── AwaitingApproval
-  └── Paused
+  ├── AwaitingApproval → Running (approved) or Cancelled/Failed (denied)
+  └── Paused → Running
   ↓
 Completed
 Failed
 Cancelled
 ```
+
+This is `RunStatus` in `core/run.py`, exactly — there is no separate
+`Waiting` status; a Run that's paused waiting on something external is
+`Paused`, and one blocked on a human decision is `AwaitingApproval`.
 
 A background Run, an approval-gated Run, and a synchronous Run are still Runs.
 
