@@ -1,8 +1,14 @@
 import pytest
 
 from runa.cli.new import scaffold_project
-from runa.cli.runs import RunNotFound, show_run
-from runa.core import Run
+from runa.cli.runs import (
+    RunNotFound,
+    approve_run,
+    deny_run,
+    list_pending_runs,
+    show_run,
+)
+from runa.core import Message, Role, Run, RunStatus, ToolCall
 from runa.persistence import SQLiteRunStore
 
 _MAIN_PY_TEMPLATE = """
@@ -45,3 +51,72 @@ def test_show_run_raises_for_an_unknown_id(tmp_path):
 
     with pytest.raises(RunNotFound):
         show_run("does-not-exist", root=project_dir)
+
+
+def _save_awaiting_approval(store: SQLiteRunStore) -> tuple[Run, ToolCall]:
+    call = ToolCall(name="SendEmail", arguments={"to": "a@example.com"})
+    run = Run(input="email someone")
+    run.start()
+    run.add_message(Message(role=Role.ASSISTANT, tool_calls=[call]))
+    run.require_approval(call.id)
+    store.save(run)
+    return run, call
+
+
+def test_list_pending_runs_shows_a_run_awaiting_approval(tmp_path):
+    project_dir, db_path = _scaffold_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    run, call = _save_awaiting_approval(store)
+    store.close()
+
+    output = list_pending_runs(root=project_dir)
+
+    assert run.id in output
+    assert call.id in output
+    assert "SendEmail" in output
+
+
+def test_list_pending_runs_is_empty_with_no_awaiting_runs(tmp_path):
+    project_dir, _ = _scaffold_with_store(tmp_path)
+
+    assert list_pending_runs(root=project_dir) == "no runs awaiting approval"
+
+
+def test_approve_run_resumes_and_persists_the_run(tmp_path):
+    project_dir, db_path = _scaffold_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    run, call = _save_awaiting_approval(store)
+    store.close()
+
+    output = approve_run(run.id, call.id, root=project_dir)
+
+    assert "approved" in output
+    store = SQLiteRunStore(db_path)
+    saved = store.get(run.id)
+    store.close()
+    assert saved.status == RunStatus.RUNNING
+    assert saved.tool_calls[0].approved is True
+
+
+def test_deny_run_fails_and_persists_the_run(tmp_path):
+    project_dir, db_path = _scaffold_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    run, call = _save_awaiting_approval(store)
+    store.close()
+
+    output = deny_run(run.id, call.id, root=project_dir, reason="not authorized")
+
+    assert "denied" in output
+    store = SQLiteRunStore(db_path)
+    saved = store.get(run.id)
+    store.close()
+    assert saved.status == RunStatus.FAILED
+    assert saved.tool_calls[0].approved is False
+    assert "not authorized" in saved.events[-1].data["error"]
+
+
+def test_approve_run_raises_for_an_unknown_id(tmp_path):
+    project_dir, _ = _scaffold_with_store(tmp_path)
+
+    with pytest.raises(RunNotFound):
+        approve_run("does-not-exist", "some-call", root=project_dir)

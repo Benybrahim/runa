@@ -1,7 +1,7 @@
 import pytest
 
 from runa.cli.main import main
-from runa.core import Run
+from runa.core import Message, Role, Run, RunStatus, ToolCall
 from runa.persistence import SQLiteRunStore
 
 
@@ -90,3 +90,71 @@ def test_runs_show_renders_a_saved_runs_timeline(tmp_path, capsys):
 def test_runs_requires_an_action():
     with pytest.raises(SystemExit):
         main(["runs"])
+
+
+def _new_project_with_store(tmp_path):
+    project_dir = tmp_path / "acme"
+    main(["new", "acme"], cwd=tmp_path)
+    db_path = str(tmp_path / "runs.db")
+    (project_dir / "main.py").write_text(
+        "from runa import configure\n"
+        "from runa.persistence import SQLiteRunStore\n"
+        "from tests.fakes import FakeProvider\n\n"
+        "configure(provider=FakeProvider(responses=[]), "
+        f"run_store=SQLiteRunStore({db_path!r}))\n"
+    )
+    return project_dir, db_path
+
+
+def test_runs_pending_and_approve_resume_a_run(tmp_path, capsys):
+    project_dir, db_path = _new_project_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    call = ToolCall(name="SendEmail", arguments={"to": "a@example.com"})
+    run = Run(input="email someone")
+    run.start()
+    run.add_message(Message(role=Role.ASSISTANT, tool_calls=[call]))
+    run.require_approval(call.id)
+    store.save(run)
+    store.close()
+
+    pending_exit = main(["runs", "pending"], cwd=project_dir)
+    pending_output = capsys.readouterr().out
+    assert pending_exit == 0
+    assert run.id in pending_output
+    assert "SendEmail" in pending_output
+
+    approve_exit = main(["runs", "approve", run.id, call.id], cwd=project_dir)
+    approve_output = capsys.readouterr().out
+    assert approve_exit == 0
+    assert "approved" in approve_output
+
+    store = SQLiteRunStore(db_path)
+    saved = store.get(run.id)
+    store.close()
+    assert saved.status == RunStatus.RUNNING
+    assert saved.tool_calls[0].approved is True
+
+
+def test_runs_deny_fails_a_run(tmp_path, capsys):
+    project_dir, db_path = _new_project_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    call = ToolCall(name="SendEmail", arguments={"to": "a@example.com"})
+    run = Run(input="email someone")
+    run.start()
+    run.add_message(Message(role=Role.ASSISTANT, tool_calls=[call]))
+    run.require_approval(call.id)
+    store.save(run)
+    store.close()
+
+    exit_code = main(
+        ["runs", "deny", run.id, call.id, "--reason", "not authorized"],
+        cwd=project_dir,
+    )
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "denied" in output
+
+    store = SQLiteRunStore(db_path)
+    saved = store.get(run.id)
+    store.close()
+    assert saved.status == RunStatus.FAILED

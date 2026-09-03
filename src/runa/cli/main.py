@@ -2,9 +2,10 @@
 
 `new` and `generate` are scaffolding (manifesto §2, §9) — they write files
 following the app/ convention and never touch the runtime. `eval` and
-`runs show` do touch it, but only by calling existing library functions
-(`run_evals()`, `timeline()`) against the app in `cwd` — no logic lives here
-that doesn't already exist elsewhere (manifesto §11, §12).
+`runs` do touch it, but only by calling existing library functions
+(`run_evals()`, `timeline()`, `approval.approve()`/`deny()`) against the app
+in `cwd` — no logic lives here that doesn't already exist elsewhere
+(manifesto §11, §12, §14).
 """
 
 import argparse
@@ -13,7 +14,7 @@ from pathlib import Path
 from runa.cli.eval import run_project_evals
 from runa.cli.generate import generate_agent
 from runa.cli.new import scaffold_project
-from runa.cli.runs import show_run
+from runa.cli.runs import approve_run, deny_run, list_pending_runs, show_run
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -36,8 +37,24 @@ def _build_parser() -> argparse.ArgumentParser:
 
     runs_parser = subparsers.add_parser("runs", help="Inspect this app's Runs")
     runs_subparsers = runs_parser.add_subparsers(dest="action", required=True)
+
     runs_show_parser = runs_subparsers.add_parser("show", help="Show a Run's timeline")
     runs_show_parser.add_argument("run_id")
+
+    runs_subparsers.add_parser("pending", help="List Runs paused awaiting approval")
+
+    runs_approve_parser = runs_subparsers.add_parser(
+        "approve", help="Approve a pending tool call and resume the Run"
+    )
+    runs_approve_parser.add_argument("run_id")
+    runs_approve_parser.add_argument("tool_call_id")
+
+    runs_deny_parser = runs_subparsers.add_parser(
+        "deny", help="Deny a pending tool call and fail the Run"
+    )
+    runs_deny_parser.add_argument("run_id")
+    runs_deny_parser.add_argument("tool_call_id")
+    runs_deny_parser.add_argument("--reason", default="")
 
     return parser
 
@@ -65,5 +82,17 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
         print(f"\n{len(results) - failed}/{len(results)} passed")
         return 1 if failed else 0
 
-    print(show_run(args.run_id, root=cwd))
+    if args.action == "show":
+        print(show_run(args.run_id, root=cwd))
+        return 0
+
+    if args.action == "pending":
+        print(list_pending_runs(root=cwd))
+        return 0
+
+    if args.action == "approve":
+        print(approve_run(args.run_id, args.tool_call_id, root=cwd))
+        return 0
+
+    print(deny_run(args.run_id, args.tool_call_id, root=cwd, reason=args.reason))
     return 0
