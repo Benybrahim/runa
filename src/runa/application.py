@@ -119,13 +119,14 @@ class Application:
                 f"unknown configuration option(s): {', '.join(sorted(unknown))}; "
                 f"valid options are: {', '.join(sorted(valid_fields))}"
             )
-        if "provider" in options and options["provider"] is not None:
-            options["provider"] = resolve_provider(options["provider"])
-        if "async_provider" in options and options["async_provider"] is not None:
-            options["async_provider"] = resolve_async_provider(
-                options["async_provider"]
-            )
+        resolvers = {
+            "provider": resolve_provider,
+            "async_provider": resolve_async_provider,
+        }
         for name, value in options.items():
+            resolve = resolvers.get(name)
+            if resolve is not None and value is not None:
+                value = resolve(value)
             setattr(self.config, name, value)
 
     @property

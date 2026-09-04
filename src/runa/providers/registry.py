@@ -17,8 +17,6 @@ arbitrary dynamic provider loading is speculative until something actually
 needs it.
 """
 
-from dataclasses import dataclass
-
 from runa.providers.anthropic import AnthropicProvider, AsyncAnthropicProvider
 from runa.providers.openai import AsyncOpenAIProvider, OpenAIProvider
 from runa.runtime.async_provider import AsyncProvider
@@ -29,19 +27,13 @@ class UnknownProvider(Exception):
     """Raised when a provider alias isn't in the registry."""
 
 
-@dataclass(frozen=True)
-class _Aliased:
-    sync: type[Provider]
-    async_: type[AsyncProvider]
-
-
-_REGISTRY: dict[str, _Aliased] = {
-    "openai": _Aliased(OpenAIProvider, AsyncOpenAIProvider),
-    "anthropic": _Aliased(AnthropicProvider, AsyncAnthropicProvider),
+_REGISTRY: dict[str, tuple[type[Provider], type[AsyncProvider]]] = {
+    "openai": (OpenAIProvider, AsyncOpenAIProvider),
+    "anthropic": (AnthropicProvider, AsyncAnthropicProvider),
 }
 
 
-def _lookup(name: str) -> _Aliased:
+def _lookup(name: str) -> tuple[type[Provider], type[AsyncProvider]]:
     try:
         return _REGISTRY[name]
     except KeyError:
@@ -61,12 +53,14 @@ def resolve_provider(provider: Provider | str) -> Provider:
     unchanged.
     """
     if isinstance(provider, str):
-        return _lookup(provider).sync()
+        sync, _ = _lookup(provider)
+        return sync()
     return provider
 
 
 def resolve_async_provider(async_provider: AsyncProvider | str) -> AsyncProvider:
     """The `async_provider=` counterpart to `resolve_provider()`."""
     if isinstance(async_provider, str):
-        return _lookup(async_provider).async_()
+        _, async_cls = _lookup(async_provider)
+        return async_cls()
     return async_provider

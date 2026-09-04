@@ -15,7 +15,7 @@ Run agents, not loops.
 ---
 
 ```python
-from runa import Agent, OpenAIProvider, configure, tool
+from runa import Agent, configure, tool
 
 
 @tool
@@ -28,7 +28,7 @@ class WeatherAgent(Agent):
     tools = [get_weather]
 
 
-configure(provider=OpenAIProvider())
+configure(provider="openai")
 
 run = WeatherAgent.run("What's the weather in Tokyo?")
 
