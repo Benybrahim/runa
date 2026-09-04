@@ -5,6 +5,9 @@ architectural or API changes — it defines the design principles and the order
 in which the framework is meant to evolve. A change that doesn't fit those
 principles is unlikely to be accepted regardless of how well it's implemented.
 
+By participating, you're expected to follow the
+[Code of Conduct](./CODE_OF_CONDUCT.md).
+
 ## Setup
 
 ```bash
@@ -54,3 +57,13 @@ pattern.
 ## Commit messages
 
 Explain *why*, not just *what*. The diff already shows what changed.
+
+## Proposing larger changes
+
+Small, focused fixes can go straight to a pull request. For anything that
+touches core architecture — a new abstraction, a change to the `Run`
+lifecycle, a new top-level module — open an issue first and work through the
+questions in [`RUNA.md`](./RUNA.md)'s "Runa Standard" (also summarized in
+[`CLAUDE.md`](./CLAUDE.md#when-changing-architecture)) before writing code.
+Discussing the shape of a change before implementing it saves rework on both
+sides. See [`GOVERNANCE.md`](./GOVERNANCE.md) for how the project is run.
