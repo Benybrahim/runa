@@ -126,14 +126,33 @@ def recover_pending(
     names the orphaned run ids; each is looked up in `run_store` and
     matched to the `Agent` class that produced it via `Run.agent_name` (see
     `agents`, matched by `Agent.agent_name()`); matches are resubmitted
-    through `queue.enqueue_run()` — the same path `run_later()` uses, so
-    each resumes exactly where `Executor.run()` would resume any other
-    paused Run. Unlike `run_later()`, each job also calls `run_store.save()`
-    once it reaches its next pause point — recovery exists to make the
-    store reflect what actually happened, so leaving that write to the
-    caller would defeat the point (a second crash right after recovery
-    would find the same stale row and repeat the whole recovery for no
-    progress).
+    through `queue.enqueue_run()` — the same path `run_later()` uses. Unlike
+    `run_later()`, each job also calls `run_store.save()` once it reaches
+    its next pause point — recovery exists to make the store reflect what
+    actually happened, so leaving that write to the caller would defeat the
+    point (a second crash right after recovery would find the same stale
+    row and repeat the whole recovery for no progress).
+
+    IMPORTANT — this restarts the Run, it does not resume it mid-flight.
+    `run_later()` only ever persists the Run's *pre-dispatch* snapshot
+    (QUEUED, no messages, no tool calls yet); nothing checkpoints progress
+    while a Run is actually executing. So `run` here is that same
+    pre-dispatch snapshot, regardless of how far the crashed process
+    actually got — `Executor.run()` sees a fresh QUEUED Run and seeds and
+    runs it from the beginning, calling the model and any tools again from
+    scratch. Any tool call the crashed process already completed — a real
+    charge, a real email, a real ticket — is repeated. Building true
+    mid-execution checkpointing would need to resolve a harder problem
+    first: `ToolCall.attempts` is incremented before a call runs (see
+    `Executor._call_tool`), so a crash between that increment and the call
+    returning would otherwise look like a *completed* call on resume
+    (`ToolCall.completed` only checks `attempts > 0 and error is None`) and
+    get silently skipped rather than retried or flagged — the same
+    attempted-vs-observed-effect ambiguity `EffectStatus.UNKNOWN` already
+    models for a single retried call (architecture.md §13), not yet
+    resolved at the level of a whole recovered Run. Only give `agents` to
+    `recover_pending()` whose tools are safe to run again in full —
+    `Tool.idempotent` is the existing signal for exactly this.
 
     A run id missing from `run_store` is skipped — it already finished and
     its journal row wasn't cleared for some unrelated reason. A Run whose

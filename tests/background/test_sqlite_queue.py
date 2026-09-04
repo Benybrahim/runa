@@ -2,9 +2,10 @@ import threading
 
 from runa.agent import Agent
 from runa.background import SQLiteQueue, recover_pending, run_later
-from runa.core import Message, Role, Run, RunStatus
+from runa.core import Message, Role, Run, RunStatus, ToolCall
 from runa.persistence import SQLiteRunStore
 from runa.runtime import Executor
+from runa.tool import Tool
 from tests.fakes import FakeProvider
 
 
@@ -200,3 +201,68 @@ def test_recover_pending_resumes_a_run_orphaned_by_a_crashed_process(tmp_path):
     reloaded = run_store.get(run.id)
     assert reloaded.status == RunStatus.COMPLETED
     assert reloaded.result == "hi"
+
+
+def test_recover_pending_reruns_a_non_idempotent_tool_call_that_already_fired(
+    tmp_path,
+):
+    # Characterizes a real limitation, not a bug to "fix" here: run_later()
+    # only ever persists the Run's pre-dispatch QUEUED snapshot — nothing
+    # checkpoints progress once a Run starts executing. So recover_pending()
+    # restarts a crashed Run from the beginning rather than resuming it
+    # mid-flight, and a non-idempotent tool call the crashed process already
+    # completed (a real charge, here) runs again. See recover_pending()'s
+    # and architecture.md §8's docstrings for why this can't be fixed with a
+    # small change, and why `agents` should only name Agents whose tools are
+    # all `idempotent = True`.
+    charges: list[int] = []
+
+    class ChargeCard(Tool):
+        idempotent = False
+
+        def call(self, amount: int) -> str:
+            charges.append(amount)
+            return f"charged {amount}"
+
+    class BillingAgent(Agent):
+        tools = [ChargeCard]
+
+    queue_path = str(tmp_path / "queue.db")
+    run_store_path = str(tmp_path / "runs.db")
+
+    # Simulate the previous process: it journaled the run, persisted it as
+    # QUEUED (the only save that ever happens before completion), and then
+    # actually charged the card — before crashing without ever recording
+    # that this happened anywhere durable.
+    run = Run(input="charge 100", agent_name="BillingAgent")
+    run.queue()
+    crashed_store = SQLiteRunStore(run_store_path)
+    crashed_store.save(run)
+    crashed_queue = SQLiteQueue(queue_path)
+    crashed_queue._connection.execute(
+        "INSERT INTO pending_jobs (run_id) VALUES (?)", (run.id,)
+    )
+    crashed_queue._connection.commit()
+    crashed_queue.close(wait=False)
+    crashed_store.close()
+    charges.append(100)  # the crashed process's real, unrecorded charge
+
+    # A new process recovers.
+    run_store = SQLiteRunStore(run_store_path)
+    queue = SQLiteQueue(queue_path, max_workers=1)
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="ChargeCard", arguments={"amount": 100})],
+            ),
+            Message(role=Role.ASSISTANT, content="done"),
+        ]
+    )
+    executor = Executor(provider)
+
+    recover_pending(queue, run_store, executor, agents=[BillingAgent])
+    queue._executor.shutdown(wait=True)
+    queue.close(wait=False)
+
+    assert charges == [100, 100]  # charged twice — the crashed run restarted

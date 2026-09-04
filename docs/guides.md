@@ -131,6 +131,8 @@ from runa import recover_pending
 recover_pending(queue, run_store, executor, agents=[ResearchAgent])
 ```
 
+This restarts a recovered Run from the beginning, not from wherever the crashed process reached — nothing checkpoints progress once a Run starts executing, only before dispatch and at its next pause point. Any tool call the crashed process already completed runs again. Only pass `agents` whose tools are all `idempotent = True`, or a real side effect (a charge, an email, a ticket) can happen twice.
+
 ---
 
 # Inspecting Runs
