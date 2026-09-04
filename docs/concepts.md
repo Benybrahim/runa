@@ -439,6 +439,11 @@ It is state across executions.
 
 The Run remains the fundamental execution boundary.
 
+A Conversation is meant to be held across separate Runs, but not across
+*concurrent* ones: two Runs racing against the same Conversation are not
+merged — whichever finishes last silently overwrites the other's turn. See
+architecture.md's Conversation section for what guarantee actually holds.
+
 ---
 
 # Strategy

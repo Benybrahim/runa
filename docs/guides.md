@@ -105,6 +105,14 @@ Conversation state survives across these executions.
 
 Run state does not.
 
+Only sequence Runs against a shared Conversation this way — finish one (including
+the `record()` that happens at the end of `.run()`) before starting the next.
+Two Runs launched concurrently against the same Conversation (e.g. via
+`run_later()` on a `ThreadQueue`) are not merged: each seeds its history from
+the Conversation as it stood when that Run started, and whichever finishes
+last silently overwrites the other's turn. Give concurrent Runs their own
+Conversations and merge deliberately instead.
+
 ---
 
 # Running in the Background
