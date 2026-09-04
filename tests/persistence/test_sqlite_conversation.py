@@ -106,6 +106,23 @@ def test_concurrent_save_and_get_from_multiple_threads_does_not_corrupt_data():
     assert errors == []
 
 
+def test_round_trips_a_messages_usage():
+    store = SQLiteConversationStore(":memory:")
+    conversation = Conversation()
+    conversation.messages.append(
+        Message(
+            role=Role.ASSISTANT,
+            content="hi there",
+            usage={"input_tokens": 10, "output_tokens": 3},
+        )
+    )
+
+    store.save(conversation)
+    loaded = store.get(conversation.id)
+
+    assert loaded.messages[0].usage == {"input_tokens": 10, "output_tokens": 3}
+
+
 def test_round_trips_messages_and_tool_calls():
     store = SQLiteConversationStore(":memory:")
     conversation = Conversation()

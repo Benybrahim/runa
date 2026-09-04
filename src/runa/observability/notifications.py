@@ -15,6 +15,11 @@ from runa.core import Event, EventType, Run
 
 Subscriber = Callable[[Event], None]
 
+
+def _format_usage(usage: dict[str, int]) -> str:
+    return f"{usage.get('input_tokens', 0)} in / {usage.get('output_tokens', 0)} out"
+
+
 _SUMMARIES: dict[EventType, Callable[[dict[str, Any]], str]] = {
     EventType.RUN_QUEUED: lambda d: "run queued",
     EventType.RUN_STARTED: lambda d: "run started",
@@ -31,9 +36,12 @@ _SUMMARIES: dict[EventType, Callable[[dict[str, Any]], str]] = {
     ),
     EventType.MODEL_RESPONDED: (
         lambda d: (
-            f"model responded: requested {d['tool_call_count']} tool call(s)"
-            if d.get("tool_call_count")
-            else f"model responded: {d.get('content', '')!r}"
+            (
+                f"model responded: requested {d['tool_call_count']} tool call(s)"
+                if d.get("tool_call_count")
+                else f"model responded: {d.get('content', '')!r}"
+            )
+            + (f" ({_format_usage(d['usage'])})" if d.get("usage") else "")
         )
     ),
     EventType.TOOL_CALLED: (

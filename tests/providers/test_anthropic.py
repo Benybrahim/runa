@@ -126,6 +126,25 @@ def test_from_wire_message_with_no_tool_use_blocks():
     assert message.tool_calls == []
 
 
+def test_from_wire_message_normalizes_usage_into_input_and_output_tokens():
+    response = SimpleNamespace(
+        content=[SimpleNamespace(type="text", text="Hi.")],
+        usage=SimpleNamespace(input_tokens=20, output_tokens=6),
+    )
+
+    message = from_wire_message(response)
+
+    assert message.usage == {"input_tokens": 20, "output_tokens": 6}
+
+
+def test_from_wire_message_with_no_usage_attribute_leaves_usage_none():
+    response = SimpleNamespace(content=[SimpleNamespace(type="text", text="Hi.")])
+
+    message = from_wire_message(response)
+
+    assert message.usage is None
+
+
 def test_async_anthropic_provider_awaits_the_async_client():
     class FakeMessages:
         async def create(self, **kwargs):

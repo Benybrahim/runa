@@ -62,3 +62,9 @@ class Message:
     tool_calls: list[ToolCall] = field(default_factory=list)
     tool_call_id: str | None = None
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    # Token accounting for a model-generated Message, e.g.
+    # {"input_tokens": 512, "output_tokens": 64}. None for a Message that
+    # didn't come from a model call, or from a provider that didn't report
+    # usage. Providers normalize their vendor-specific usage shape into
+    # these two keys — see providers/*.py.
+    usage: dict[str, int] | None = None

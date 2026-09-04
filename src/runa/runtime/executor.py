@@ -193,6 +193,7 @@ class Executor:
             EventType.MODEL_RESPONDED,
             content=message.content,
             tool_call_count=len(message.tool_calls),
+            usage=message.usage,
         )
 
     def _call_tool(self, agent: "Agent", run: Run, tool_call: ToolCall) -> None:

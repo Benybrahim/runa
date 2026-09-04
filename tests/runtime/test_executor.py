@@ -109,6 +109,38 @@ def test_executor_runs_every_tool_call_requested_in_a_single_turn():
     assert len(provider.calls) == 2
 
 
+def test_model_responded_event_carries_the_messages_usage():
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                content="hi",
+                usage={"input_tokens": 10, "output_tokens": 3},
+            )
+        ]
+    )
+    executor = Executor(provider)
+    agent = WeatherAgent()
+    run = Run(input="hello")
+
+    result = executor.run(agent, run)
+
+    responded = next(e for e in result.events if e.type == EventType.MODEL_RESPONDED)
+    assert responded.data["usage"] == {"input_tokens": 10, "output_tokens": 3}
+
+
+def test_model_responded_event_usage_is_none_when_the_provider_reports_none():
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    executor = Executor(provider)
+    agent = WeatherAgent()
+    run = Run(input="hello")
+
+    result = executor.run(agent, run)
+
+    responded = next(e for e in result.events if e.type == EventType.MODEL_RESPONDED)
+    assert responded.data["usage"] is None
+
+
 def test_populated_context_is_seeded_as_a_system_message():
     provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
     executor = Executor(provider)

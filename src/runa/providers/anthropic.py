@@ -78,7 +78,21 @@ def from_wire_message(response: Any) -> Message:
                 ToolCall(name=block.name, arguments=dict(block.input), id=block.id)
             )
 
-    return Message(role=Role.ASSISTANT, content=text, tool_calls=tool_calls)
+    usage = getattr(response, "usage", None)
+    return Message(
+        role=Role.ASSISTANT,
+        content=text,
+        tool_calls=tool_calls,
+        usage=from_wire_usage(usage) if usage is not None else None,
+    )
+
+
+def from_wire_usage(usage: Any) -> dict[str, int]:
+    """Normalize Anthropic's `Usage` into Runa's common usage shape."""
+    return {
+        "input_tokens": usage.input_tokens,
+        "output_tokens": usage.output_tokens,
+    }
 
 
 class AnthropicProvider:

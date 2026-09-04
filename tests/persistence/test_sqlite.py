@@ -100,6 +100,23 @@ def test_round_trips_messages_tool_calls_artifacts_and_events():
     assert isinstance(loaded.events[0], Event)
 
 
+def test_round_trips_a_messages_usage():
+    store = SQLiteRunStore(":memory:")
+    run = Run(input="hi")
+    run.add_message(
+        Message(
+            role=Role.ASSISTANT,
+            content="hi there",
+            usage={"input_tokens": 10, "output_tokens": 3},
+        )
+    )
+
+    store.save(run)
+    loaded = store.get(run.id)
+
+    assert loaded.messages[0].usage == {"input_tokens": 10, "output_tokens": 3}
+
+
 def test_round_trips_a_failed_runs_error():
     store = SQLiteRunStore(":memory:")
     run = Run(input="hi")

@@ -116,6 +116,31 @@ def test_from_wire_message_with_no_tool_calls():
     assert message.tool_calls == []
 
 
+def test_from_wire_message_normalizes_usage_into_input_and_output_tokens():
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(message=SimpleNamespace(content="Hi.", tool_calls=None))
+        ],
+        usage=SimpleNamespace(prompt_tokens=12, completion_tokens=4),
+    )
+
+    message = from_wire_message(response)
+
+    assert message.usage == {"input_tokens": 12, "output_tokens": 4}
+
+
+def test_from_wire_message_with_no_usage_attribute_leaves_usage_none():
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(message=SimpleNamespace(content="Hi.", tool_calls=None))
+        ]
+    )
+
+    message = from_wire_message(response)
+
+    assert message.usage is None
+
+
 def test_async_openai_provider_awaits_the_async_client():
     class FakeCompletions:
         async def create(self, **kwargs):

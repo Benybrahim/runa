@@ -43,6 +43,23 @@ def test_timeline_summarizes_a_direct_answer_with_the_model_and_content():
     assert responded.summary == "model responded: 'hi'"
 
 
+def test_timeline_summarizes_a_response_with_usage_when_the_provider_reports_it():
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                content="hi",
+                usage={"input_tokens": 10, "output_tokens": 3},
+            )
+        ]
+    )
+    run = Executor(provider).run(NamedModelAgent(), Run(input="hello"))
+
+    responded = next(e for e in timeline(run) if e.type == EventType.MODEL_RESPONDED)
+
+    assert responded.summary == "model responded: 'hi' (10 in / 3 out)"
+
+
 def test_timeline_summarizes_a_model_call_with_no_configured_model():
     provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     run = Executor(provider).run(GreeterAgent(), Run(input="hello"))

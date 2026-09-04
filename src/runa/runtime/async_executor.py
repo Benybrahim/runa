@@ -185,6 +185,7 @@ class AsyncExecutor:
             EventType.MODEL_RESPONDED,
             content=message.content,
             tool_call_count=len(message.tool_calls),
+            usage=message.usage,
         )
 
     async def _call_tools(

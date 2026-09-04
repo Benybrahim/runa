@@ -130,6 +130,7 @@ def run_to_dict(run: Run) -> dict[str, Any]:
                 "content": message.content,
                 "tool_call_ids": [tc.id for tc in message.tool_calls],
                 "tool_call_id": message.tool_call_id,
+                "usage": message.usage,
             }
             for message in run.messages
         ],
@@ -164,6 +165,7 @@ def run_from_dict(data: dict[str, Any]) -> Run:
             content=m["content"],
             tool_calls=[tool_calls_by_id[tc_id] for tc_id in m["tool_call_ids"]],
             tool_call_id=m["tool_call_id"],
+            usage=m.get("usage"),
         )
         for m in data["messages"]
     ]
@@ -215,6 +217,7 @@ def conversation_to_dict(conversation: Conversation) -> dict[str, Any]:
                 "content": message.content,
                 "tool_calls": [_tool_call_to_dict(tc) for tc in message.tool_calls],
                 "tool_call_id": message.tool_call_id,
+                "usage": message.usage,
             }
             for message in conversation.messages
         ],
@@ -233,6 +236,7 @@ def conversation_from_dict(data: dict[str, Any]) -> Conversation:
                 content=m["content"],
                 tool_calls=[_tool_call_from_dict(tc) for tc in m["tool_calls"]],
                 tool_call_id=m["tool_call_id"],
+                usage=m.get("usage"),
             )
             for m in data["messages"]
         ],

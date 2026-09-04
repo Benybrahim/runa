@@ -75,9 +75,21 @@ def from_wire_message(response: Any) -> Message:
         )
         for call in (choice.tool_calls or [])
     ]
+    usage = getattr(response, "usage", None)
     return Message(
-        role=Role.ASSISTANT, content=choice.content or "", tool_calls=tool_calls
+        role=Role.ASSISTANT,
+        content=choice.content or "",
+        tool_calls=tool_calls,
+        usage=from_wire_usage(usage) if usage is not None else None,
     )
+
+
+def from_wire_usage(usage: Any) -> dict[str, int]:
+    """Normalize OpenAI's `CompletionUsage` into Runa's common usage shape."""
+    return {
+        "input_tokens": usage.prompt_tokens,
+        "output_tokens": usage.completion_tokens,
+    }
 
 
 class OpenAIProvider:

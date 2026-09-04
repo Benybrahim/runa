@@ -58,6 +58,23 @@ def test_async_executor_runs_a_full_tool_use_loop():
     ]
 
 
+def test_async_model_responded_event_carries_the_messages_usage():
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                content="hi",
+                usage={"input_tokens": 10, "output_tokens": 3},
+            )
+        ]
+    )
+    executor = AsyncExecutor(provider)
+    run = asyncio.run(executor.run(WeatherAgent(), Run(input="hello")))
+
+    responded = next(e for e in run.events if e.type == EventType.MODEL_RESPONDED)
+    assert responded.data["usage"] == {"input_tokens": 10, "output_tokens": 3}
+
+
 def test_async_populated_context_is_seeded_as_a_system_message():
     provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
     executor = AsyncExecutor(provider)
