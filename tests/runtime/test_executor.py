@@ -1,3 +1,8 @@
+import threading
+import time
+
+import pytest
+
 from runa.agent import Agent
 from runa.approval import approve
 from runa.core import (
@@ -7,6 +12,7 @@ from runa.core import (
     Message,
     Role,
     Run,
+    RunAlreadyDriving,
     RunStatus,
     ToolCall,
 )
@@ -499,6 +505,63 @@ def test_running_an_already_terminal_run_again_is_a_no_op():
     assert result is run
     assert calls == ["after_run"]  # not called again
     assert len(provider.calls) == 1  # no second model call either
+
+
+def test_run_raises_when_another_executor_is_already_driving_it():
+    provider = FakeProvider(responses=[])
+    executor = Executor(provider)
+    run = Run(input="hi")
+    run.begin_driving()  # simulate another Executor already in flight
+    try:
+        with pytest.raises(RunAlreadyDriving):
+            executor.run(WeatherAgent(), run)
+    finally:
+        run.end_driving()
+
+    # the guard fires before any seeding/model call, so nothing ran
+    assert provider.calls == []
+    assert run.status == RunStatus.CREATED
+
+
+def test_two_threads_driving_the_same_run_do_not_silently_corrupt_it():
+    """Reproduces the real hazard `begin_driving()` closes: two Executors
+    racing the same Run object used to interleave their steps with no
+    error, silently duplicating the model call. Now exactly one thread
+    succeeds and the other gets a clear `RunAlreadyDriving`."""
+
+    class SlowProvider:
+        def __init__(self):
+            self.calls = 0
+
+        def complete(self, *, messages, tools, model):
+            self.calls += 1
+            time.sleep(0.1)
+            return Message(role=Role.ASSISTANT, content="done")
+
+    provider = SlowProvider()
+    executor = Executor(provider)
+    run = Run(input="hi")
+    agent = WeatherAgent()
+    results: list[Run] = []
+    errors: list[Exception] = []
+
+    def drive():
+        try:
+            results.append(executor.run(agent, run))
+        except RunAlreadyDriving as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=drive) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert len(errors) == 1
+    assert len(results) == 1
+    assert results[0].status == RunStatus.COMPLETED
+    assert provider.calls == 1
+    assert [m.role for m in run.messages].count(Role.ASSISTANT) == 1
 
 
 def test_review_hook_is_skipped_when_the_run_fails_instead_of_completing():

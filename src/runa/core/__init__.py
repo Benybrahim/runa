@@ -17,7 +17,7 @@ from runa.core.context import Context
 from runa.core.conversation import Conversation
 from runa.core.event import Event, EventType
 from runa.core.message import EffectStatus, Message, Role, ToolCall
-from runa.core.run import IllegalTransition, Run, RunStatus
+from runa.core.run import IllegalTransition, Run, RunAlreadyDriving, RunStatus
 from runa.core.state import ConversationState, RunState
 
 __all__ = [
@@ -37,6 +37,7 @@ __all__ = [
     "PlanArtifact",
     "Role",
     "Run",
+    "RunAlreadyDriving",
     "RunState",
     "RunStatus",
     "TextArtifact",

@@ -1,10 +1,21 @@
 import asyncio
 import time
 
+import pytest
+
 from runa.agent import Agent
 from runa.approval import approve
 from runa.config import configure
-from runa.core import DataArtifact, EventType, Message, Role, Run, RunStatus, ToolCall
+from runa.core import (
+    DataArtifact,
+    EventType,
+    Message,
+    Role,
+    Run,
+    RunAlreadyDriving,
+    RunStatus,
+    ToolCall,
+)
 from runa.runtime.async_executor import AsyncExecutor
 from runa.runtime.executor import Executor
 from runa.runtime.provider import StreamChunk
@@ -211,6 +222,21 @@ def test_running_an_already_terminal_run_again_is_a_no_op():
     assert result is run
     assert calls == ["after_run"]
     assert len(provider.calls) == 1
+
+
+def test_async_run_raises_when_another_executor_is_already_driving_it():
+    provider = FakeAsyncProvider(responses=[])
+    executor = AsyncExecutor(provider)
+    run = Run(input="hi")
+    run.begin_driving()  # simulate another Executor already in flight
+    try:
+        with pytest.raises(RunAlreadyDriving):
+            asyncio.run(executor.run(WeatherAgent(), run))
+    finally:
+        run.end_driving()
+
+    assert provider.calls == []
+    assert run.status == RunStatus.CREATED
 
 
 def test_async_executor_review_hook_can_revise_the_result():

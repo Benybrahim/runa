@@ -6,6 +6,7 @@ from runa.core import (
     Message,
     Role,
     Run,
+    RunAlreadyDriving,
     RunStatus,
     TextArtifact,
 )
@@ -159,3 +160,19 @@ def test_usage_ignores_messages_without_reported_usage():
     run.add_message(Message(role=Role.ASSISTANT, content="no usage reported"))
 
     assert run.usage == {"input_tokens": 0, "output_tokens": 0}
+
+
+def test_begin_driving_raises_if_the_run_is_already_being_driven():
+    run = Run(input="hello")
+    run.begin_driving()
+
+    with pytest.raises(RunAlreadyDriving):
+        run.begin_driving()
+
+
+def test_end_driving_lets_the_run_be_driven_again():
+    run = Run(input="hello")
+    run.begin_driving()
+    run.end_driving()
+
+    run.begin_driving()  # does not raise — the claim was released

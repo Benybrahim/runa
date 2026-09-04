@@ -116,55 +116,63 @@ class Executor:
         `run.conversation` isn't re-recorded. Without this check, calling
         `run()` a second time on an already-completed Run would silently
         re-invoke `after_run` (see `Run.is_terminal`).
+
+        Raises `RunAlreadyDriving` if another Executor is already driving
+        this same Run object — see `Run.begin_driving()`.
         """
         if run.is_terminal:
             return run
 
-        if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
-            seed_run(agent, run)
-            run.start()
-            try:
-                agent.before_run(run)
-                agent.plan(run)
-            except Exception as exc:  # same guarantee as the step loop below
-                run.fail(error=str(exc))
-        elif run.status in (RunStatus.PAUSED, RunStatus.AWAITING_APPROVAL):
-            run.resume()
+        run.begin_driving()
+        try:
+            if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
+                seed_run(agent, run)
+                run.start()
+                try:
+                    agent.before_run(run)
+                    agent.plan(run)
+                except Exception as exc:  # same guarantee as the step loop below
+                    run.fail(error=str(exc))
+            elif run.status in (RunStatus.PAUSED, RunStatus.AWAITING_APPROVAL):
+                run.resume()
 
-        deadline = None if self.timeout is None else time.monotonic() + self.timeout
+            deadline = None if self.timeout is None else time.monotonic() + self.timeout
 
-        steps = 0
-        while run.status == RunStatus.RUNNING:
-            if run.cancel_requested:
-                run.cancel()
-                break
-            if steps >= self.max_steps:
-                run.fail(error=f"exceeded max_steps ({self.max_steps})")
-                break
-            if deadline is not None and time.monotonic() >= deadline:
-                run.fail(error=f"exceeded timeout ({self.timeout}s)")
-                break
-            steps += 1
+            steps = 0
+            while run.status == RunStatus.RUNNING:
+                if run.cancel_requested:
+                    run.cancel()
+                    break
+                if steps >= self.max_steps:
+                    run.fail(error=f"exceeded max_steps ({self.max_steps})")
+                    break
+                if deadline is not None and time.monotonic() >= deadline:
+                    run.fail(error=f"exceeded timeout ({self.timeout}s)")
+                    break
+                steps += 1
 
-            try:
-                action = self.strategy.step(run)
-                self._apply(agent, run, action, on_chunk)
-            except Exception as exc:  # convert into a failed Run, not a crash
-                run.fail(error=str(exc))
-                break
+                try:
+                    action = self.strategy.step(run)
+                    self._apply(agent, run, action, on_chunk)
+                except Exception as exc:  # convert into a failed Run, not a crash
+                    run.fail(error=str(exc))
+                    break
 
-        if run.is_terminal:
-            try:
-                agent.after_run(run)
-            except Exception as exc:  # Run already terminal; don't falsify it
-                warnings.warn(
-                    f"after_run raised {exc!r} — ignored, Run {run.id} already "
-                    f"reached a terminal status ({run.status.value})",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
-            if run.conversation is not None:
-                run.conversation.record(run)
+            if run.is_terminal:
+                try:
+                    agent.after_run(run)
+                except Exception as exc:  # Run already terminal; don't falsify it
+                    warnings.warn(
+                        f"after_run raised {exc!r} — ignored, Run {run.id} "
+                        f"already reached a terminal status "
+                        f"({run.status.value})",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
+                if run.conversation is not None:
+                    run.conversation.record(run)
+        finally:
+            run.end_driving()
         return run
 
     def _apply(
