@@ -38,6 +38,7 @@ process boundaries once an app configures a durable one, e.g.
 from dataclasses import dataclass, field, fields
 
 from runa.persistence.store import InMemoryRunStore, RunStore
+from runa.providers.registry import resolve_async_provider, resolve_provider
 from runa.runtime.async_provider import AsyncProvider
 from runa.runtime.provider import Provider
 
@@ -83,7 +84,11 @@ class Application:
 
         runa.configure(provider=OpenAIProvider())
 
-    which delegates to `runa.application.configure(...)`.
+    which delegates to `runa.application.configure(...)`. `provider` also
+    accepts the ergonomic string alias for the common case with no
+    provider-specific configuration:
+
+        runa.configure(provider="openai")
     """
 
     def __init__(self) -> None:
@@ -98,6 +103,14 @@ class Application:
         `run_store`). Raises `InvalidConfiguration` for a keyword that
         isn't a known `Config` field, so a typo like `provder=...` fails
         loudly instead of being silently ignored.
+
+        `provider`/`async_provider` accept either a `Provider`/`AsyncProvider`
+        instance or its ergonomic string alias (`provider="openai"`) — the
+        alias is resolved to an instance right here, so `self.config` and
+        everything downstream only ever sees a real Provider (see
+        `runa.providers.registry.resolve_provider`). An unrecognized alias
+        raises `UnknownProvider` immediately, at configure() time, rather
+        than failing later inside the runtime.
         """
         valid_fields = {f.name for f in fields(Config)}
         unknown = set(options) - valid_fields
@@ -105,6 +118,12 @@ class Application:
             raise InvalidConfiguration(
                 f"unknown configuration option(s): {', '.join(sorted(unknown))}; "
                 f"valid options are: {', '.join(sorted(valid_fields))}"
+            )
+        if "provider" in options and options["provider"] is not None:
+            options["provider"] = resolve_provider(options["provider"])
+        if "async_provider" in options and options["async_provider"] is not None:
+            options["async_provider"] = resolve_async_provider(
+                options["async_provider"]
             )
         for name, value in options.items():
             setattr(self.config, name, value)

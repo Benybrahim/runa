@@ -12,6 +12,7 @@ from runa.application import (
 )
 from runa.core import Message, Role, RunStatus
 from runa.persistence import InMemoryRunStore
+from runa.providers import AsyncOpenAIProvider, OpenAIProvider, UnknownProvider
 from tests.fakes import FakeAsyncProvider, FakeProvider
 
 
@@ -62,6 +63,35 @@ def test_configure_only_touches_the_options_passed():
 def test_configure_rejects_an_unknown_option():
     with pytest.raises(InvalidConfiguration):
         application.configure(model_provider=FakeProvider(responses=[]))
+
+
+def test_configure_resolves_a_string_provider_alias(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    application.configure(provider="openai")
+
+    assert isinstance(application.provider, OpenAIProvider)
+
+
+def test_configure_still_accepts_an_explicit_provider_instance():
+    provider = FakeProvider(responses=[])
+
+    application.configure(provider=provider)
+
+    assert application.provider is provider
+
+
+def test_configure_raises_a_clear_error_for_an_unknown_provider_alias():
+    with pytest.raises(UnknownProvider, match="unrecognized-vendor"):
+        application.configure(provider="unrecognized-vendor")
+
+
+def test_configure_resolves_a_string_async_provider_alias(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    application.configure(provider=FakeProvider(responses=[]), async_provider="openai")
+
+    assert isinstance(application.async_provider, AsyncOpenAIProvider)
 
 
 def test_explicit_application_can_be_constructed_and_configured():

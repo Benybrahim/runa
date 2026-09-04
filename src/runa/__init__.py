@@ -76,6 +76,7 @@ from runa.providers import (
     AsyncAnthropicProvider,
     AsyncOpenAIProvider,
     OpenAIProvider,
+    UnknownProvider,
 )
 from runa.runtime import (
     Action,
@@ -177,6 +178,7 @@ __all__ = [
     "Tool",
     "ToolCall",
     "UnknownApprovalTool",
+    "UnknownProvider",
     "UnknownToolCall",
     "Verdict",
     "application",

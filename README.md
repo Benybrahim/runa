@@ -1,10 +1,18 @@
+<div align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/brand/mark-dark.svg">
+  <img src="assets/brand/mark.svg" width="40" height="40" alt="Runa">
+</picture>
+
 # Runa
 
 **The application framework for agentic AI.**
 
-Build AI applications, not agent scripts.
+Run agents, not loops.
 
-Rails made building web applications feel like building applications. Runa aims to do the same for agentic AI.
+</div>
+
+---
 
 ```python
 from runa import Agent, OpenAIProvider, configure, tool

@@ -61,12 +61,20 @@ A minimal `main.py` configures the model provider:
 
 ```python
 from runa import configure
-from runa.providers.openai import OpenAIProvider
 
-configure(provider=OpenAIProvider())
+configure(provider="openai")
 ```
 
-The exact provider depends on the model service your application uses.
+The string is shorthand for `OpenAIProvider()` — the exact provider depends
+on the model service your application uses (`"anthropic"` for
+`AnthropicProvider()`, and so on). Pass a provider instance directly instead
+when it needs its own configuration:
+
+```python
+from runa.providers.openai import OpenAIProvider
+
+configure(provider=OpenAIProvider(base_url="..."))
+```
 
 Configuration should be application-level rather than repeated across every Agent.
 
