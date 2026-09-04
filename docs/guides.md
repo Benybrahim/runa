@@ -141,6 +141,47 @@ recover_pending(queue, run_store, executor, agents=[ResearchAgent])
 
 This restarts a recovered Run from the beginning, not from wherever the crashed process reached — nothing checkpoints progress once a Run starts executing, only before dispatch and at its next pause point. Any tool call the crashed process already completed runs again. Only pass `agents` whose tools are all `idempotent = True`, or a real side effect (a charge, an email, a ticket) can happen twice.
 
+## Shutting Down a Background Queue
+
+`ThreadQueue`/`SQLiteQueue` run jobs on a `ThreadPoolExecutor`. A normal
+process exit — the script falls off the end, or `sys.exit()` — already
+waits for in-flight jobs to finish before the interpreter actually
+terminates; that's Python's own `ThreadPoolExecutor` behavior, not
+something Runa adds, and it works even if the application never calls
+`queue.close()`.
+
+`SIGTERM` — how Docker, Kubernetes, and systemd all ask a process to stop —
+does not go through that same path. With no handler installed, the default
+action for SIGTERM is immediate termination: whatever a worker thread was
+doing (mid-tool-call, mid-model-call) simply stops, with no chance to run
+cleanup code. If the application needs in-flight background Runs to finish
+before a SIGTERM-driven shutdown completes, it has to say so itself:
+
+```python
+import signal
+
+
+def handle_sigterm(signum, frame):
+    queue.close(wait=True)  # block until running jobs finish
+    raise SystemExit(0)
+
+
+signal.signal(signal.SIGTERM, handle_sigterm)
+```
+
+Registering a signal handler is an application decision, not something
+Runa does on the application's behalf — a web server or job runner already
+managing its own SIGTERM handling shouldn't have Runa silently install a
+competing one.
+
+For work where losing in-flight progress to `SIGKILL` (which no signal
+handler can intercept at all) is unacceptable, durability is the real
+answer, not a longer grace period: use a `DurableQueue` (`SQLiteQueue`) and
+call `recover_pending()` at the next startup, as above. A `SIGTERM` handler
+and `DurableQueue` recovery address different failure windows — the handler
+covers an orderly stop with time to finish; recovery covers whatever the
+handler didn't reach in time, or a harder kill that skipped it entirely.
+
 ---
 
 # Inspecting Runs

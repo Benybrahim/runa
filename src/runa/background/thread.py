@@ -23,5 +23,12 @@ class ThreadQueue:
         self._executor.submit(job)
 
     def close(self, *, wait: bool = True) -> None:
-        """Stop accepting new jobs; `wait=True` blocks until running jobs finish."""
+        """Stop accepting new jobs; `wait=True` blocks until running jobs finish.
+
+        A normal process exit already waits for in-flight jobs without
+        calling this — that's `ThreadPoolExecutor`'s own `atexit` behavior.
+        `SIGTERM` bypasses it, killing a worker thread mid-job with no
+        cleanup; call this from your own signal handler if that matters
+        (see docs/guides.md, "Shutting Down a Background Queue").
+        """
         self._executor.shutdown(wait=wait)

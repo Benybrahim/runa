@@ -84,6 +84,14 @@ class SQLiteQueue:
     def close(self, *, wait: bool = True) -> None:
         """Stop accepting new jobs; `wait=True` blocks until running jobs
         finish.
+
+        Same `SIGTERM` caveat as `ThreadQueue.close()`: a normal process
+        exit already waits without calling this, but `SIGTERM` kills a
+        worker thread mid-job with no cleanup unless the application calls
+        this from its own signal handler (see docs/guides.md, "Shutting
+        Down a Background Queue"). `recover_pending()` is what makes that
+        survivable regardless — the journal row this job's `wrapped()`
+        never got to clear is exactly what it looks for on next startup.
         """
         self._executor.shutdown(wait=wait)
         with self._lock:
