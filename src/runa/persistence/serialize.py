@@ -76,6 +76,19 @@ def _json_safe(value: Any) -> Any:
     falling back to `str(value)` matches what the model itself was already
     shown for this call (`content` in `Executor._call_tool`) rather than
     raising and losing the whole Run to one non-serializable result.
+
+    `Run.input` and `Run.result` get the same treatment for the same reason:
+    `Agent.run(input: Any, ...)` places no constraint on `input`, and
+    architecture.md §2 explicitly expects `Result` to hold structured,
+    application-defined objects, not just text — `agent.review()` can return
+    any value as the Run's final result. A Run round-tripped through a store
+    loses the original object's type either way once it isn't JSON-safe (a
+    dataclass decoded back from JSON is a plain dict, not that dataclass);
+    the choice here is only between that degraded-but-present `str()` form
+    and losing the whole Run to a `save()` that raises — the latter is worse
+    for a value the application may not control (e.g. `input` handed in by a
+    caller) and, unlike a raise inside a request/response cycle, can fail
+    silently when it happens on a background queue's worker thread.
     """
     try:
         json.dumps(value)
@@ -120,7 +133,7 @@ def run_to_dict(run: Run) -> dict[str, Any]:
         "agent_name": run.agent_name,
         "agent_version": run.agent_version,
         "parent_run_id": run.parent_run_id,
-        "input": run.input,
+        "input": _json_safe(run.input),
         "context": _json_safe_dict(run.context),
         "state": _json_safe_dict(run.state),
         "messages": [
@@ -145,7 +158,7 @@ def run_to_dict(run: Run) -> dict[str, Any]:
         ],
         "tool_calls": tool_calls_by_id,
         "artifacts": [_artifact_to_dict(a) for a in run.artifacts],
-        "result": run.result,
+        "result": _json_safe(run.result),
         "error": run.error,
         "status": run.status.value,
         "created_at": run.created_at.isoformat(),
