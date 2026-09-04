@@ -9,6 +9,7 @@ of one at a time.
 import asyncio
 import inspect
 import time
+import warnings
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
@@ -94,6 +95,12 @@ class AsyncExecutor:
         `TypeError` otherwise.
 
         A no-op if `run` is already terminal — see `Executor.run`.
+
+        A bug in `before_run`/`plan` fails the Run with that exception as
+        `Run.error`, rather than stranding it at RUNNING forever; a bug in
+        `after_run` is surfaced as a `RuntimeWarning` instead, since the Run
+        has already reached its real terminal status by then — see
+        `Executor.run`'s docstring for why the two cases differ.
         """
         if run.is_terminal:
             return run
@@ -101,8 +108,11 @@ class AsyncExecutor:
         if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
             seed_run(agent, run)
             run.start()
-            agent.before_run(run)
-            agent.plan(run)
+            try:
+                agent.before_run(run)
+                agent.plan(run)
+            except Exception as exc:  # same guarantee as the step loop below
+                run.fail(error=str(exc))
         elif run.status in (RunStatus.PAUSED, RunStatus.AWAITING_APPROVAL):
             run.resume()
 
@@ -129,7 +139,15 @@ class AsyncExecutor:
                 break
 
         if run.is_terminal:
-            agent.after_run(run)
+            try:
+                agent.after_run(run)
+            except Exception as exc:  # Run already terminal; don't falsify it
+                warnings.warn(
+                    f"after_run raised {exc!r} — ignored, Run {run.id} already "
+                    f"reached a terminal status ({run.status.value})",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
             if run.conversation is not None:
                 run.conversation.record(run)
         return run

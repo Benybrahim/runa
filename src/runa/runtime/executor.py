@@ -2,6 +2,7 @@
 
 import inspect
 import time
+import warnings
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -64,6 +65,17 @@ class Executor:
     `before_run`/`plan` — they're a start-of-run setup phase, not re-run on
     every resume.
 
+    A bug in `before_run` or `plan` fails the Run with that exception as
+    `Run.error`, same as a bug in the Strategy loop itself — `run.start()`
+    already moved the Run to RUNNING by the time either hook runs, so
+    leaving an exception there unhandled would strand the Run at RUNNING
+    forever instead of a terminal status, indistinguishable from one still
+    genuinely in progress. `after_run` runs after the Run already reached
+    its real terminal status (COMPLETED/FAILED/CANCELLED), so a bug there
+    can't be turned into a Run failure without falsifying that outcome —
+    it's instead surfaced as a `RuntimeWarning` and otherwise ignored, the
+    same treatment `instrument()` gives a raising subscriber.
+
     If `run.conversation` is set, its history is seeded in ahead of this
     Run's own input, and this Run's messages are folded back into it once
     the Run reaches a terminal status — that's what lets a later Run pick
@@ -111,8 +123,11 @@ class Executor:
         if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
             seed_run(agent, run)
             run.start()
-            agent.before_run(run)
-            agent.plan(run)
+            try:
+                agent.before_run(run)
+                agent.plan(run)
+            except Exception as exc:  # same guarantee as the step loop below
+                run.fail(error=str(exc))
         elif run.status in (RunStatus.PAUSED, RunStatus.AWAITING_APPROVAL):
             run.resume()
 
@@ -139,7 +154,15 @@ class Executor:
                 break
 
         if run.is_terminal:
-            agent.after_run(run)
+            try:
+                agent.after_run(run)
+            except Exception as exc:  # Run already terminal; don't falsify it
+                warnings.warn(
+                    f"after_run raised {exc!r} — ignored, Run {run.id} already "
+                    f"reached a terminal status ({run.status.value})",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
             if run.conversation is not None:
                 run.conversation.record(run)
         return run

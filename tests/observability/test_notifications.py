@@ -1,5 +1,7 @@
+import pytest
+
 from runa.agent import Agent
-from runa.core import EventType, Message, Role, Run, ToolCall
+from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.observability import instrument, timeline
 from runa.runtime import Executor
 from runa.tool import Tool
@@ -179,6 +181,43 @@ def test_instrument_supports_multiple_subscribers():
 
     assert [event.type for event in first] == [EventType.RUN_STARTED]
     assert [event.type for event in second] == [EventType.RUN_STARTED]
+
+
+def test_a_raising_subscriber_does_not_fail_or_crash_the_run():
+    # Before this, an exception from a subscriber (e.g. a webhook endpoint
+    # that's down) propagated straight out of Executor.run() — including
+    # from run.start(), which fires outside the Executor's own try/except —
+    # defeating the guarantee that Run execution converts failures into a
+    # failed Run rather than crashing the caller.
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    run = Run(input="hello")
+
+    def broken_subscriber(event):
+        raise ConnectionError("endpoint unreachable")
+
+    instrument(run, broken_subscriber)
+
+    with pytest.warns(RuntimeWarning, match="endpoint unreachable"):
+        result = Executor(provider).run(GreeterAgent(), run)
+
+    assert result.status == RunStatus.COMPLETED
+    assert result.result == "hi"
+
+
+def test_a_raising_subscriber_does_not_block_other_subscribers():
+    seen = []
+    run = Run(input="hello")
+
+    def broken_subscriber(event):
+        raise RuntimeError("boom")
+
+    instrument(run, broken_subscriber)
+    instrument(run, seen.append)
+
+    with pytest.warns(RuntimeWarning):
+        run.start()
+
+    assert [event.type for event in seen] == [EventType.RUN_STARTED]
 
 
 def test_unsubscribe_stops_further_notifications():

@@ -6,6 +6,7 @@ on the instance so subscribers are notified as Events happen, without
 `core/` needing to know observability exists.
 """
 
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -89,12 +90,32 @@ def instrument(run: Run, subscriber: Subscriber) -> Callable[[], None]:
     Returns a callable that removes the subscription. Multiple subscribers
     can be attached to the same run; each wraps the previous, so all are
     notified, in the order they were attached.
+
+    A subscriber that raises (a webhook endpoint that's down, a bug in
+    application code) does not fail or crash the Run — the event is already
+    recorded on `run.events` by the time `subscriber` runs, and observability
+    must not be able to affect execution (architecture.md §10: "should not
+    duplicate execution logic"). Without this, an exception here would
+    propagate out of whatever emitted the event — including `run.start()`
+    and other lifecycle transitions the Executor's own step loop doesn't
+    wrap in a try/except — defeating `Executor.run()`'s guarantee to convert
+    failures into a failed Run rather than crash. The exception is instead
+    surfaced as a `RuntimeWarning`, so a broken subscriber stays visible
+    without corrupting the Run it's attached to.
     """
     original_emit = run.emit
 
     def emit(event_type: EventType, **data: Any) -> Event:
         event = original_emit(event_type, **data)
-        subscriber(event)
+        try:
+            subscriber(event)
+        except Exception as exc:  # noqa: BLE001
+            warnings.warn(
+                f"subscriber raised {exc!r} handling {event.type.value} event "
+                "— ignored, since observability must not affect Run execution",
+                RuntimeWarning,
+                stacklevel=2,
+            )
         return event
 
     run.emit = emit  # type: ignore[method-assign]

@@ -158,6 +158,38 @@ def test_cancel_requested_before_the_loop_starts_stops_the_run_immediately():
     assert provider.calls == []
 
 
+def test_a_bug_in_before_run_fails_the_run_instead_of_crashing_and_stranding_it():
+    class BuggyAgent(Agent):
+        def before_run(self, run):
+            raise RuntimeError("bug in before_run")
+
+    provider = FakeAsyncProvider(responses=[])
+    run = Run(input="hi")
+
+    result = asyncio.run(AsyncExecutor(provider).run(BuggyAgent(), run))
+
+    assert result.status == RunStatus.FAILED
+    assert result.error == "bug in before_run"
+    assert provider.calls == []
+
+
+def test_a_bug_in_after_run_does_not_crash_or_falsify_an_already_completed_run(
+    recwarn,
+):
+    class BuggyAgent(Agent):
+        def after_run(self, run):
+            raise RuntimeError("bug in after_run")
+
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
+    run = Run(input="hi")
+
+    result = asyncio.run(AsyncExecutor(provider).run(BuggyAgent(), run))
+
+    assert result.status == RunStatus.COMPLETED
+    assert result.result == "ok"
+    assert any("bug in after_run" in str(w.message) for w in recwarn.list)
+
+
 def test_running_an_already_terminal_run_again_is_a_no_op():
     calls = []
 

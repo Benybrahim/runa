@@ -424,6 +424,60 @@ def test_agent_hooks_are_called_around_execution():
     assert calls == ["before_run", "plan", "review", "after_run"]
 
 
+def test_a_bug_in_before_run_fails_the_run_instead_of_crashing_and_stranding_it():
+    # Before this, an exception here propagated straight out of
+    # Executor.run() *and* left the Run stuck at RUNNING forever (run.start()
+    # already ran) — an ambiguous non-terminal state indistinguishable from a
+    # Run still genuinely in progress.
+    class BuggyAgent(Agent):
+        def before_run(self, run):
+            raise RuntimeError("bug in before_run")
+
+    provider = FakeProvider(responses=[])
+    run = Run(input="hi")
+
+    result = Executor(provider).run(BuggyAgent(), run)
+
+    assert result.status == RunStatus.FAILED
+    assert result.error == "bug in before_run"
+    assert len(provider.calls) == 0  # never reached the step loop
+
+
+def test_a_bug_in_plan_fails_the_run_the_same_way_as_before_run():
+    class BuggyAgent(Agent):
+        def plan(self, run):
+            raise RuntimeError("bug in plan")
+
+    provider = FakeProvider(responses=[])
+    run = Run(input="hi")
+
+    result = Executor(provider).run(BuggyAgent(), run)
+
+    assert result.status == RunStatus.FAILED
+    assert result.error == "bug in plan"
+
+
+def test_a_bug_in_after_run_does_not_crash_or_falsify_an_already_completed_run(
+    recwarn,
+):
+    # The Run already reached its real terminal status by the time
+    # after_run runs, so a bug there must not be turned into a Run failure
+    # (that would misreport a Run that actually completed) — it's surfaced
+    # as a warning instead.
+    class BuggyAgent(Agent):
+        def after_run(self, run):
+            raise RuntimeError("bug in after_run")
+
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
+    run = Run(input="hi")
+
+    result = Executor(provider).run(BuggyAgent(), run)
+
+    assert result.status == RunStatus.COMPLETED
+    assert result.result == "ok"
+    assert any("bug in after_run" in str(w.message) for w in recwarn.list)
+
+
 def test_running_an_already_terminal_run_again_is_a_no_op():
     calls = []
 
