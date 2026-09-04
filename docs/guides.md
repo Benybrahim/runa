@@ -217,10 +217,12 @@ for entry in timeline(run):
 
 The CLI reads the same information back from a `RunStore` instead, so it
 only sees Runs that were actually saved there — `run_later()` saves
-automatically (that's what lets `runa runs show` follow background work),
-but a plain synchronous `Agent.run()` does not, on purpose (persistence
-stays outside the core execution primitive). Save one explicitly if you
-want to inspect it later from the CLI instead of in-process:
+automatically, but only when given a `DurableQueue` (see "Running in the
+Background" above; that's what lets `runa runs show` follow background
+work after a crash). A plain synchronous `Agent.run()`, and `run_later()`
+on the default `InlineQueue`, save nothing, on purpose (persistence stays
+outside the core execution primitive). Save one explicitly if you want to
+inspect it later from the CLI instead of in-process:
 
 ```python
 from runa.config import default_run_store

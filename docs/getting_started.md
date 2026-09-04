@@ -287,8 +287,9 @@ runa eval    # app/evaluations/ — probabilistic behavior
 ```
 
 You can also inspect a Run's execution directly from the CLI, once it's
-been saved to a `RunStore` — automatic for `run_later()`, or call
-`default_run_store().save(run)` yourself after a synchronous `run`:
+been saved to a `RunStore` — automatic for `run_later()` given a
+`DurableQueue`, or call `default_run_store().save(run)` yourself after a
+synchronous `run` (or a backgrounded one on the default `InlineQueue`):
 
 ```bash
 runa runs show <id>

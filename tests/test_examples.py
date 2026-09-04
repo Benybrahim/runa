@@ -69,6 +69,36 @@ def test_hello_anthropic_example():
     assert run.result == "It's sunny in Tokyo."
 
 
+def test_conversation_example():
+    conversation_example = _load("conversation")
+    fake = FakeProvider(
+        [
+            Message(role=Role.ASSISTANT, content="I'm sorry to hear that."),
+            Message(role=Role.ASSISTANT, content="It was A123."),
+        ]
+    )
+    configure(provider=fake)
+
+    conversation = conversation_example.Conversation()
+    first = conversation_example.SupportAgent.run(
+        "My order #A123 hasn't arrived.", conversation=conversation
+    )
+    second = conversation_example.SupportAgent.run(
+        "What was that order number again?", conversation=conversation
+    )
+
+    assert first.status == RunStatus.COMPLETED
+    assert second.status == RunStatus.COMPLETED
+    # second call's messages carry the first turn's history forward
+    contents = [m.content for m in fake.calls[1]["messages"]]
+    assert contents == [
+        conversation_example.SupportAgent.instructions,
+        "My order #A123 hasn't arrived.",
+        "I'm sorry to hear that.",
+        "What was that order number again?",
+    ]
+
+
 def test_background_example():
     background = _load("background")
     fake = FakeProvider(
