@@ -1,11 +1,14 @@
+import asyncio
+
 import pytest
 
 from runa.agent import Agent
+from runa.background import run_later
 from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.observability import instrument, timeline
-from runa.runtime import Executor
+from runa.runtime import AsyncExecutor, Executor
 from runa.tool import Tool
-from tests.fakes import FakeProvider
+from tests.fakes import FakeAsyncProvider, FakeProvider
 
 
 class GreeterAgent(Agent):
@@ -218,6 +221,50 @@ def test_a_raising_subscriber_does_not_block_other_subscribers():
         run.start()
 
     assert [event.type for event in seen] == [EventType.RUN_STARTED]
+
+
+def test_timeline_works_for_a_run_async_run_with_no_runstore():
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    run = asyncio.run(AsyncExecutor(provider).run(GreeterAgent(), Run(input="hello")))
+
+    assert [entry.type for entry in timeline(run)] == [
+        EventType.RUN_STARTED,
+        EventType.MODEL_CALLED,
+        EventType.MODEL_RESPONDED,
+        EventType.RUN_COMPLETED,
+    ]
+
+
+def test_timeline_works_for_a_run_later_run_with_no_runstore():
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    run = run_later(GreeterAgent(), Run(input="hello"), Executor(provider))
+
+    assert [entry.type for entry in timeline(run)] == [
+        EventType.RUN_QUEUED,
+        EventType.RUN_STARTED,
+        EventType.MODEL_CALLED,
+        EventType.MODEL_RESPONDED,
+        EventType.RUN_COMPLETED,
+    ]
+
+
+def test_separate_runs_have_isolated_event_histories():
+    provider = FakeProvider(
+        responses=[
+            Message(role=Role.ASSISTANT, content="hi"),
+            Message(role=Role.ASSISTANT, content="bye"),
+        ]
+    )
+    executor = Executor(provider)
+    first = executor.run(GreeterAgent(), Run(input="hello"))
+    second = executor.run(GreeterAgent(), Run(input="goodbye"))
+
+    assert first.id != second.id
+    assert first.events is not second.events
+    assert [e.type for e in timeline(first)] == [e.type for e in timeline(second)]
+    # mutating one Run's event log must not leak into the other's
+    first.emit(EventType.ARTIFACT_CREATED, artifact_id="x")
+    assert len(timeline(first)) != len(timeline(second))
 
 
 def test_unsubscribe_stops_further_notifications():
