@@ -20,7 +20,7 @@ from pathlib import Path
 from runa.approval import approve, deny
 from runa.cli._project import loaded_app
 from runa.config import default_run_store
-from runa.core import Run, RunStatus, ToolCall
+from runa.core import EventType, Run, RunStatus, ToolCall
 from runa.observability import timeline
 from runa.persistence import RunStore
 
@@ -90,10 +90,20 @@ def list_runs(
 
 
 def _pending_tool_call(run: Run) -> ToolCall | None:
-    """The tool call an AWAITING_APPROVAL Run is paused on, if any."""
-    for tool_call in run.tool_calls:
-        if tool_call.approved is None:
-            return tool_call
+    """The tool call an AWAITING_APPROVAL Run is paused on, if any.
+
+    Identified via the Run's last APPROVAL_REQUIRED event, not by scanning
+    for `approved is None` — every tool call defaults to `approved=None`,
+    including ordinary, already-completed calls that were never
+    approval-gated. A Run with an earlier ordinary call and a later gated
+    one would otherwise report the wrong call here: a human approving from
+    this listing would see the harmless earlier call's name and arguments
+    instead of the one actually awaiting their decision.
+    """
+    for event in reversed(run.events):
+        if event.type == EventType.APPROVAL_REQUIRED:
+            tool_call_id = event.data["tool_call_id"]
+            return next((tc for tc in run.tool_calls if tc.id == tool_call_id), None)
     return None
 
 

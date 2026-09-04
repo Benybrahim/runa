@@ -193,6 +193,36 @@ def test_list_pending_runs_is_empty_with_no_awaiting_runs(tmp_path):
     assert list_pending_runs(root=project_dir) == "no runs awaiting approval"
 
 
+def test_list_pending_runs_reports_the_gated_call_not_an_earlier_completed_one(
+    tmp_path,
+):
+    """An earlier, ordinary tool call also has `approved is None` — the
+    pending-call lookup must not mistake it for the one actually gating
+    approval (see `_pending_tool_call`)."""
+    project_dir, db_path = _scaffold_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+
+    search_call = ToolCall(name="SearchKB", arguments={"query": "refund policy"})
+    search_call.attempts = 1
+    transfer_call = ToolCall(name="TransferFunds", arguments={"amount": 5000})
+    run = Run(input="handle the refund")
+    run.start()
+    run.add_message(Message(role=Role.ASSISTANT, tool_calls=[search_call]))
+    run.add_message(
+        Message(role=Role.TOOL, content="found it", tool_call_id=search_call.id)
+    )
+    run.add_message(Message(role=Role.ASSISTANT, tool_calls=[transfer_call]))
+    run.require_approval(transfer_call.id)
+    store.save(run)
+    store.close()
+
+    output = list_pending_runs(root=project_dir)
+
+    assert "TransferFunds" in output
+    assert transfer_call.id in output
+    assert "SearchKB" not in output
+
+
 def test_approve_run_resumes_and_persists_the_run(tmp_path):
     project_dir, db_path = _scaffold_with_store(tmp_path)
     store = SQLiteRunStore(db_path)
