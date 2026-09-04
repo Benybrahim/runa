@@ -117,7 +117,7 @@ make hello       # run examples/hello.py
 
 ## Contributing
 
-Runa is open source, but its core is intentionally opinionated. Read [`RUNA.md`](RUNA.md) before proposing architectural or API changes, then see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the practical workflow.
+Runa is open source, but its core is intentionally opinionated. Read [`RUNA.md`](RUNA.md) before proposing architectural or API changes, then see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the practical workflow, [`GOVERNANCE.md`](GOVERNANCE.md) for how decisions get made, and [`SECURITY.md`](SECURITY.md) to report a vulnerability. Writing or design work should follow [`BRAND.md`](BRAND.md).
 
 ## License
 

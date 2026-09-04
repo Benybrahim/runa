@@ -12,6 +12,7 @@ When a decision requires more context:
 * [docs/rails-to-runa.md](./docs/rails-to-runa.md) explains the Rails inspiration and conceptual mapping.
 * [docs/getting_started.md](./docs/getting_started.md) describes the intended developer experience.
 * [docs/guides.md](./docs/guides.md) contains practical patterns.
+* [BRAND.md](./BRAND.md) defines Runa's identity: positioning, voice, terminology, and visual direction. Read it before writing README/docs copy, CLI-facing text, or anything visual.
 
 Do not duplicate the philosophy from these documents here. This file is the operational reference for development.
 
