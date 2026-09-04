@@ -84,16 +84,27 @@ def run_later(
     `queue.enqueue_run()`, not after, since a durable queue may start the
     job on another thread the moment it's called — saving first avoids
     racing that thread's own mutation of `run.events`/`run.messages`.
+
+    The job also saves the Run back once it reaches its next pause point —
+    the same thing `recover_pending()`'s own job wrapper does. Without this,
+    the store would keep showing the Run as QUEUED forever after a normal
+    (non-crash) completion: nothing else writes the terminal status back, so
+    `runa runs show <id>` couldn't answer "what happened?" for durable
+    background work, the one case durability is meant to cover.
     """
     queue = queue or InlineQueue()
     run.agent_name = agent.agent_name()
     run.agent_version = agent.version
     run.queue()
 
+    durable = isinstance(queue, DurableQueue)
+
     def job() -> None:
         executor.run(agent, run)
+        if durable:
+            default_run_store().save(run)
 
-    if isinstance(queue, DurableQueue):
+    if durable:
         default_run_store().save(run)
         queue.enqueue_run(run.id, job)
     else:

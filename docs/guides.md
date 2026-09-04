@@ -117,7 +117,7 @@ run = ResearchAgent.run_later("Produce a detailed report.")
 
 The returned object represents the same conceptual unit of work as `run()`.
 
-For durable background execution, configure a persistent Run store and an appropriate Queue — `configure(provider=..., run_store=SQLiteRunStore(...))`. `run_later()` saves the Run there itself when queuing onto a `DurableQueue`, so recovery has something to find; no extra wiring needed beyond `configure()`.
+For durable background execution, configure a persistent Run store and an appropriate Queue — `configure(provider=..., run_store=SQLiteRunStore(...))`. `run_later()` saves the Run there itself when queuing onto a `DurableQueue` — once before dispatch (so recovery has something to find after a crash) and again once the Run reaches its next pause point (completion, failure, or an approval gate), so `runa runs show <id>` reflects what actually happened instead of the Run's last-queued status. No extra wiring needed beyond `configure()`.
 
 Do not create a separate “job object” in application code just because execution happens later.
 

@@ -118,6 +118,51 @@ def test_run_later_with_sqlite_queue_completes_once_the_queue_drains(tmp_path):
     assert result.result == "hi"
 
 
+def test_run_later_saves_the_terminal_status_once_a_durable_job_completes(
+    tmp_path, monkeypatch
+):
+    # Before this, run_later() only saved the Run once, as QUEUED, before
+    # dispatch — nothing wrote the COMPLETED status back, so the store (and
+    # `runa runs show <id>`) would show the Run as forever QUEUED even
+    # though it finished successfully.
+    run_store = SQLiteRunStore(str(tmp_path / "runs.db"))
+    monkeypatch.setattr("runa.config._default_run_store", run_store)
+    queue = SQLiteQueue(str(tmp_path / "queue.db"), max_workers=1)
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    executor = Executor(provider)
+    agent = GreeterAgent()
+    run = Run(input="hello")
+
+    run_later(agent, run, executor, queue=queue)
+    queue.close(wait=True)
+
+    saved = run_store.get(run.id)
+    assert saved.status == RunStatus.COMPLETED
+    assert saved.result == "hi"
+
+
+def test_run_later_saves_a_failed_status_once_a_durable_job_fails(
+    tmp_path, monkeypatch
+):
+    # Same gap as above, but for failure: a background Run that errors out
+    # must not leave the store silently claiming it's still QUEUED — that
+    # would hide the failure from anyone inspecting the store.
+    run_store = SQLiteRunStore(str(tmp_path / "runs.db"))
+    monkeypatch.setattr("runa.config._default_run_store", run_store)
+    queue = SQLiteQueue(str(tmp_path / "queue.db"), max_workers=1)
+    provider = FakeProvider(responses=[])  # raises on the first call
+    executor = Executor(provider)
+    agent = GreeterAgent()
+    run = Run(input="hello")
+
+    run_later(agent, run, executor, queue=queue)
+    queue.close(wait=True)
+
+    saved = run_store.get(run.id)
+    assert saved.status == RunStatus.FAILED
+    assert saved.error
+
+
 def test_recover_pending_resumes_a_run_orphaned_by_a_crashed_process(tmp_path):
     queue_path = str(tmp_path / "queue.db")
     run_store_path = str(tmp_path / "runs.db")
