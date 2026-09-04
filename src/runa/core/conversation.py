@@ -21,6 +21,20 @@ application decision, not one Runa can make for it. Give each concurrent
 Run its own Conversation and merge deliberately, or sequence Runs against a
 shared Conversation (finish one — including `record()` — before starting
 the next).
+
+Growth: `record()` never truncates — `.messages` grows by one Run's worth
+of turns every time, indefinitely. `seed_run()` (`runtime/_shared.py`)
+sends all of it to the model on every subsequent Run, so a long-lived
+Conversation eventually produces a Provider call that exceeds the model's
+context window; that fails the Run cleanly (`RunStatus.FAILED` with the
+Provider's error), not a crash, but it does mean the conversation is now
+stuck failing every future Run against it. Runa doesn't truncate or
+summarize on the application's behalf — manifesto §6 draws the same line
+against turning this into an agent-specific memory system it draws for
+Run/Conversation/Application state generally. `.messages` is a plain list;
+trim it yourself between Runs (e.g. `conversation.messages = conversation.
+messages[-N:]`) or fold older turns into `conversation.state` as a summary
+if losing raw history is unacceptable.
 """
 
 import threading

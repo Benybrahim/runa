@@ -113,6 +113,23 @@ the Conversation as it stood when that Run started, and whichever finishes
 last silently overwrites the other's turn. Give concurrent Runs their own
 Conversations and merge deliberately instead.
 
+A Conversation's history has no built-in limit — every Run's turn is added
+on top of the last, forever. Eventually that history is large enough that
+the model API itself rejects it (a Provider error, which fails the Run
+cleanly rather than crashing — but the Conversation stays stuck failing
+every Run after that until something trims it). Runa doesn't truncate or
+summarize this automatically — that would mean building the kind of
+agent-specific memory system the framework deliberately avoids.
+`conversation.messages` is a plain list, so manage it the way any
+application-owned list would be managed:
+
+```python
+conversation.messages = conversation.messages[-40:]  # keep the last N turns
+```
+
+or fold older turns into `conversation.state` as a summary first, if losing
+raw history isn't acceptable.
+
 ---
 
 # Running in the Background
