@@ -14,9 +14,18 @@ import sys
 from pathlib import Path
 
 from runa.approval import UnknownToolCall
+from runa.cli._project import AppLoadError
 from runa.cli.eval import run_project_evals
-from runa.cli.generate import generate_agent
-from runa.cli.new import scaffold_project
+from runa.cli.generate import (
+    AgentAlreadyExists,
+    EvaluationAlreadyExists,
+    NotARunaProject,
+    ToolAlreadyExists,
+    generate_agent,
+    generate_evaluation,
+    generate_tool,
+)
+from runa.cli.new import ProjectAlreadyExists, scaffold_project
 from runa.cli.runs import (
     RunNotFound,
     approve_run,
@@ -45,6 +54,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "agent", help="Generate a new Agent"
     )
     generate_agent_parser.add_argument("name")
+
+    generate_tool_parser = generate_subparsers.add_parser(
+        "tool", help="Generate a new Tool"
+    )
+    generate_tool_parser.add_argument("name")
+
+    generate_evaluation_parser = generate_subparsers.add_parser(
+        "evaluation", help="Generate a new app/evaluations/ case module"
+    )
+    generate_evaluation_parser.add_argument("name")
 
     subparsers.add_parser("eval", help="Run this app's app/evaluations/ cases")
     subparsers.add_parser("test", help="Run this app's app/tests/ test functions")
@@ -116,8 +135,24 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
             f"error: no main.py found in {cwd} — is this a Runa app?", file=sys.stderr
         )
         return 1
-    except (RunNotFound, UnknownToolCall, IllegalTransition) as exc:
+    except (
+        RunNotFound,
+        UnknownToolCall,
+        IllegalTransition,
+        ProjectAlreadyExists,
+        AgentAlreadyExists,
+        ToolAlreadyExists,
+        EvaluationAlreadyExists,
+        NotARunaProject,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
+        return 1
+    except AppLoadError as exc:
+        print(
+            f"error: failed to load {cwd / 'main.py'}: {exc}\n"
+            "(run `python main.py` directly to see the full traceback)",
+            file=sys.stderr,
+        )
         return 1
 
 
@@ -125,11 +160,46 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
     if args.command == "new":
         project_dir = scaffold_project(args.name, root=cwd)
         print(f"created {project_dir}")
+        print(
+            "\nnext steps:\n"
+            f"  cd {project_dir.name}\n"
+            "  export OPENAI_API_KEY=...   # or switch main.py to AnthropicProvider\n"
+            "  runa generate agent MyAgent\n"
+            "  python main.py"
+        )
         return 0
 
-    if args.command == "generate":
+    if args.command == "generate" and args.kind == "agent":
         agent_file = generate_agent(args.name, root=cwd)
         print(f"created {agent_file}")
+        class_name = args.name if args.name.endswith("Agent") else f"{args.name}Agent"
+        print(
+            "\nnext: declare its tools and instructions, then run it from "
+            "main.py, e.g.\n"
+            f"  from app.agents.{agent_file.stem} import {class_name}\n"
+            f"  run = {class_name}.run(...)"
+        )
+        return 0
+
+    if args.command == "generate" and args.kind == "tool":
+        tool_file = generate_tool(args.name, root=cwd)
+        print(f"created {tool_file}")
+        class_name = args.name if args.name.endswith("Tool") else f"{args.name}Tool"
+        print(
+            "\nnext: implement call(), then declare it on an Agent, e.g.\n"
+            f"  from app.tools.{tool_file.stem} import {class_name}\n"
+            f"  tools = [{class_name}]"
+        )
+        return 0
+
+    if args.command == "generate" and args.kind == "evaluation":
+        eval_file = generate_evaluation(args.name, root=cwd)
+        print(f"created {eval_file}")
+        print(
+            "\nnext: point `agent` at the Agent you want to evaluate and add "
+            "EvalCase(...) entries, then\n"
+            "  runa eval"
+        )
         return 0
 
     if args.command == "eval":

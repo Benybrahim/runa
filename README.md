@@ -63,7 +63,7 @@ runa/
 ├── approval.py       requires_approval — human-in-the-loop gate
 ├── observability/     timeline() + instrument() — reads Run.events
 ├── eval/              expect(run) + run_evals() + Judge — same code path as prod
-└── cli/               `runa new`, `runa generate agent`, `runa eval`, `runa test`, `runa runs show`/`list`
+└── cli/               `runa new`, `runa generate agent`/`tool`/`evaluation`, `runa eval`, `runa test`, `runa runs show`/`list`
 ```
 
 Every layer is defined in terms of the `Run`: persistence stores it, background execution changes when it advances, observability reads its event log, evaluation replays and scores it. See [`docs/architecture.md`](docs/architecture.md) for the full layer-by-layer breakdown.
@@ -218,7 +218,7 @@ myapp/
 └── README.md
 ```
 
-`runa generate agent Research` adds `app/agents/research_agent.py` with the `Agent` subclass skeleton. `main.py` is a plain script the developer runs (`python main.py`), not an import-time side effect of the `app` package — a `Provider` can do real work in `__init__` (e.g. `OpenAIProvider` builds a client that fails fast without credentials), so auto-configuring on `import app` would break importing an agent or tool module for anyone without a key set. Explicit beats implicit here (manifesto §7).
+`runa generate agent Research` adds `app/agents/research_agent.py` with the `Agent` subclass skeleton; `runa generate tool WebSearch` adds `app/tools/web_search_tool.py` with a `Tool` subclass skeleton the same way. `runa generate evaluation Research` adds `app/evaluations/research_eval.py` — since an eval module declares module-level `agent`/`cases` rather than a class (see below), the generated file is self-contained with its own placeholder `Agent` rather than importing one that might not exist yet, so `runa eval` always succeeds against it (0 cases) before you've pointed it at a real agent. `main.py` is a plain script the developer runs (`python main.py`), not an import-time side effect of the `app` package — a `Provider` can do real work in `__init__` (e.g. `OpenAIProvider` builds a client that fails fast without credentials), so auto-configuring on `import app` would break importing an agent or tool module for anyone without a key set. Explicit beats implicit here (manifesto §7).
 
 `runa eval` imports `main.py` (so `configure()` runs) and every module under `app/evaluations/` — each must define module-level `agent` and `cases` — and runs them through `run_evals()`, printing a PASS/FAIL line per case (manifesto §12). Cases may assert structure (`to_be_completed()`, `to_have_called(...)`, `to_have_error(...)`) or behavior via a `Judge` (`to_be_helpful()`, `to_be_factual()`, `not_to_hallucinate()`, or a custom `to_satisfy(rubric)`) — the latter make a real, non-deterministic model call to grade the Run's transcript.
 
@@ -240,7 +240,7 @@ All layers described in [`docs/architecture.md`](docs/architecture.md) are imple
 * `background/` + `approval.py` — `run_later`, `Queue` (`InlineQueue`, `ThreadQueue`, `SQLiteQueue`), `DurableQueue`/`recover_pending()` for crash recovery, `approve`/`deny`, `Run.request_cancel()` for cooperative cancellation
 * `observability/` — `timeline()`, `instrument()`
 * `eval/` — `expect(run)`, `run_evals()`, `Judge` (LLM-graded `to_be_helpful()`/`to_be_factual()`/`not_to_hallucinate()`/`to_meet_the_goal()`)
-* `cli/` — `runa new`, `runa generate agent`, `runa eval`, `runa test`, `runa runs show`/`list`/`pending`/`approve`/`deny`/`cancel`
+* `cli/` — `runa new`, `runa generate agent`/`tool`/`evaluation`, `runa eval`, `runa test`, `runa runs show`/`list`/`pending`/`approve`/`deny`/`cancel`
 
 The core API is stable enough to build against, but Runa is still young — expect the surface to keep growing (durable/remote persistence backends, richer strategies, additional providers) without changing these foundations.
 

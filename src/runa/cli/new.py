@@ -52,9 +52,11 @@ A Runa application.
 - `app/evaluations/` — eval cases, run with `runa eval`
 - `app/tests/` — deterministic tests, run with `runa test`
 
-Generate a new agent with:
+Generate scaffolding with:
 
     runa generate agent MyAgent
+    runa generate tool MyTool
+    runa generate evaluation MyAgent
 """
 
 

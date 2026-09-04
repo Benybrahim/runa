@@ -381,6 +381,25 @@ def result_error(run: Run) -> str:
     return run.events[-1].data["error"]
 
 
+def test_a_hallucinated_tool_call_fails_the_run_with_a_clear_message():
+    """See the sync `Executor` test of the same name — same fix, same gap:
+    an undeclared tool name used to fail the Run with just `"'Ghost'"`.
+    """
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="Ghost", arguments={})],
+            )
+        ]
+    )
+    run = asyncio.run(AsyncExecutor(provider).run(WeatherAgent(), Run(input="x")))
+
+    assert run.status == RunStatus.FAILED
+    assert "unknown tool 'Ghost'" in run.error
+    assert "GetWeather" in run.error
+
+
 def test_retry_strategy_retries_a_flaky_tool_before_succeeding():
     class FlakyTool(Tool):
         idempotent = True

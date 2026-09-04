@@ -252,7 +252,13 @@ class Executor:
             run.require_approval(tool_call.id)
             return
 
-        tool = agent.resolved_tools()[tool_call.name]
+        tools = agent.resolved_tools()
+        tool = tools.get(tool_call.name)
+        if tool is None:
+            raise ValueError(
+                f"model called unknown tool {tool_call.name!r} — declared "
+                f"tools are: {sorted(tools) or '(none)'}"
+            )
         if inspect.iscoroutinefunction(tool.call):
             raise TypeError(
                 f"{tool.tool_name()!r} defines an async call() — run this Agent with "

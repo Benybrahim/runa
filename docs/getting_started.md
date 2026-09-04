@@ -44,7 +44,8 @@ The project structure is conventional on purpose.
 Structure carries meaning.
 
 `runa generate agent <Name>` scaffolds a new agent module under `app/agents/`
-following that same convention.
+following that same convention. `runa generate tool <Name>` and `runa generate
+evaluation <Name>` do the same for `app/tools/` and `app/evaluations/`.
 
 ---
 

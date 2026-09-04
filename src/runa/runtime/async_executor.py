@@ -262,7 +262,13 @@ class AsyncExecutor:
 
     async def _call_tool(self, agent: "Agent", run: Run, tool_call: ToolCall) -> None:
         """Run one tool call — see `Executor._call_tool` for the Artifact dispatch."""
-        tool = agent.resolved_tools()[tool_call.name]
+        tools = agent.resolved_tools()
+        tool = tools.get(tool_call.name)
+        if tool is None:
+            raise ValueError(
+                f"model called unknown tool {tool_call.name!r} — declared "
+                f"tools are: {sorted(tools) or '(none)'}"
+            )
         tool_call.idempotent = tool.idempotent
         if isinstance(tool, ParentRunAware):
             tool.bind_parent_run_id(run.id)

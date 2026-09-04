@@ -257,6 +257,87 @@ def test_running_outside_a_runa_app_directory_prints_a_clean_error(tmp_path, cap
     assert "no main.py found" in capsys.readouterr().err
 
 
+def test_a_broken_main_py_prints_a_clean_error_instead_of_a_traceback(tmp_path, capsys):
+    """The common early-project case: `main.py`'s `configure()` builds a real
+    Provider (e.g. `OpenAIProvider()`), which fails fast without an API key.
+    Every app-loading command — including ones like `runs list` that never
+    touch the Provider — used to surface that as a raw multi-frame traceback
+    through contextlib/importlib. It should read like the other clean,
+    operator-input errors this module already handles.
+    """
+    project_dir = tmp_path / "acme"
+    main(["new", "acme"], cwd=tmp_path)
+    (project_dir / "main.py").write_text("raise RuntimeError('no API key set')\n")
+
+    exit_code = main(["runs", "list"], cwd=project_dir)
+
+    err = capsys.readouterr().err
+    assert exit_code == 1
+    assert "failed to load" in err
+    assert "no API key set" in err
+    assert "python main.py" in err
+    assert "Traceback" not in err
+
+
+def test_new_prints_next_steps(tmp_path, capsys):
+    main(["new", "acme"], cwd=tmp_path)
+
+    output = capsys.readouterr().out
+    assert "next steps" in output
+    assert "cd acme" in output
+
+
+def test_generate_agent_prints_next_steps(tmp_path, capsys):
+    project_dir = tmp_path / "acme"
+    main(["new", "acme"], cwd=tmp_path)
+
+    main(["generate", "agent", "Support"], cwd=project_dir)
+
+    output = capsys.readouterr().out
+    assert "SupportAgent.run(" in output
+
+
+def test_generate_tool_writes_into_the_project_and_prints_next_steps(tmp_path, capsys):
+    project_dir = tmp_path / "acme"
+    main(["new", "acme"], cwd=tmp_path)
+
+    exit_code = main(["generate", "tool", "WebSearch"], cwd=project_dir)
+
+    assert exit_code == 0
+    assert (project_dir / "app" / "tools" / "web_search_tool.py").is_file()
+    output = capsys.readouterr().out
+    assert "created" in output
+    assert "WebSearchTool" in output
+
+
+def test_generate_evaluation_writes_into_the_project_and_prints_next_steps(
+    tmp_path, capsys
+):
+    project_dir = tmp_path / "acme"
+    main(["new", "acme"], cwd=tmp_path)
+
+    exit_code = main(["generate", "evaluation", "Weather"], cwd=project_dir)
+
+    assert exit_code == 0
+    assert (project_dir / "app" / "evaluations" / "weather_eval.py").is_file()
+    output = capsys.readouterr().out
+    assert "created" in output
+    assert "runa eval" in output
+
+
+def test_generating_a_tool_twice_prints_a_clean_error_instead_of_a_traceback(
+    tmp_path, capsys
+):
+    project_dir = tmp_path / "acme"
+    main(["new", "acme"], cwd=tmp_path)
+    main(["generate", "tool", "WebSearch"], cwd=project_dir)
+
+    exit_code = main(["generate", "tool", "WebSearch"], cwd=project_dir)
+
+    assert exit_code == 1
+    assert "already exists" in capsys.readouterr().err
+
+
 def _new_project_with_store(tmp_path):
     project_dir = tmp_path / "acme"
     main(["new", "acme"], cwd=tmp_path)

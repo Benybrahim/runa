@@ -224,6 +224,30 @@ def test_tool_exception_fails_the_run():
     assert result.tool_calls[0].effect == EffectStatus.UNKNOWN
 
 
+def test_a_hallucinated_tool_call_fails_the_run_with_a_clear_message():
+    """A model calling a tool name not declared on the Agent used to fail the
+    Run with just `str(KeyError("Ghost"))` — `"'Ghost'"`, with no indication
+    it was even about a tool call. This should name the problem and list
+    what *is* declared, so `run.error`/`runa runs show` are actually useful.
+    """
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="Ghost", arguments={})],
+            )
+        ]
+    )
+    executor = Executor(provider)
+    run = Run(input="do the thing")
+
+    result = executor.run(WeatherAgent(), run)
+
+    assert result.status == RunStatus.FAILED
+    assert "unknown tool 'Ghost'" in result.error
+    assert "GetWeather" in result.error
+
+
 def test_a_transient_model_error_fails_the_run_with_no_retrying_provider():
     class FlakyProvider:
         def __init__(self):
