@@ -57,24 +57,28 @@ class Executor:
     pause (background handoff, approval) gets a fresh budget rather than
     inheriting elapsed wait time. `None` (the default) means no timeout.
 
-    Agent hooks fire in one fixed order: `before_run` and `plan` once, before
-    the first Strategy step; `review` once, when the Strategy decides to
-    Complete — its return value replaces the Strategy's draft result unless
-    it returns `None` (manifesto §6's "reflection"); `after_run` once the
-    Run reaches a terminal status. Resuming a paused Run skips
-    `before_run`/`plan` — they're a start-of-run setup phase, not re-run on
-    every resume.
+    Agent hooks fire in one fixed order: seeding, then `before_run` and
+    `plan` once, before the first Strategy step; `review` once, when the
+    Strategy decides to Complete — its return value replaces the Strategy's
+    draft result unless it returns `None` (manifesto §6's "reflection");
+    `after_run` once the Run reaches a terminal status. Resuming a paused
+    Run skips seeding/`before_run`/`plan` — they're a start-of-run setup
+    phase, not re-run on every resume.
 
-    A bug in `before_run` or `plan` fails the Run with that exception as
-    `Run.error`, same as a bug in the Strategy loop itself — `run.start()`
-    already moved the Run to RUNNING by the time either hook runs, so
-    leaving an exception there unhandled would strand the Run at RUNNING
-    forever instead of a terminal status, indistinguishable from one still
-    genuinely in progress. `after_run` runs after the Run already reached
-    its real terminal status (COMPLETED/FAILED/CANCELLED), so a bug there
-    can't be turned into a Run failure without falsifying that outcome —
-    it's instead surfaced as a `RuntimeWarning` and otherwise ignored, the
-    same treatment `instrument()` gives a raising subscriber.
+    A bug while seeding the Run (`seed_run`) or in `before_run`/`plan` fails
+    the Run with that exception as `Run.error`, same as a bug in the
+    Strategy loop itself — `run.start()` moves the Run to RUNNING *before*
+    any of the three runs, so leaving an exception there unhandled would
+    strand the Run at RUNNING forever instead of a terminal status,
+    indistinguishable from one still genuinely in progress — and, for a Run
+    driven from a background thread (`run_later()` on a `ThreadQueue`/
+    `SQLiteQueue`), an exception that isn't caught here would otherwise
+    vanish into the thread pool with nothing to observe it. `after_run` runs
+    after the Run already reached its real terminal status (COMPLETED/
+    FAILED/CANCELLED), so a bug there can't be turned into a Run failure
+    without falsifying that outcome — it's instead surfaced as a
+    `RuntimeWarning` and otherwise ignored, the same treatment
+    `instrument()` gives a raising subscriber.
 
     If `run.conversation` is set, its history is seeded in ahead of this
     Run's own input, and this Run's messages are folded back into it once
@@ -126,9 +130,9 @@ class Executor:
         run.begin_driving()
         try:
             if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
-                seed_run(agent, run)
                 run.start()
                 try:
+                    seed_run(agent, run)
                     agent.before_run(run)
                     agent.plan(run)
                 except Exception as exc:  # same guarantee as the step loop below

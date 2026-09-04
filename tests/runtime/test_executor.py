@@ -6,6 +6,7 @@ import pytest
 from runa.agent import Agent
 from runa.approval import approve
 from runa.core import (
+    Context,
     DataArtifact,
     EffectStatus,
     EventType,
@@ -513,6 +514,26 @@ def test_a_bug_in_before_run_fails_the_run_instead_of_crashing_and_stranding_it(
 
     assert result.status == RunStatus.FAILED
     assert result.error == "bug in before_run"
+    assert len(provider.calls) == 0  # never reached the step loop
+
+
+def test_a_bug_while_seeding_the_run_fails_it_instead_of_stranding_it():
+    # Before this, seed_run() ran *before* run.start() — an exception there
+    # left the Run stuck at QUEUED forever (run.fail() from QUEUED is an
+    # IllegalTransition) and propagated straight out of Executor.run()
+    # uncaught. That's especially bad for run_later() on a background
+    # thread, where nothing would ever observe the exception at all.
+    class Unstringable:
+        def __str__(self):
+            raise RuntimeError("bug while rendering context")
+
+    provider = FakeProvider(responses=[])
+    run = Run(input="hi", context=Context(bad=Unstringable()))
+
+    result = Executor(provider).run(WeatherAgent(), run)
+
+    assert result.status == RunStatus.FAILED
+    assert "bug while rendering context" in result.error
     assert len(provider.calls) == 0  # never reached the step loop
 
 

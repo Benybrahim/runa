@@ -96,11 +96,13 @@ class AsyncExecutor:
 
         A no-op if `run` is already terminal — see `Executor.run`.
 
-        A bug in `before_run`/`plan` fails the Run with that exception as
-        `Run.error`, rather than stranding it at RUNNING forever; a bug in
-        `after_run` is surfaced as a `RuntimeWarning` instead, since the Run
-        has already reached its real terminal status by then — see
-        `Executor.run`'s docstring for why the two cases differ.
+        A bug while seeding the Run, or in `before_run`/`plan`, fails the Run
+        with that exception as `Run.error`, rather than stranding it at
+        RUNNING forever; a bug in `after_run` is surfaced as a
+        `RuntimeWarning` instead, since the Run has already reached its real
+        terminal status by then — see `Executor.run`'s docstring for why the
+        two cases differ, and for why this matters especially for a Run
+        driven from a background thread.
 
         Raises `RunAlreadyDriving` if another Executor is already driving
         this same Run object — see `Run.begin_driving()`.
@@ -111,9 +113,9 @@ class AsyncExecutor:
         run.begin_driving()
         try:
             if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
-                seed_run(agent, run)
                 run.start()
                 try:
+                    seed_run(agent, run)
                     agent.before_run(run)
                     agent.plan(run)
                 except Exception as exc:  # same guarantee as the step loop below

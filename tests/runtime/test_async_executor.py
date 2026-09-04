@@ -7,6 +7,7 @@ from runa.agent import Agent
 from runa.approval import approve
 from runa.config import configure
 from runa.core import (
+    Context,
     DataArtifact,
     EventType,
     Message,
@@ -181,6 +182,26 @@ def test_a_bug_in_before_run_fails_the_run_instead_of_crashing_and_stranding_it(
 
     assert result.status == RunStatus.FAILED
     assert result.error == "bug in before_run"
+    assert provider.calls == []
+
+
+def test_a_bug_while_seeding_the_run_fails_it_instead_of_stranding_it():
+    # Same gap as Executor's equivalent test: seed_run() used to run before
+    # run.start(), so an exception there couldn't be turned into run.fail()
+    # (QUEUED -> FAILED is an illegal transition) and escaped uncaught —
+    # fatal for a Run driven from a background thread, where nothing would
+    # ever observe it.
+    class Unstringable:
+        def __str__(self):
+            raise RuntimeError("bug while rendering context")
+
+    provider = FakeAsyncProvider(responses=[])
+    run = Run(input="hi", context=Context(bad=Unstringable()))
+
+    result = asyncio.run(AsyncExecutor(provider).run(WeatherAgent(), run))
+
+    assert result.status == RunStatus.FAILED
+    assert "bug while rendering context" in result.error
     assert provider.calls == []
 
 

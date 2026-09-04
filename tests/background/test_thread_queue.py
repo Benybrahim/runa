@@ -2,7 +2,7 @@ import threading
 
 from runa.agent import Agent
 from runa.background import ThreadQueue, run_later
-from runa.core import Message, Role, Run, RunStatus
+from runa.core import Context, Message, Role, Run, RunStatus
 from runa.runtime import Executor
 from tests.fakes import FakeProvider
 
@@ -58,3 +58,29 @@ def test_run_later_with_thread_queue_completes_once_the_queue_drains():
     assert result is run
     assert result.status == RunStatus.COMPLETED
     assert result.result == "hi"
+
+
+def test_a_bug_before_the_step_loop_fails_the_run_instead_of_vanishing_on_the_worker():
+    # A ThreadPoolExecutor swallows any exception a submitted job raises
+    # unless something calls future.result() — nobody does here, since
+    # run_later() is fire-and-forget by design. So an exception that
+    # Executor.run() doesn't already convert into run.fail() would
+    # otherwise disappear completely: no Run failure, no raised exception,
+    # no trace anywhere. This proves Executor's seeding fix closes that gap
+    # for the background path specifically, not just the synchronous one.
+    class Unstringable:
+        def __str__(self):
+            raise RuntimeError("bug while rendering context")
+
+    provider = FakeProvider(responses=[])
+    executor = Executor(provider)
+    agent = GreeterAgent()
+    run = Run(input="hello", context=Context(bad=Unstringable()))
+    queue = ThreadQueue(max_workers=1)
+
+    result = run_later(agent, run, executor, queue=queue)
+    queue.close(wait=True)
+
+    assert result is run
+    assert result.status == RunStatus.FAILED
+    assert "bug while rendering context" in result.error

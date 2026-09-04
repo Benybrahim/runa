@@ -278,7 +278,40 @@ You do not need a separate job programming model for agent work.
 
 ---
 
-## 10. Observe a Run
+## 10. Run Asynchronously
+
+An Agent can also run through `asyncio`, when the application is already
+async or the work benefits from concurrent I/O:
+
+```python
+run = await ResearchAgent.run_async("Produce a detailed report on fusion energy.")
+```
+
+`run_async()` is still awaited by the caller — it is not background
+execution. It drives the same Run through an `AsyncExecutor`/`AsyncProvider`
+instead of `Executor`/`Provider`, so tools and model calls run as async I/O,
+and independent tool calls from one model turn run concurrently.
+
+Three execution modes, one Run:
+
+```text
+agent.run(...)
+    synchronous execution — the caller blocks until the Run finishes
+
+agent.run_async(...)
+    asynchronous execution — the caller awaits the Run; I/O runs concurrently
+
+agent.run_later(...)
+    background execution — the caller gets the Run immediately; a Queue
+    advances it
+```
+
+Each produces the same `Run`, moving through the same lifecycle — only how
+and when it advances differs.
+
+---
+
+## 11. Observe a Run
 
 Because execution produces Events, a Run can be inspected after execution.
 
@@ -304,7 +337,7 @@ saved there.
 
 ---
 
-## 11. Evaluate an Agent
+## 12. Evaluate an Agent
 
 Tests can verify application invariants:
 
@@ -341,7 +374,7 @@ runa runs list --status failed
 
 ---
 
-## 12. Customize Only When Needed
+## 13. Customize Only When Needed
 
 The normal path should remain simple.
 
