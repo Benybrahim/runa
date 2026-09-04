@@ -15,7 +15,7 @@ its own docstring.
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from runa.config import default_run_store
+from runa.application import application
 from runa.core import Run
 from runa.persistence import RunStore
 from runa.runtime import Executor
@@ -79,7 +79,7 @@ def run_later(
     the Run itself (`background/sqlite.py` — an Agent/Executor hold live
     resources that don't survive a process boundary). So `recover_pending()`
     resolves an orphaned id against a `RunStore` — meaning this Run must be
-    saved to `default_run_store()` before it's handed to the queue, or
+    saved to `application.run_store` before it's handed to the queue, or
     there's nothing for recovery to find after a crash. Saved before
     `queue.enqueue_run()`, not after, since a durable queue may start the
     job on another thread the moment it's called — saving first avoids
@@ -102,10 +102,10 @@ def run_later(
     def job() -> None:
         executor.run(agent, run)
         if durable:
-            default_run_store().save(run)
+            application.run_store.save(run)
 
     if durable:
-        default_run_store().save(run)
+        application.run_store.save(run)
         queue.enqueue_run(run.id, job)
     else:
         queue.enqueue(job)

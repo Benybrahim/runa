@@ -1,4 +1,5 @@
 from runa.agent import Agent
+from runa.application import application
 from runa.background import InlineQueue, recover_pending, run_later
 from runa.core import Message, Role, Run, RunStatus
 from runa.persistence import InMemoryRunStore
@@ -134,7 +135,7 @@ def test_run_later_saves_to_the_default_run_store_before_a_durable_queue_dispatc
     monkeypatch,
 ):
     store = InMemoryRunStore()
-    monkeypatch.setattr("runa.config._default_run_store", store)
+    monkeypatch.setattr(application.config, "run_store", store)
     provider = FakeProvider(responses=[])
     executor = Executor(provider)
     agent = GreeterAgent()

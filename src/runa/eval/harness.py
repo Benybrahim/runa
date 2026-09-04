@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from runa.agent import Agent
-from runa.config import default_provider
+from runa.application import application
 from runa.core import Run, RunStatus
 from runa.eval.judge import (
     RUBRIC_FACTUAL,
@@ -87,7 +87,7 @@ class Expectation:
         explicitly to grade with a different model, or a `FakeProvider` in
         tests of your own eval cases.
         """
-        judge = judge or Judge(default_provider())
+        judge = judge or Judge(application.provider)
         verdict = judge.grade(self.run, rubric)
         if not verdict.passed:
             raise ExpectationFailed(

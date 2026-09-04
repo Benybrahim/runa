@@ -10,7 +10,7 @@ from runa.agent import (
     DuplicateToolName,
     UnknownApprovalTool,
 )
-from runa.config import ProviderNotConfigured, configure
+from runa.application import ProviderNotConfigured, application, configure
 from runa.core import Conversation, EventType, Message, Role, RunStatus, ToolCall
 from runa.runtime import AsyncExecutor, Executor
 from runa.tool import Tool
@@ -161,7 +161,7 @@ def test_run_async_and_run_later_also_stamp_agent_nameentity():
 
 
 def test_run_raises_if_no_default_provider_and_no_executor(monkeypatch):
-    monkeypatch.setattr("runa.config._default_provider", None)
+    monkeypatch.setattr(application.config, "provider", None)
 
     class SimpleAgent(Agent):
         pass

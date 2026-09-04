@@ -51,7 +51,11 @@ evaluation <Name>` do the same for `app/tools/` and `app/evaluations/`.
 
 ## 2. Configure the Application
 
-Runa keeps application-wide infrastructure in one place.
+Runa keeps application-wide infrastructure in one place: an `Application`.
+It owns the shared runtime an Agent needs but shouldn't have to repeat —
+today that's the model provider and the Run store; persistence, execution,
+telemetry, and other infrastructure grow the same `Application` rather than
+becoming their own configuration path.
 
 A minimal `main.py` configures the model provider:
 
@@ -65,6 +69,30 @@ configure(provider=OpenAIProvider())
 The exact provider depends on the model service your application uses.
 
 Configuration should be application-level rather than repeated across every Agent.
+
+`configure(...)` is sugar for configuring the default `Application` —
+`runa.application` — that every Agent resolves its provider from:
+
+```python
+import runa
+
+runa.configure(provider=OpenAIProvider())
+assert runa.application.provider is not None
+```
+
+Construct an explicit `Application()` instead when you need isolated
+infrastructure — most commonly in tests, where a `FakeProvider` on one
+`Application` should never leak into another test's:
+
+```python
+app = runa.Application()
+app.configure(provider=OpenAIProvider())
+```
+
+An explicit `Application` doesn't change how Agents run: pass its provider
+into an `Executor` yourself (`Executor(provider=app.provider)`) and hand it
+to `Agent.run(executor=...)`, the same escape hatch every Agent already
+supports.
 
 ---
 
@@ -288,7 +316,7 @@ runa eval    # app/evaluations/ — probabilistic behavior
 
 You can also inspect a Run's execution directly from the CLI, once it's
 been saved to a `RunStore` — automatic for `run_later()` given a
-`DurableQueue`, or call `default_run_store().save(run)` yourself after a
+`DurableQueue`, or call `runa.application.run_store.save(run)` yourself after a
 synchronous `run` (or a backgrounded one on the default `InlineQueue`):
 
 ```bash

@@ -3,9 +3,9 @@
 from collections.abc import Callable
 from typing import Any, ClassVar
 
+from runa.application import application
 from runa.background import Queue
 from runa.background import run_later as _run_later
-from runa.config import default_async_provider, default_provider
 from runa.core import Conversation, Run, RunStatus, ToolCall
 from runa.runtime import AsyncExecutor, Executor
 from runa.tool import Tool
@@ -161,7 +161,7 @@ class Agent:
         into it once the Run completes, so the next `.run(..., conversation=
         conversation)` call picks up where this one left off.
         """
-        executor = executor or Executor(provider=default_provider())
+        executor = executor or Executor(provider=application.provider)
         return executor.run(cls(), Run(input=input, conversation=conversation))
 
     @classmethod
@@ -179,7 +179,7 @@ class Agent:
         Independent tool calls the model asks for in one turn run
         concurrently — see `AsyncExecutor` for the exact rule.
         """
-        executor = executor or AsyncExecutor(provider=default_async_provider())
+        executor = executor or AsyncExecutor(provider=application.async_provider)
         return await executor.run(cls(), Run(input=input, conversation=conversation))
 
     @classmethod
@@ -192,7 +192,7 @@ class Agent:
         conversation: Conversation | None = None,
     ) -> Run:
         """Queue this agent's run for background execution. See `Agent.run`."""
-        executor = executor or Executor(provider=default_provider())
+        executor = executor or Executor(provider=application.provider)
         run = Run(input=input, conversation=conversation)
         return _run_later(cls(), run, executor, queue=queue)
 
@@ -277,7 +277,7 @@ class DelegateTool(Tool):
         self._parent_run_id = run_id
 
     def call(self, input: str) -> Any:
-        executor = self._executor or Executor(provider=default_provider())
+        executor = self._executor or Executor(provider=application.provider)
         run = executor.run(
             self._agent_cls(), Run(input=input, parent_run_id=self._parent_run_id)
         )
@@ -328,7 +328,7 @@ class AsyncDelegateTool(Tool):
         self._parent_run_id = run_id
 
     async def call(self, input: str) -> Any:
-        executor = self._executor or AsyncExecutor(provider=default_async_provider())
+        executor = self._executor or AsyncExecutor(provider=application.async_provider)
         run = await executor.run(
             self._agent_cls(), Run(input=input, parent_run_id=self._parent_run_id)
         )

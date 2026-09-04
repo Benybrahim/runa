@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from runa import Executor, Judge, Run, RunStatus, approve, configure, run_evals
+from runa.application import application
 from runa.core import Message, Role, ToolCall
 from tests.fakes import FakeAsyncProvider, FakeProvider, FakeStreamingProvider
 
@@ -28,7 +29,7 @@ def _load(name: str):
 
 @pytest.fixture(autouse=True)
 def _reset_default_provider(monkeypatch):
-    monkeypatch.setattr("runa.config._default_provider", None)
+    monkeypatch.setattr(application.config, "provider", None)
 
 
 def test_hello_example():

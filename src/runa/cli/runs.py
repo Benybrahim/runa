@@ -3,9 +3,9 @@
 Manifesto §11 asks that "what happened?" have an answer without adding
 tracing code to every agent; §14 asks that human approval be part of the
 runtime, not a Python-only API. Both are thin wiring over functions that
-already exist — `default_run_store()`, `timeline()`, `approval.approve()`/
+already exist — `application.run_store`, `timeline()`, `approval.approve()`/
 `deny()` — this module only exposes them to argv. Only useful once an app
-configures a durable `RunStore` (see `config.py`), since the default is
+configures a durable `RunStore` (see `application.py`), since the default is
 in-memory and won't outlive the process that created the run.
 
 Approving or denying here only moves the Run's status (see `approval.py`
@@ -17,9 +17,9 @@ Agent that produced it.
 from datetime import datetime
 from pathlib import Path
 
+from runa.application import application
 from runa.approval import approve, deny
 from runa.cli._project import loaded_app
-from runa.config import default_run_store
 from runa.core import EventType, Run, RunStatus, ToolCall
 from runa.observability import timeline
 from runa.persistence import RunStore
@@ -45,7 +45,7 @@ def format_run_timeline(run: Run) -> str:
 def show_run(run_id: str, *, root: Path) -> str:
     """Look up `run_id` in the app's configured RunStore and render its timeline."""
     with loaded_app(root):
-        run = default_run_store().get(run_id)
+        run = application.run_store.get(run_id)
 
     if run is None:
         raise RunNotFound(f"no run found with id {run_id!r}")
@@ -80,7 +80,7 @@ def list_runs(
     parsed_status = RunStatus(status) if status is not None else None
     parsed_since = datetime.fromisoformat(since) if since is not None else None
     with loaded_app(root):
-        runs = default_run_store().list(
+        runs = application.run_store.list(
             status=parsed_status,
             since=parsed_since,
             agent_name=agent_name,
@@ -124,7 +124,7 @@ def format_pending_runs(runs: list[Run]) -> str:
 def list_pending_runs(*, root: Path) -> str:
     """Render every Run in the app's RunStore that's paused awaiting approval."""
     with loaded_app(root):
-        runs = default_run_store().list()
+        runs = application.run_store.list()
     return format_pending_runs(runs)
 
 
@@ -138,7 +138,7 @@ def _get_run(store: RunStore, run_id: str) -> Run:
 def approve_run(run_id: str, tool_call_id: str, *, root: Path) -> str:
     """Approve a pending tool call and persist the Run's resumed status."""
     with loaded_app(root):
-        store = default_run_store()
+        store = application.run_store
         run = _get_run(store, run_id)
         approve(run, tool_call_id)
         store.save(run)
@@ -148,7 +148,7 @@ def approve_run(run_id: str, tool_call_id: str, *, root: Path) -> str:
 def deny_run(run_id: str, tool_call_id: str, *, root: Path, reason: str = "") -> str:
     """Deny a pending tool call and persist the Run's failed status."""
     with loaded_app(root):
-        store = default_run_store()
+        store = application.run_store
         run = _get_run(store, run_id)
         deny(run, tool_call_id, reason=reason)
         store.save(run)
@@ -167,7 +167,7 @@ def cancel_run(run_id: str, *, root: Path) -> str:
     if the saved Run has already reached a terminal status.
     """
     with loaded_app(root):
-        store = default_run_store()
+        store = application.run_store
         run = _get_run(store, run_id)
         run.cancel()
         store.save(run)

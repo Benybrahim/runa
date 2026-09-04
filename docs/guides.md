@@ -225,10 +225,10 @@ outside the core execution primitive). Save one explicitly if you want to
 inspect it later from the CLI instead of in-process:
 
 ```python
-from runa.config import default_run_store
+from runa import application
 
 run = ResearchAgent.run("...")
-default_run_store().save(run)
+application.run_store.save(run)
 ```
 
 ```bash

@@ -9,8 +9,8 @@ CLI-only harness.
 import importlib
 from pathlib import Path
 
+from runa.application import application
 from runa.cli._project import loaded_app
-from runa.config import default_provider
 from runa.eval import EvalResult, run_evals
 from runa.runtime import Executor
 
@@ -33,7 +33,7 @@ def run_project_evals(root: Path) -> list[EvalResult]:
         )
 
     with loaded_app(root):
-        executor = Executor(provider=default_provider())
+        executor = Executor(provider=application.provider)
 
         results: list[EvalResult] = []
         for eval_file in sorted(evaluations_dir.glob("*.py")):

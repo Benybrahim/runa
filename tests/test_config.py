@@ -1,5 +1,11 @@
+"""runa.config is now a backward-compatible facade over runa.application —
+see test_application.py for the Application/Config behavior itself. These
+tests only check the facade still wires through correctly.
+"""
+
 import pytest
 
+from runa.application import application
 from runa.config import (
     AsyncProviderNotConfigured,
     ProviderNotConfigured,
@@ -13,7 +19,7 @@ from tests.fakes import FakeAsyncProvider, FakeProvider
 
 
 def test_default_provider_raises_before_configure(monkeypatch):
-    monkeypatch.setattr("runa.config._default_provider", None)
+    monkeypatch.setattr(application.config, "provider", None)
 
     with pytest.raises(ProviderNotConfigured):
         default_provider()
@@ -25,10 +31,11 @@ def test_configure_sets_the_default_provider():
     configure(provider=provider)
 
     assert default_provider() is provider
+    assert application.config.provider is provider
 
 
 def test_default_run_store_is_in_memory_until_configured(monkeypatch):
-    monkeypatch.setattr("runa.config._default_run_store", InMemoryRunStore())
+    monkeypatch.setattr(application.config, "run_store", InMemoryRunStore())
 
     assert isinstance(default_run_store(), InMemoryRunStore)
 
@@ -45,7 +52,7 @@ def test_configure_sets_the_default_run_store():
 def test_configure_without_run_store_leaves_the_previous_one(monkeypatch):
     provider = FakeProvider(responses=[])
     store = InMemoryRunStore()
-    monkeypatch.setattr("runa.config._default_run_store", store)
+    monkeypatch.setattr(application.config, "run_store", store)
 
     configure(provider=provider)
 
@@ -53,7 +60,7 @@ def test_configure_without_run_store_leaves_the_previous_one(monkeypatch):
 
 
 def test_default_async_provider_raises_before_configure(monkeypatch):
-    monkeypatch.setattr("runa.config._default_async_provider", None)
+    monkeypatch.setattr(application.config, "async_provider", None)
 
     with pytest.raises(AsyncProviderNotConfigured):
         default_async_provider()
@@ -69,7 +76,7 @@ def test_configure_sets_the_default_async_provider():
 
 def test_configure_without_async_provider_leaves_the_previous_one(monkeypatch):
     async_provider = FakeAsyncProvider(responses=[])
-    monkeypatch.setattr("runa.config._default_async_provider", async_provider)
+    monkeypatch.setattr(application.config, "async_provider", async_provider)
 
     configure(provider=FakeProvider(responses=[]))
 

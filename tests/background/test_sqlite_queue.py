@@ -1,6 +1,7 @@
 import threading
 
 from runa.agent import Agent
+from runa.application import application
 from runa.background import SQLiteQueue, recover_pending, run_later
 from runa.core import Message, Role, Run, RunStatus, ToolCall
 from runa.persistence import SQLiteRunStore
@@ -127,7 +128,7 @@ def test_run_later_saves_the_terminal_status_once_a_durable_job_completes(
     # `runa runs show <id>`) would show the Run as forever QUEUED even
     # though it finished successfully.
     run_store = SQLiteRunStore(str(tmp_path / "runs.db"))
-    monkeypatch.setattr("runa.config._default_run_store", run_store)
+    monkeypatch.setattr(application.config, "run_store", run_store)
     queue = SQLiteQueue(str(tmp_path / "queue.db"), max_workers=1)
     provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     executor = Executor(provider)
@@ -149,7 +150,7 @@ def test_run_later_saves_a_failed_status_once_a_durable_job_fails(
     # must not leave the store silently claiming it's still QUEUED — that
     # would hide the failure from anyone inspecting the store.
     run_store = SQLiteRunStore(str(tmp_path / "runs.db"))
-    monkeypatch.setattr("runa.config._default_run_store", run_store)
+    monkeypatch.setattr(application.config, "run_store", run_store)
     queue = SQLiteQueue(str(tmp_path / "queue.db"), max_workers=1)
     provider = FakeProvider(responses=[])  # raises on the first call
     executor = Executor(provider)
