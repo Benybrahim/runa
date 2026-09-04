@@ -14,6 +14,7 @@ RunStore, and resubmit it with `enqueue_run()`.
 """
 
 import sqlite3
+import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 
@@ -34,27 +35,38 @@ class SQLiteQueue:
 
     def __init__(self, path: str, max_workers: int = 4) -> None:
         self._connection = sqlite3.connect(path, check_same_thread=False)
-        self._connection.execute(_SCHEMA)
-        self._connection.commit()
+        # check_same_thread=False only lifts sqlite3's same-thread check; it
+        # does not make one Connection object safe to call from multiple
+        # threads at once (the sqlite3 docs say as much). Every job here
+        # runs on a ThreadPoolExecutor worker and clears its own journal row
+        # in `wrapped()` below, concurrently with `enqueue_run()`/`pending()`
+        # on whatever thread calls those — so every access is serialized
+        # through `self._lock`.
+        self._lock = threading.Lock()
+        with self._lock:
+            self._connection.execute(_SCHEMA)
+            self._connection.commit()
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
 
     def enqueue(self, job: Callable[[], None]) -> None:
         self._executor.submit(job)
 
     def enqueue_run(self, run_id: str, job: Callable[[], None]) -> None:
-        self._connection.execute(
-            "INSERT OR REPLACE INTO pending_jobs (run_id) VALUES (?)", (run_id,)
-        )
-        self._connection.commit()
+        with self._lock:
+            self._connection.execute(
+                "INSERT OR REPLACE INTO pending_jobs (run_id) VALUES (?)", (run_id,)
+            )
+            self._connection.commit()
 
         def wrapped() -> None:
             try:
                 job()
             finally:
-                self._connection.execute(
-                    "DELETE FROM pending_jobs WHERE run_id = ?", (run_id,)
-                )
-                self._connection.commit()
+                with self._lock:
+                    self._connection.execute(
+                        "DELETE FROM pending_jobs WHERE run_id = ?", (run_id,)
+                    )
+                    self._connection.commit()
 
         self._executor.submit(wrapped)
 
@@ -63,7 +75,10 @@ class SQLiteQueue:
         job finished). Resolve each one against a RunStore and resubmit via
         `enqueue_run()` to recover it.
         """
-        rows = self._connection.execute("SELECT run_id FROM pending_jobs").fetchall()
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT run_id FROM pending_jobs"
+            ).fetchall()
         return [row[0] for row in rows]
 
     def close(self, *, wait: bool = True) -> None:
@@ -71,4 +86,5 @@ class SQLiteQueue:
         finish.
         """
         self._executor.shutdown(wait=wait)
-        self._connection.close()
+        with self._lock:
+            self._connection.close()

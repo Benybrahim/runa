@@ -1,3 +1,4 @@
+import threading
 from datetime import UTC, datetime, timedelta
 
 from runa.core import (
@@ -217,6 +218,40 @@ def test_list_filters_by_since():
     matches = store.list(since=datetime.now(UTC) - timedelta(hours=1))
 
     assert [r.id for r in matches] == [recent.id]
+
+
+def test_concurrent_save_and_get_from_multiple_threads_does_not_corrupt_data():
+    # check_same_thread=False only lifts sqlite3's same-thread check; a
+    # shared Connection still isn't safe to call from multiple threads at
+    # once without external locking. Drive real overlap with a barrier so
+    # every thread's execute()/commit() genuinely interleaves.
+    store = SQLiteRunStore(":memory:")
+    runs = [Run(input=f"input-{i}") for i in range(20)]
+    for run in runs:
+        store.save(run)
+
+    errors: list[Exception] = []
+    barrier = threading.Barrier(8)
+
+    def hammer(worker_id: int) -> None:
+        barrier.wait()
+        for i in range(50):
+            run = runs[(worker_id * 50 + i) % len(runs)]
+            try:
+                store.save(run)
+                loaded = store.get(run.id)
+                if loaded is None:
+                    raise AssertionError(f"get returned None for {run.id}")
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+
+    threads = [threading.Thread(target=hammer, args=(i,)) for i in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
 
 
 def test_a_tool_call_found_via_run_tool_calls_is_the_same_object_in_its_message():

@@ -8,6 +8,7 @@ their own columns so `list()` can filter without deserializing every row.
 """
 
 import sqlite3
+import threading
 from datetime import datetime
 
 from runa.core import Run, RunStatus
@@ -26,36 +27,48 @@ CREATE TABLE IF NOT EXISTS runs (
 
 
 class SQLiteRunStore:
-    """RunStore backed by a SQLite database at `path` (`:memory:` works too)."""
+    """RunStore backed by a SQLite database at `path` (`:memory:` works too).
+
+    `check_same_thread=False` only lifts sqlite3's same-thread check; it does
+    not make one Connection object safe to call from multiple threads at
+    once (the sqlite3 docs say as much). A background Run store is used from
+    exactly that way — a `Queue` worker thread saves a Run while another
+    thread lists or reads — so every access below is serialized through
+    `self._lock`.
+    """
 
     def __init__(self, path: str) -> None:
         self._connection = sqlite3.connect(path, check_same_thread=False)
-        self._connection.execute(_SCHEMA)
-        self._connection.commit()
+        self._lock = threading.Lock()
+        with self._lock:
+            self._connection.execute(_SCHEMA)
+            self._connection.commit()
 
     def save(self, run: Run) -> None:
-        self._connection.execute(
-            "INSERT INTO runs "
-            "(id, status, created_at, agent_name, parent_run_id, data) "
-            "VALUES (?, ?, ?, ?, ?, ?) "
-            "ON CONFLICT(id) DO UPDATE SET status = excluded.status, "
-            "created_at = excluded.created_at, agent_name = excluded.agent_name, "
-            "parent_run_id = excluded.parent_run_id, data = excluded.data",
-            (
-                run.id,
-                run.status.value,
-                run.created_at.isoformat(),
-                run.agent_name,
-                run.parent_run_id,
-                run_to_json(run),
-            ),
-        )
-        self._connection.commit()
+        with self._lock:
+            self._connection.execute(
+                "INSERT INTO runs "
+                "(id, status, created_at, agent_name, parent_run_id, data) "
+                "VALUES (?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(id) DO UPDATE SET status = excluded.status, "
+                "created_at = excluded.created_at, agent_name = excluded.agent_name, "
+                "parent_run_id = excluded.parent_run_id, data = excluded.data",
+                (
+                    run.id,
+                    run.status.value,
+                    run.created_at.isoformat(),
+                    run.agent_name,
+                    run.parent_run_id,
+                    run_to_json(run),
+                ),
+            )
+            self._connection.commit()
 
     def get(self, run_id: str) -> Run | None:
-        row = self._connection.execute(
-            "SELECT data FROM runs WHERE id = ?", (run_id,)
-        ).fetchone()
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT data FROM runs WHERE id = ?", (run_id,)
+            ).fetchone()
         return run_from_json(row[0]) if row else None
 
     def list(
@@ -83,8 +96,10 @@ class SQLiteRunStore:
             params.append(parent_run_id)
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
-        rows = self._connection.execute(query, params).fetchall()
+        with self._lock:
+            rows = self._connection.execute(query, params).fetchall()
         return [run_from_json(row[0]) for row in rows]
 
     def close(self) -> None:
-        self._connection.close()
+        with self._lock:
+            self._connection.close()

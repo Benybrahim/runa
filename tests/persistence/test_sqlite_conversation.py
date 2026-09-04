@@ -1,3 +1,5 @@
+import threading
+
 from runa.core import Conversation, Message, Role, TextArtifact, ToolCall
 from runa.persistence import SQLiteConversationStore
 
@@ -70,6 +72,38 @@ def test_survives_reopening_the_same_database_file(tmp_path):
 
     assert loaded.id == conversation.id
     assert loaded.messages[0].content == "hi"
+
+
+def test_concurrent_save_and_get_from_multiple_threads_does_not_corrupt_data():
+    # Same concern as SQLiteRunStore: check_same_thread=False alone doesn't
+    # make a shared Connection safe under real thread overlap.
+    store = SQLiteConversationStore(":memory:")
+    conversations = [Conversation() for _ in range(20)]
+    for conversation in conversations:
+        store.save(conversation)
+
+    errors: list[Exception] = []
+    barrier = threading.Barrier(8)
+
+    def hammer(worker_id: int) -> None:
+        barrier.wait()
+        for i in range(50):
+            conversation = conversations[(worker_id * 50 + i) % len(conversations)]
+            try:
+                store.save(conversation)
+                loaded = store.get(conversation.id)
+                if loaded is None:
+                    raise AssertionError(f"get returned None for {conversation.id}")
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+
+    threads = [threading.Thread(target=hammer, args=(i,)) for i in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
 
 
 def test_round_trips_messages_and_tool_calls():

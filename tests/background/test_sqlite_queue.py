@@ -56,6 +56,36 @@ def test_run_later_journals_and_clears_the_run_id(tmp_path):
     assert run.status == RunStatus.COMPLETED
 
 
+def test_concurrent_enqueue_run_from_multiple_threads_does_not_corrupt_the_journal(
+    tmp_path,
+):
+    # check_same_thread=False only lifts sqlite3's same-thread check; the
+    # shared Connection still isn't safe under real overlap between caller
+    # threads calling enqueue_run() and worker threads clearing rows in
+    # wrapped()'s finally block, without external locking.
+    queue = SQLiteQueue(str(tmp_path / "queue.db"), max_workers=8)
+    errors: list[Exception] = []
+    barrier = threading.Barrier(8)
+
+    def submit(worker_id: int) -> None:
+        barrier.wait()
+        for i in range(25):
+            run_id = f"run-{worker_id}-{i}"
+            try:
+                queue.enqueue_run(run_id, lambda: None)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+
+    threads = [threading.Thread(target=submit, args=(i,)) for i in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    queue.close(wait=True)
+
+    assert errors == []
+
+
 def test_pending_survives_reopening_the_same_database(tmp_path):
     path = str(tmp_path / "queue.db")
     queue = SQLiteQueue(path)
