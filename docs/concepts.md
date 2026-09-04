@@ -179,8 +179,8 @@ run.state.findings
 Spans multiple Runs.
 
 ```python
-conversation.history
-conversation.preferences
+conversation.state.summary
+conversation.state.preferences
 ```
 
 ## Application State
