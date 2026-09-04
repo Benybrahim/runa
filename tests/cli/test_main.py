@@ -201,6 +201,62 @@ def test_runs_requires_an_action():
         main(["runs"])
 
 
+def test_runs_show_with_an_unknown_id_prints_a_clean_error_instead_of_a_traceback(
+    tmp_path, capsys
+):
+    project_dir = tmp_path / "acme"
+    main(["new", "acme"], cwd=tmp_path)
+    (project_dir / "main.py").write_text(
+        "from runa import configure\n"
+        "from tests.fakes import FakeProvider\n\n"
+        "configure(provider=FakeProvider(responses=[]))\n"
+    )
+
+    exit_code = main(["runs", "show", "does-not-exist"], cwd=project_dir)
+
+    assert exit_code == 1
+    assert "does-not-exist" in capsys.readouterr().err
+
+
+def test_runs_approve_with_an_unknown_tool_call_id_prints_a_clean_error(
+    tmp_path, capsys
+):
+    project_dir, db_path = _new_project_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    run = Run(input="email someone")
+    run.start()
+    run.pause()
+    store.save(run)
+    store.close()
+
+    exit_code = main(["runs", "approve", run.id, "no-such-call"], cwd=project_dir)
+
+    assert exit_code == 1
+    assert "no-such-call" in capsys.readouterr().err
+
+
+def test_runs_cancel_on_an_already_terminal_run_prints_a_clean_error(tmp_path, capsys):
+    project_dir, db_path = _new_project_with_store(tmp_path)
+    store = SQLiteRunStore(db_path)
+    run = Run(input="hello")
+    run.start()
+    run.complete(result="hi")
+    store.save(run)
+    store.close()
+
+    exit_code = main(["runs", "cancel", run.id], cwd=project_dir)
+
+    assert exit_code == 1
+    assert "cannot" in capsys.readouterr().err.lower()
+
+
+def test_running_outside_a_runa_app_directory_prints_a_clean_error(tmp_path, capsys):
+    exit_code = main(["runs", "show", "some-id"], cwd=tmp_path)
+
+    assert exit_code == 1
+    assert "no main.py found" in capsys.readouterr().err
+
+
 def _new_project_with_store(tmp_path):
     project_dir = tmp_path / "acme"
     main(["new", "acme"], cwd=tmp_path)

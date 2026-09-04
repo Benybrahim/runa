@@ -10,12 +10,15 @@ logic lives here that doesn't already exist elsewhere (manifesto §11, §12,
 """
 
 import argparse
+import sys
 from pathlib import Path
 
+from runa.approval import UnknownToolCall
 from runa.cli.eval import run_project_evals
 from runa.cli.generate import generate_agent
 from runa.cli.new import scaffold_project
 from runa.cli.runs import (
+    RunNotFound,
     approve_run,
     cancel_run,
     deny_run,
@@ -24,6 +27,7 @@ from runa.cli.runs import (
     show_run,
 )
 from runa.cli.test import run_project_tests
+from runa.core import IllegalTransition
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -92,9 +96,32 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
+    """Parse argv and dispatch, converting operator-input errors into a clean
+    message on stderr and exit code 1 instead of a raw Python traceback —
+    a mistyped run id or tool_call_id, or running outside a Runa app
+    directory, is routine CLI usage, not a Runa bug. Anything else (a real
+    bug, in Runa or in the app's own code) still propagates with its full
+    traceback, since swallowing that would hide the thing a developer
+    actually needs to see.
+    """
     cwd = cwd or Path.cwd()
     args = _build_parser().parse_args(argv)
 
+    try:
+        return _dispatch(args, cwd)
+    except ModuleNotFoundError as exc:
+        if exc.name != "main":
+            raise
+        print(
+            f"error: no main.py found in {cwd} — is this a Runa app?", file=sys.stderr
+        )
+        return 1
+    except (RunNotFound, UnknownToolCall, IllegalTransition) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+
+def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
     if args.command == "new":
         project_dir = scaffold_project(args.name, root=cwd)
         print(f"created {project_dir}")
