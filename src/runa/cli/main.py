@@ -40,7 +40,10 @@ from runa.core import IllegalTransition
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="runa")
+    parser = argparse.ArgumentParser(
+        prog="runa",
+        description="Agent → Run → Result. See docs/getting_started.md.",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     new_parser = subparsers.add_parser("new", help="Scaffold a new Runa application")

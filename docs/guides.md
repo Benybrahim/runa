@@ -205,7 +205,29 @@ handler didn't reach in time, or a harder kill that skipped it entirely.
 
 A Run records execution events.
 
-Use the Run timeline or CLI tooling to inspect execution:
+In-process, the timeline is always available, on any Run, with no setup:
+
+```python
+from runa.observability import timeline
+
+run = ResearchAgent.run("...")
+for entry in timeline(run):
+    print(entry.timestamp, entry.summary)
+```
+
+The CLI reads the same information back from a `RunStore` instead, so it
+only sees Runs that were actually saved there — `run_later()` saves
+automatically (that's what lets `runa runs show` follow background work),
+but a plain synchronous `Agent.run()` does not, on purpose (persistence
+stays outside the core execution primitive). Save one explicitly if you
+want to inspect it later from the CLI instead of in-process:
+
+```python
+from runa.config import default_run_store
+
+run = ResearchAgent.run("...")
+default_run_store().save(run)
+```
 
 ```bash
 runa runs show <id>

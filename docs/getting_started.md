@@ -254,6 +254,11 @@ The goal is simple:
 
 > Understand what happened without adding tracing code to every Agent.
 
+`timeline(run)` reads this straight off the `Run` object, so it works
+in-process with no setup. The `runa runs show <id>` CLI form below reads it
+back from a `RunStore` instead, so it only sees Runs that were actually
+saved there.
+
 ---
 
 ## 11. Evaluate an Agent
@@ -281,7 +286,9 @@ runa test    # app/tests/ — deterministic invariants
 runa eval    # app/evaluations/ — probabilistic behavior
 ```
 
-You can also inspect any Run's execution directly:
+You can also inspect a Run's execution directly from the CLI, once it's
+been saved to a `RunStore` — automatic for `run_later()`, or call
+`default_run_store().save(run)` yourself after a synchronous `run`:
 
 ```bash
 runa runs show <id>

@@ -23,12 +23,21 @@ dependency (manifesto §2), not a per-agent one, so it's set once here
 rather than at each call site — swap OpenAIProvider for AnthropicProvider
 (or any other Provider) as this app's needs change. Requires an API key
 in the environment for whichever provider you use.
+
+`run_store=SQLiteRunStore("runa.db")` makes `runa runs show`/`list` work
+right away — `runa.configure()`'s own default RunStore is in-memory and
+would silently lose every Run the moment this process exits, which the
+generated project shouldn't ask a new developer to discover on their own
+(rails-to-runa.md: "Rails made persistence feel like a native part of
+application programming"). Swap it for another RunStore, or drop it back
+to the library default, as this app's needs change.
 """
 
 from runa import configure
+from runa.persistence import SQLiteRunStore
 from runa.providers import OpenAIProvider
 
-configure(provider=OpenAIProvider())
+configure(provider=OpenAIProvider(), run_store=SQLiteRunStore("runa.db"))
 
 
 if __name__ == "__main__":
@@ -38,6 +47,11 @@ if __name__ == "__main__":
     # print(run.result)
     pass
 '''
+
+_GITIGNORE_TEMPLATE = """__pycache__/
+*.pyc
+runa.db
+"""
 
 _README_TEMPLATE = """# {name}
 
@@ -51,6 +65,8 @@ A Runa application.
 - `app/resources/` — shared resources (clients, config)
 - `app/evaluations/` — eval cases, run with `runa eval`
 - `app/tests/` — deterministic tests, run with `runa test`
+- `runa.db` — this app's Run history (see `main.py`); inspect it with
+  `runa runs show`/`list`, don't commit it
 
 Generate scaffolding with:
 
@@ -80,5 +96,6 @@ def scaffold_project(name: str, *, root: Path) -> Path:
     (project_dir / "pyproject.toml").write_text(_PYPROJECT_TEMPLATE.format(name=name))
     (project_dir / "README.md").write_text(_README_TEMPLATE.format(name=name))
     (project_dir / "main.py").write_text(_MAIN_TEMPLATE)
+    (project_dir / ".gitignore").write_text(_GITIGNORE_TEMPLATE)
 
     return project_dir
