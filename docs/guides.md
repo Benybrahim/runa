@@ -12,15 +12,18 @@ Agent → Run → Outcome
 
 # Building a Tool
 
-Start with the smallest possible tool.
+Start with the smallest possible tool: a plain function decorated with `@tool`.
+Name, description, and input schema are inferred from the function's name,
+docstring, and type annotations.
 
 ```python
-from runa import Tool
+from runa import tool
 
 
-class WebSearch(Tool):
-    def call(self, query: str):
-        return search_web(query)
+@tool
+def web_search(query: str) -> str:
+    """Search the web for a query."""
+    return search_web(query)
 ```
 
 Then declare it on an Agent:
@@ -32,10 +35,26 @@ class ResearchAgent(Agent):
     Prefer reliable sources.
     """
 
-    tools = [WebSearch]
+    tools = [web_search]
 ```
 
-Keep the Agent responsible for behavior and the Tool responsible for the external operation.
+Reach for the `Tool` base class when a tool needs more than a function body
+provides — approval, idempotency, or other class-level configuration:
+
+```python
+from runa import Tool
+
+
+class WebSearch(Tool):
+    requires_approval = True
+
+    def call(self, query: str):
+        return search_web(query)
+```
+
+`tools = [...]` accepts either form, and a `Tool` subclass there is
+instantiated once when the Agent's tools are resolved. Keep the Agent
+responsible for behavior and the Tool responsible for the external operation.
 
 ---
 

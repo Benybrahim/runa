@@ -175,15 +175,18 @@ This means the same execution can later be observed, persisted, evaluated, or re
 
 An Agent becomes useful when it can interact with the application or the outside world.
 
-A simple function can become a Tool:
+A simple function can become a Tool with `@tool`. Its name, description, and
+input schema are inferred from the function's name, docstring, and type
+annotations:
 
 ```python
-from runa import Tool
+from runa import tool
 
 
-class WebSearch(Tool):
-    def call(self, query: str):
-        return search_web(query)
+@tool
+def web_search(query: str) -> str:
+    """Search the web for information."""
+    return search_web(query)
 ```
 
 Then declare it on the Agent:
@@ -195,7 +198,19 @@ class ResearchAgent(Agent):
     Prefer reliable sources.
     """
 
-    tools = [WebSearch]
+    tools = [web_search]
+```
+
+For a tool that needs more than a function body — approval, idempotency, or
+other class-level configuration — subclass `Tool` instead:
+
+```python
+from runa import Tool
+
+
+class WebSearch(Tool):
+    def call(self, query: str):
+        return search_web(query)
 ```
 
 Tools should expose clear structured inputs and explicit outputs.
