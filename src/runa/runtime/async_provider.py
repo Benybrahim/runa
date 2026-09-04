@@ -8,7 +8,9 @@ either one or the other, never both.
 optional, separate protocol a Provider may additionally satisfy.
 """
 
-from collections.abc import AsyncIterator
+import asyncio
+from collections.abc import AsyncIterator, Callable
+from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from runa.core import Message
@@ -23,6 +25,42 @@ class AsyncProvider(Protocol):
         tools: list[dict[str, Any]],
         model: str | None,
     ) -> Message: ...
+
+
+@dataclass
+class AsyncRetryingProvider:
+    """The async counterpart to `RetryingProvider` (see `provider.py`) — same
+    retry policy, `await`ed instead of blocking: any exception retried by
+    default, up to `max_retries` times, doubling `backoff` seconds each
+    attempt, with `is_retryable` as the escape hatch for a specific
+    Provider's own exception types. `sleep` defaults to `asyncio.sleep`
+    rather than `time.sleep`, so a retry delay doesn't block the event loop.
+    """
+
+    provider: AsyncProvider
+    max_retries: int = 3
+    backoff: float = 1.0
+    is_retryable: Callable[[Exception], bool] = lambda exc: True
+    sleep: Callable[[float], Any] = field(default=asyncio.sleep, repr=False)
+
+    async def complete(
+        self,
+        *,
+        messages: list[Message],
+        tools: list[dict[str, Any]],
+        model: str | None,
+    ) -> Message:
+        attempt = 0
+        while True:
+            try:
+                return await self.provider.complete(
+                    messages=messages, tools=tools, model=model
+                )
+            except Exception as exc:
+                attempt += 1
+                if attempt > self.max_retries or not self.is_retryable(exc):
+                    raise
+                await self.sleep(self.backoff * (2 ** (attempt - 1)))
 
 
 class AsyncStream:

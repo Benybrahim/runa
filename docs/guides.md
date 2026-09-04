@@ -400,6 +400,49 @@ A retry should not accidentally duplicate a side effect.
 
 ---
 
+# Retrying Transient Model Errors
+
+`RetryStrategy` covers tool calls, not the model call itself. A rate limit,
+timeout, or dropped connection from the model API fails the whole Run
+immediately unless the Provider is wrapped in `RetryingProvider` (or
+`AsyncRetryingProvider` for `run_async()`):
+
+```python
+from runa import configure, RetryingProvider
+from runa.providers import AnthropicProvider
+
+configure(provider=RetryingProvider(AnthropicProvider(), max_retries=3))
+```
+
+This is safe by construction, not just by convention: `Executor._call_model`
+only writes the response to `Run.messages` once `complete()` returns, so a
+failed attempt hasn't changed anything a retry could duplicate — unlike a
+tool call, no `idempotent` flag is needed here.
+
+By default every exception is retried, with exponential backoff starting at
+`backoff` seconds. To retry only specific failures — e.g. a provider's own
+rate-limit or connection-error types — pass `is_retryable`:
+
+```python
+import anthropic
+
+configure(
+    provider=RetryingProvider(
+        AnthropicProvider(),
+        is_retryable=lambda exc: isinstance(
+            exc, anthropic.RateLimitError | anthropic.APIConnectionError
+        ),
+    )
+)
+```
+
+Only `complete()` is retried — a `RetryingProvider` wrapping a streaming
+Provider no longer satisfies `StreamingProvider`, since a partially
+delivered stream can't be safely restarted once some chunks have already
+reached `on_chunk`.
+
+---
+
 # Choosing Between Agent Hooks and Strategy
 
 Start with ordinary Agent behavior.

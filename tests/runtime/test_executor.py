@@ -17,7 +17,7 @@ from runa.core import (
     ToolCall,
 )
 from runa.runtime.executor import Executor
-from runa.runtime.provider import StreamChunk
+from runa.runtime.provider import RetryingProvider, StreamChunk
 from runa.runtime.retry import RetryStrategy
 from runa.runtime.strategy import CallModel, Complete, Fail, Strategy
 from runa.tool import Tool
@@ -222,6 +222,49 @@ def test_tool_exception_fails_the_run():
     assert result.tool_calls[0].error == "boom"
     assert result.tool_calls[0].attempts == 1
     assert result.tool_calls[0].effect == EffectStatus.UNKNOWN
+
+
+def test_a_transient_model_error_fails_the_run_with_no_retrying_provider():
+    class FlakyProvider:
+        def __init__(self):
+            self.attempts = 0
+
+        def complete(self, *, messages, tools, model):
+            self.attempts += 1
+            raise ConnectionError("rate limited")
+
+    provider = FlakyProvider()
+    executor = Executor(provider)
+    run = Run(input="hello")
+
+    result = executor.run(WeatherAgent(), run)
+
+    assert result.status == RunStatus.FAILED
+    assert "rate limited" in result.error
+    assert provider.attempts == 1  # no retry at all without RetryingProvider
+
+
+def test_retrying_provider_rescues_a_run_from_a_transient_model_error():
+    class FlakyProvider:
+        def __init__(self):
+            self.attempts = 0
+
+        def complete(self, *, messages, tools, model):
+            self.attempts += 1
+            if self.attempts < 3:
+                raise ConnectionError("rate limited")
+            return Message(role=Role.ASSISTANT, content="hi")
+
+    inner = FlakyProvider()
+    provider = RetryingProvider(inner, max_retries=3, sleep=lambda s: None)
+    executor = Executor(provider)
+    run = Run(input="hello")
+
+    result = executor.run(WeatherAgent(), run)
+
+    assert result.status == RunStatus.COMPLETED
+    assert result.result == "hi"
+    assert inner.attempts == 3
 
 
 def test_retry_strategy_retries_a_flaky_tool_before_succeeding():

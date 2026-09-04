@@ -3,11 +3,18 @@
 from runa.runtime.async_executor import AsyncExecutor
 from runa.runtime.async_provider import (
     AsyncProvider,
+    AsyncRetryingProvider,
     AsyncStream,
     AsyncStreamingProvider,
 )
 from runa.runtime.executor import Executor
-from runa.runtime.provider import Provider, Stream, StreamChunk, StreamingProvider
+from runa.runtime.provider import (
+    Provider,
+    RetryingProvider,
+    Stream,
+    StreamChunk,
+    StreamingProvider,
+)
 from runa.runtime.retry import RetryStrategy
 from runa.runtime.strategy import (
     Action,
@@ -23,6 +30,7 @@ __all__ = [
     "Action",
     "AsyncExecutor",
     "AsyncProvider",
+    "AsyncRetryingProvider",
     "AsyncStream",
     "AsyncStreamingProvider",
     "CallModel",
@@ -33,6 +41,7 @@ __all__ = [
     "Fail",
     "Provider",
     "RetryStrategy",
+    "RetryingProvider",
     "Strategy",
     "Stream",
     "StreamChunk",

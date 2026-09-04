@@ -13,8 +13,9 @@ included); one that also implements `stream()` additionally satisfies
 `runtime/executor.py`.
 """
 
-from collections.abc import Iterator
-from dataclasses import dataclass
+import time
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from runa.core import Message
@@ -28,6 +29,64 @@ class Provider(Protocol):
         tools: list[dict[str, Any]],
         model: str | None,
     ) -> Message: ...
+
+
+@dataclass
+class RetryingProvider:
+    """Wraps a Provider, retrying `complete()` on failure before giving up.
+
+    Without this, any transient failure from the model API itself — a rate
+    limit, a timeout, a dropped connection — fails the whole Run on the
+    first hit: `RetryStrategy` (`runtime/retry.py`) only retries *tool*
+    calls, since a tool call can have a real side effect a blind retry
+    might repeat. A model call has no such hazard here — `Executor.
+    _call_model` only calls `run.add_message()` with the result *after*
+    `complete()` returns, so a failed attempt has written nothing to the
+    Run; retrying just repeats the same read-only request.
+
+    Retries every exception by default, up to `max_retries` times, with
+    delays that double each attempt starting at `backoff` seconds — the
+    same blunt, type-agnostic policy `RetryStrategy` already uses for tool
+    calls (no attempt to special-case "transient" vs "permanent" here
+    either). Pass `is_retryable` to narrow that down for a specific
+    Provider's own exception types (e.g. only `anthropic.RateLimitError`
+    and `anthropic.APIConnectionError`) — those types are vendor-specific
+    and belong at the call site, not in this generic wrapper
+    (architecture.md §5: "Provider-specific concepts must remain inside
+    provider adapters").
+
+    Satisfies `Provider` structurally, so it drops in anywhere a Provider
+    is expected: `Executor(provider=RetryingProvider(AnthropicProvider()))`.
+    Wraps `complete()` only — a Provider that also implements `stream()`
+    stops satisfying `StreamingProvider` once wrapped, since a partially
+    delivered stream can't be safely retried from the start once some
+    chunks have already reached `on_chunk`.
+    """
+
+    provider: Provider
+    max_retries: int = 3
+    backoff: float = 1.0
+    is_retryable: Callable[[Exception], bool] = lambda exc: True
+    sleep: Callable[[float], None] = field(default=time.sleep, repr=False)
+
+    def complete(
+        self,
+        *,
+        messages: list[Message],
+        tools: list[dict[str, Any]],
+        model: str | None,
+    ) -> Message:
+        attempt = 0
+        while True:
+            try:
+                return self.provider.complete(
+                    messages=messages, tools=tools, model=model
+                )
+            except Exception as exc:
+                attempt += 1
+                if attempt > self.max_retries or not self.is_retryable(exc):
+                    raise
+                self.sleep(self.backoff * (2 ** (attempt - 1)))
 
 
 @dataclass
