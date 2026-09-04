@@ -147,3 +147,23 @@ class Run:
     @property
     def completed(self) -> bool:
         return self.status == RunStatus.COMPLETED
+
+    @property
+    def usage(self) -> dict[str, int]:
+        """Token usage summed across every model call this Run has made.
+
+        Each `Message.usage` is already normalized to `{"input_tokens",
+        "output_tokens"}` by the Provider that produced it (architecture.md
+        §10); this just adds them up so an application doesn't need to walk
+        `run.messages` itself to answer "what did this Run cost?" A Message
+        with no usage (not a model response, or a provider that didn't
+        report it) contributes nothing. Always both keys, zeroed rather than
+        omitted, for a Run that hasn't called a model yet.
+        """
+        totals = {"input_tokens": 0, "output_tokens": 0}
+        for message in self.messages:
+            if message.usage is None:
+                continue
+            for key in totals:
+                totals[key] += message.usage.get(key, 0)
+        return totals

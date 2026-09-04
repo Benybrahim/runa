@@ -124,3 +124,38 @@ def test_add_message_and_artifact():
     run.add_artifact(TextArtifact(text="a report"))
     assert len(run.artifacts) == 1
     assert run.events[-1].type == EventType.ARTIFACT_CREATED
+
+
+def test_usage_is_zeroed_for_a_run_with_no_model_calls():
+    run = Run(input="hello")
+    assert run.usage == {"input_tokens": 0, "output_tokens": 0}
+
+
+def test_usage_sums_across_every_model_call():
+    run = Run(input="hello")
+    run.add_message(Message(role=Role.USER, content="hi"))
+    run.add_message(
+        Message(
+            role=Role.ASSISTANT,
+            content="one moment",
+            usage={"input_tokens": 100, "output_tokens": 10},
+        )
+    )
+    run.add_message(Message(role=Role.TOOL, content="result", tool_call_id="tc-1"))
+    run.add_message(
+        Message(
+            role=Role.ASSISTANT,
+            content="done",
+            usage={"input_tokens": 150, "output_tokens": 5},
+        )
+    )
+
+    assert run.usage == {"input_tokens": 250, "output_tokens": 15}
+
+
+def test_usage_ignores_messages_without_reported_usage():
+    run = Run(input="hello")
+    run.add_message(Message(role=Role.USER, content="hi"))
+    run.add_message(Message(role=Role.ASSISTANT, content="no usage reported"))
+
+    assert run.usage == {"input_tokens": 0, "output_tokens": 0}
