@@ -1,6 +1,12 @@
 # The RUNA Doctrine
 
-RUNA is an opinionated, integrated framework for building agent applications according to the Agent-Run-Execution (ARE) pattern: Agents declare behavior, Execution progresses it, and Runs persist what happened. The Run is core unit.
+RUNA is an opinionated, integrated framework for building agent applications.
+
+Its architecture is built around three core concepts: **Agent, Execution, and Run**.
+
+Agents declare behavior. Execution progresses that behavior. Runs persist what happened.
+
+**The Run is the core unit.**
 
 RUNA is inspired by the philosophy that made Rails effective: conventions over configuration, integrated systems over assembled stacks, strong defaults, beautiful code, and developer happiness.
 
@@ -12,19 +18,21 @@ RUNA exists to make that complexity feel natural.
 
 ## 1. Agent, Execution, and Run
 
-RUNA divides an agent application into three layers, each with a specific responsibility: Agent, Execution, and Run.
+RUNA organizes an agent application around three core concepts, each with a distinct responsibility.
 
-An Agent declares behavior.
+An **Agent** declares behavior: what it is, what it can do, and how it should behave.
 
-Execution progresses that behavior: calling the model, invoking tools, applying policy, and deciding what happens next.
+**Execution** is the runtime that progresses that behavior through time: calling models, invoking tools, applying policy, and determining what happens next.
 
-A Run persists what happened: identity, lifecycle, state, events, actions, artifacts, and result.
+A **Run** persists what happened: its identity, lifecycle, state, events, actions, artifacts, and result.
 
-The Run is the common boundary for persistence, background execution, approval, and evaluation, because it is where Execution's progress is recorded.
+The Run is the common boundary for persistence, background execution, approval, observability, and evaluation, because it is where Execution's progress is recorded.
 
 A Run may be short or long, synchronous or asynchronous, complete or paused.
 
 The execution model remains the same.
+
+**Agents declare behavior. Execution progresses it. Runs persist what happened.**
 
 ---
 
@@ -32,11 +40,11 @@ The execution model remains the same.
 
 Agents should be ordinary application objects with responsibilities, behavior, and capabilities.
 
-Developers should not need to construct graphs to express simple agent behavior.
+Developers should not need to construct graphs to express ordinary agent behavior.
 
-Graphs and workflows are useful when relationships or execution structure are the problem being modeled. They are not the default programming model.
+Graphs and workflows are useful when execution structure itself is the problem being modeled. They are not the default programming model.
 
-**Agents declare behavior. Execution progresses it. Runs persist it.**
+**Objects before graphs.**
 
 ---
 
@@ -48,11 +56,13 @@ The common path should be simple. Complexity should be available when the applic
 
 RUNA should let developers describe what an agent does without first assembling its runtime.
 
+**Intent before infrastructure.**
+
 ---
 
 ## 4. Convention Over Configuration
 
-Agent applications contain recurring patterns.
+Agent applications contain recurring structure.
 
 Agents have capabilities. Runs have state. Executions produce events and artifacts. Runs can be persisted, resumed, evaluated, and observed.
 
@@ -70,25 +80,33 @@ Explicit configuration should be reserved for decisions that are genuinely appli
 
 Developers should not have to assemble an agent stack before they can build an application.
 
-RUNA provides a coherent default environment for models, tools, runs, persistence, background execution, observability, approval, and evaluation.
+RUNA provides a coherent environment for models, tools, runs, persistence, background execution, observability, approval, and evaluation.
 
 The defaults are strong.
 
 The system remains open.
 
+Omakase does not mean that every application must use every component. It means that when applications need these capabilities, they work together by default rather than requiring developers to assemble and integrate them themselves.
+
+**Integrated before assembled.**
+
 ---
 
-## 6. State Has a Lifetime
+## 6. State Has an Owner and a Lifetime
 
 Memory is not one thing.
 
-RUNA distinguishes state by ownership and lifetime:
+State has an owner and a lifetime.
 
-- Run state belongs to one execution.
-- Conversation state spans related executions.
-- Application state belongs to the application domain.
+RUNA distinguishes state accordingly:
+
+* **Run state** belongs to one Run.
+* **Conversation state** spans related Runs.
+* **Application state** belongs to the application's domain.
 
 State should be explicit rather than hidden behind one universal memory abstraction.
+
+**State has an owner and a lifetime.**
 
 ---
 
@@ -114,7 +132,11 @@ Agents may use tools, planning, delegation, reflection, deterministic logic, or 
 
 Those are strategies, not requirements.
 
+RUNA standardizes the software engineering around intelligence, not intelligence itself.
+
 The simplest agent should remain simple.
+
+**Standard runtime. Open behavior.**
 
 ---
 
@@ -128,7 +150,7 @@ and:
 
 > **Was it good?**
 
-Events make execution observable.
+Runs and events make execution observable.
 
 Tests verify deterministic application invariants.
 
@@ -148,20 +170,23 @@ The framework makes the common path easy.
 
 The underlying system remains accessible.
 
+**Strong defaults. Clear escape hatches.**
+
 ---
 
 # The Runa Standard
 
 Before adding a feature to the core framework, ask:
 
-- Does it make the common case simpler?
-- Does it follow an existing convention?
-- Does it make agent behavior easier to understand?
-- Does it belong naturally to an Agent, Execution, or Run?
-- Does it make capabilities and authority clearer?
-- Does it improve observability or evaluation?
-- Can Runa provide a strong default?
-- Does it preserve an escape hatch?
+* Does it make the common case simpler?
+* Does it follow an existing convention?
+* Does it make agent behavior easier to understand?
+* Does it belong naturally to an Agent, Execution, or Run?
+* Does it make state ownership or lifetime clearer?
+* Does it make capabilities and authority clearer?
+* Does it improve observability or evaluation?
+* Can Runa provide a strong default?
+* Does it preserve an escape hatch?
 
 If not, it may not belong in the core.
 
@@ -169,4 +194,4 @@ If not, it may not belong in the core.
 
 # In One Sentence
 
-> **RUNA is an opinionated, integrated framework for building agent applications according to the Agent-Run-Execution (ARE) pattern: Agents declare behavior, Execution progresses it, and Runs persist what happened. The Run is the core unit.**
+> **RUNA is an opinionated, integrated framework for agent applications, built around the Agent-Execution-Run architecture: Agents declare behavior, Execution progresses it, and Runs persist what happened. The Run is the core unit.**
