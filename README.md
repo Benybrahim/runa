@@ -66,6 +66,7 @@ In addition to that, Runa also comes with:
 
    where "myapp" is the application name.
 
+
 3. Change directory to `myapp`, define an Agent:
 
     ```bash
@@ -73,6 +74,7 @@ In addition to that, Runa also comes with:
     $ runa generate agent MyAgent
     ```
    Run with `--help` or `-h` for options.
+
 
 4. Run the agent:
 
