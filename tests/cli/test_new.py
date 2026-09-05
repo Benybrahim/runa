@@ -41,6 +41,25 @@ def test_scaffold_project_wires_up_a_durable_run_store(tmp_path):
     assert "runa.db" in gitignore
 
 
+def test_scaffold_project_writes_a_gitignored_env_file(tmp_path):
+    """A fresh project should never require `export OPENAI_API_KEY=...`
+    in the shell: `.env` ships with the key main.py expects, and main.py
+    loads it via `load_dotenv()`, so filling in `.env` is the only step."""
+    project_dir = scaffold_project("acme", root=tmp_path)
+
+    env_file = (project_dir / ".env").read_text()
+    assert "OPENAI_API_KEY=" in env_file
+
+    main_py = (project_dir / "main.py").read_text()
+    assert "load_dotenv()" in main_py
+
+    pyproject = (project_dir / "pyproject.toml").read_text()
+    assert "python-dotenv" in pyproject
+
+    gitignore = (project_dir / ".gitignore").read_text()
+    assert ".env" in gitignore.splitlines()
+
+
 def test_scaffold_project_writes_the_project_name_into_generated_files(tmp_path):
     project_dir = scaffold_project("acme", root=tmp_path)
 

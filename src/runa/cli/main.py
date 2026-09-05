@@ -170,7 +170,7 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
         print(
             "\nnext steps:\n"
             f"  cd {project_dir.name}\n"
-            "  export OPENAI_API_KEY=...   # or switch main.py to AnthropicProvider\n"
+            "  put your OPENAI_API_KEY in .env   # or switch to AnthropicProvider\n"
             "  runa generate agent MyAgent\n"
             "  runa run MyAgent '...'"
         )
