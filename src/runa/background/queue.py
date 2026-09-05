@@ -167,6 +167,8 @@ def recover_pending(
         run = run_store.get(run_id)
         if run is None:
             continue
+        if run.agent_name is None:
+            continue
         agent_cls = by_name.get(run.agent_name)
         if agent_cls is None:
             continue

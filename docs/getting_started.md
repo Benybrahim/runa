@@ -190,6 +190,7 @@ from runa.providers import OpenAIProvider
 
 configure(provider=OpenAIProvider())
 
+
 @tool
 def get_weather(city: str) -> str:
     return f"{city}: sunny, 22C"
@@ -198,6 +199,7 @@ def get_weather(city: str) -> str:
 class WeatherAgent(Agent):
     instructions = "Answer weather questions using the get_weather tool."
     tools = [get_weather]
+
 
 if __name__ == "__main__":
     run = WeatherAgent.run("What's the weather in Tokyo?")

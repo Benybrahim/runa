@@ -1,5 +1,8 @@
 import asyncio
 from types import SimpleNamespace
+from typing import cast
+
+import anthropic
 
 from runa.core import Message, Role, ToolCall
 from runa.providers.anthropic import (
@@ -156,7 +159,7 @@ def test_async_anthropic_provider_awaits_the_async_client():
             self.messages = FakeMessages()
 
     client = FakeAsyncClient()
-    provider = AsyncAnthropicProvider(client=client)
+    provider = AsyncAnthropicProvider(client=cast(anthropic.AsyncAnthropic, client))
 
     message = asyncio.run(
         provider.complete(
@@ -205,7 +208,7 @@ def test_anthropic_provider_stream_yields_chunks_and_sets_the_final_message():
             self.messages = FakeMessages()
 
     client = FakeClient()
-    provider = AnthropicProvider(client=client)
+    provider = AnthropicProvider(client=cast(anthropic.Anthropic, client))
 
     stream = provider.stream(
         messages=[Message(role=Role.USER, content="hi")], tools=[], model=None
@@ -213,6 +216,7 @@ def test_anthropic_provider_stream_yields_chunks_and_sets_the_final_message():
     chunks = [chunk.delta for chunk in stream]
 
     assert chunks == ["Let", " me", " check."]
+    assert stream.message is not None
     assert stream.message.content == "Let me check."
     assert client.messages.kwargs["model"] == "claude-sonnet-5"
 
@@ -255,7 +259,7 @@ def test_async_anthropic_provider_stream_yields_chunks_and_sets_the_final_messag
             self.messages = FakeMessages()
 
     client = FakeAsyncClient()
-    provider = AsyncAnthropicProvider(client=client)
+    provider = AsyncAnthropicProvider(client=cast(anthropic.AsyncAnthropic, client))
     stream = provider.stream(
         messages=[Message(role=Role.USER, content="hi")], tools=[], model=None
     )
@@ -266,5 +270,6 @@ def test_async_anthropic_provider_stream_yields_chunks_and_sets_the_final_messag
     chunks = asyncio.run(collect())
 
     assert chunks == ["hi", " there"]
+    assert stream.message is not None
     assert stream.message.content == "hi there"
     assert client.messages.kwargs["model"] == "claude-sonnet-5"

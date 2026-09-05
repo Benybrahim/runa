@@ -406,6 +406,7 @@ def test_runs_pending_and_approve_resume_a_run(tmp_path, capsys):
     store = SQLiteRunStore(db_path)
     saved = store.get(run.id)
     store.close()
+    assert saved is not None
     assert saved.status == RunStatus.RUNNING
     assert saved.tool_calls[0].approved is True
 
@@ -432,6 +433,7 @@ def test_runs_deny_fails_a_run(tmp_path, capsys):
     store = SQLiteRunStore(db_path)
     saved = store.get(run.id)
     store.close()
+    assert saved is not None
     assert saved.status == RunStatus.FAILED
 
 
@@ -452,4 +454,5 @@ def test_runs_cancel_cancels_a_paused_run(tmp_path, capsys):
     store = SQLiteRunStore(db_path)
     saved = store.get(run.id)
     store.close()
+    assert saved is not None
     assert saved.status == RunStatus.CANCELLED

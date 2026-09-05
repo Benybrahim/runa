@@ -40,10 +40,10 @@ def test_run_later_journals_and_clears_the_run_id(tmp_path):
 
     original_run = executor.run
 
-    def blocking_run(agent, run):
+    def blocking_run(agent, run, **kwargs):
         started.set()
         release.wait(timeout=5)
-        return original_run(agent, run)
+        return original_run(agent, run, **kwargs)
 
     executor.run = blocking_run
 
@@ -139,6 +139,7 @@ def test_run_later_saves_the_terminal_status_once_a_durable_job_completes(
     queue.close(wait=True)
 
     saved = run_store.get(run.id)
+    assert saved is not None
     assert saved.status == RunStatus.COMPLETED
     assert saved.result == "hi"
 
@@ -161,6 +162,7 @@ def test_run_later_saves_a_failed_status_once_a_durable_job_fails(
     queue.close(wait=True)
 
     saved = run_store.get(run.id)
+    assert saved is not None
     assert saved.status == RunStatus.FAILED
     assert saved.error
 
@@ -200,6 +202,7 @@ def test_recover_pending_resumes_a_run_orphaned_by_a_crashed_process(tmp_path):
     assert queue.pending() == []
     queue.close(wait=False)
     reloaded = run_store.get(run.id)
+    assert reloaded is not None
     assert reloaded.status == RunStatus.COMPLETED
     assert reloaded.result == "hi"
 

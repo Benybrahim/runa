@@ -11,6 +11,7 @@ def test_save_and_get_round_trips_a_conversation():
 
     store.save(conversation)
     loaded = store.get(conversation.id)
+    assert loaded is not None
 
     assert loaded is not conversation
     assert loaded.id == conversation.id
@@ -25,6 +26,7 @@ def test_round_trips_state_with_a_non_json_safe_value():
 
     store.save(conversation)
     loaded = store.get(conversation.id)
+    assert loaded is not None
 
     assert loaded.state.findings == str([artifact])
 
@@ -54,7 +56,9 @@ def test_save_again_overwrites_the_previous_version():
     conversation.messages.append(Message(role=Role.USER, content="hi"))
     store.save(conversation)
 
-    assert len(store.get(conversation.id).messages) == 1
+    reloaded = store.get(conversation.id)
+    assert reloaded is not None
+    assert len(reloaded.messages) == 1
     assert len(store.list()) == 1
 
 
@@ -69,6 +73,7 @@ def test_survives_reopening_the_same_database_file(tmp_path):
 
     second_connection = SQLiteConversationStore(path)
     loaded = second_connection.get(conversation.id)
+    assert loaded is not None
 
     assert loaded.id == conversation.id
     assert loaded.messages[0].content == "hi"
@@ -119,6 +124,7 @@ def test_round_trips_a_messages_usage():
 
     store.save(conversation)
     loaded = store.get(conversation.id)
+    assert loaded is not None
 
     assert loaded.messages[0].usage == {"input_tokens": 10, "output_tokens": 3}
 
@@ -136,6 +142,7 @@ def test_round_trips_messages_and_tool_calls():
 
     store.save(conversation)
     loaded = store.get(conversation.id)
+    assert loaded is not None
 
     assert loaded.messages[0].tool_calls[0].name == "send_refund"
     assert loaded.messages[0].tool_calls[0].arguments == {"order_id": "A123"}

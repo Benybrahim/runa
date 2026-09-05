@@ -1,5 +1,8 @@
 import asyncio
 from types import SimpleNamespace
+from typing import cast
+
+import openai
 
 from runa.core import Message, Role, ToolCall
 from runa.providers.openai import (
@@ -162,7 +165,7 @@ def test_async_openai_provider_awaits_the_async_client():
             self.chat = FakeChat()
 
     client = FakeAsyncClient()
-    provider = AsyncOpenAIProvider(client=client)
+    provider = AsyncOpenAIProvider(client=cast(openai.AsyncOpenAI, client))
 
     message = asyncio.run(
         provider.complete(
@@ -233,7 +236,7 @@ def test_openai_provider_stream_yields_content_deltas_only():
             self.chat = FakeChat()
 
     client = FakeClient()
-    provider = OpenAIProvider(client=client)
+    provider = OpenAIProvider(client=cast(openai.OpenAI, client))
 
     stream = provider.stream(
         messages=[Message(role=Role.USER, content="hi")], tools=[], model=None
@@ -241,6 +244,7 @@ def test_openai_provider_stream_yields_content_deltas_only():
     chunks = [chunk.delta for chunk in stream]
 
     assert chunks == ["Let", " me check."]
+    assert stream.message is not None
     assert stream.message.content == "Let me check."
     assert client.chat.completions.kwargs["model"] == "gpt-5-nano"
 
@@ -293,7 +297,7 @@ def test_async_openai_provider_stream_yields_content_deltas_only():
             self.chat = FakeChat()
 
     client = FakeAsyncClient()
-    provider = AsyncOpenAIProvider(client=client)
+    provider = AsyncOpenAIProvider(client=cast(openai.AsyncOpenAI, client))
     stream = provider.stream(
         messages=[Message(role=Role.USER, content="hi")], tools=[], model=None
     )
@@ -304,5 +308,6 @@ def test_async_openai_provider_stream_yields_content_deltas_only():
     chunks = asyncio.run(collect())
 
     assert chunks == ["hi", " there"]
+    assert stream.message is not None
     assert stream.message.content == "hi there"
     assert client.chat.completions.kwargs["model"] == "gpt-5-nano"

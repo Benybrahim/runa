@@ -83,4 +83,4 @@ def test_a_bug_before_the_step_loop_fails_the_run_instead_of_vanishing_on_the_wo
 
     assert result is run
     assert result.status == RunStatus.FAILED
-    assert "bug while rendering context" in result.error
+    assert "bug while rendering context" in (result.error or "")

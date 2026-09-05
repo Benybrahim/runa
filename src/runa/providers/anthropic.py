@@ -1,9 +1,10 @@
 """AnthropicProvider: a thin adapter between core.Message and Anthropic's API."""
 
 from collections.abc import AsyncIterator, Iterator
-from typing import Any
+from typing import Any, cast
 
 import anthropic
+from anthropic.types import MessageParam, ToolUnionParam
 
 from runa.core import Message, Role, ToolCall
 from runa.runtime.async_provider import AsyncStream
@@ -125,8 +126,10 @@ class AnthropicProvider:
             model=model or DEFAULT_MODEL,
             max_tokens=self.max_tokens,
             system=system,
-            messages=wire_messages,
-            tools=to_wire_tools(tools) if tools else anthropic.NOT_GIVEN,
+            messages=cast(list[MessageParam], wire_messages),
+            tools=cast(list[ToolUnionParam], to_wire_tools(tools))
+            if tools
+            else anthropic.omit,
         )
         return from_wire_message(response)
 
@@ -146,8 +149,10 @@ class AnthropicProvider:
                 model=model or DEFAULT_MODEL,
                 max_tokens=self.max_tokens,
                 system=system,
-                messages=wire_messages,
-                tools=to_wire_tools(tools) if tools else anthropic.NOT_GIVEN,
+                messages=cast(list[MessageParam], wire_messages),
+                tools=cast(list[ToolUnionParam], to_wire_tools(tools))
+                if tools
+                else anthropic.omit,
             ) as vendor_stream:
                 for text in vendor_stream.text_stream:
                     yield StreamChunk(delta=text)
@@ -186,8 +191,10 @@ class AsyncAnthropicProvider:
             model=model or DEFAULT_MODEL,
             max_tokens=self.max_tokens,
             system=system,
-            messages=wire_messages,
-            tools=to_wire_tools(tools) if tools else anthropic.NOT_GIVEN,
+            messages=cast(list[MessageParam], wire_messages),
+            tools=cast(list[ToolUnionParam], to_wire_tools(tools))
+            if tools
+            else anthropic.omit,
         )
         return from_wire_message(response)
 
@@ -208,8 +215,10 @@ class AsyncAnthropicProvider:
                 model=model or DEFAULT_MODEL,
                 max_tokens=self.max_tokens,
                 system=system,
-                messages=wire_messages,
-                tools=to_wire_tools(tools) if tools else anthropic.NOT_GIVEN,
+                messages=cast(list[MessageParam], wire_messages),
+                tools=cast(list[ToolUnionParam], to_wire_tools(tools))
+                if tools
+                else anthropic.omit,
             ) as vendor_stream:
                 async for text in vendor_stream.text_stream:
                     yield StreamChunk(delta=text)

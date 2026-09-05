@@ -11,7 +11,7 @@ from runa.agent import (
     UnknownApprovalTool,
 )
 from runa.application import ProviderNotConfigured, application, configure
-from runa.core import Conversation, EventType, Message, Role, RunStatus, ToolCall
+from runa.core import Conversation, EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime import AsyncExecutor, Executor
 from runa.tool import Tool
 from tests.fakes import FakeAsyncProvider, FakeProvider
@@ -88,10 +88,11 @@ def test_default_hooks_are_noops():
         pass
 
     agent = SimpleAgent()
-    agent.before_run(None)
-    agent.plan(None)
-    agent.review(None)
-    agent.after_run(None)
+    run = Run(input="hi")
+    agent.before_run(run)
+    agent.plan(run)
+    agent.review(run)
+    agent.after_run(run)
 
 
 def test_subclasses_do_not_share_resolved_tool_cache():
@@ -303,6 +304,7 @@ def test_a_parent_agent_can_delegate_to_a_sub_agent():
     assert run.result == "Fusion is promising, per research."
     # the sub-run isn't folded into the parent's own event log, but it
     # stays reachable for direct inspection (manifesto §15)
+    assert research_tool.last_run is not None
     assert research_tool.last_run.status == RunStatus.COMPLETED
     assert research_tool.last_run.result == "Fusion is promising."
     # the sub-agent's own Run carries its own identity, not the parent's
@@ -338,6 +340,7 @@ def test_a_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
     failed_call = next(tc for tc in run.tool_calls if tc.name == "ResearchAgent")
     assert failed_call.error is not None
     # still reachable for inspection even though the delegated run failed
+    assert research_tool.last_run is not None
     assert research_tool.last_run.status == RunStatus.FAILED
 
 
@@ -392,6 +395,7 @@ def test_a_parent_agent_can_delegate_to_a_sub_agent_via_async_executor():
     assert run.result == "Fusion is promising, per research."
     # the sub-run isn't folded into the parent's own event log, but it
     # stays reachable for direct inspection (manifesto §15)
+    assert research_tool.last_run is not None
     assert research_tool.last_run.status == RunStatus.COMPLETED
     assert research_tool.last_run.result == "Fusion is promising."
     assert research_tool.last_run.parent_run_id == run.id
@@ -423,6 +427,7 @@ def test_an_async_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
     assert run.status == RunStatus.FAILED
     failed_call = next(tc for tc in run.tool_calls if tc.name == "ResearchAgent")
     assert failed_call.error is not None
+    assert research_tool.last_run is not None
     assert research_tool.last_run.status == RunStatus.FAILED
 
 

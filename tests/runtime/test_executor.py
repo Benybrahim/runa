@@ -245,8 +245,8 @@ def test_a_hallucinated_tool_call_fails_the_run_with_a_clear_message():
     result = executor.run(WeatherAgent(), run)
 
     assert result.status == RunStatus.FAILED
-    assert "unknown tool 'Ghost'" in result.error
-    assert "GetWeather" in result.error
+    assert "unknown tool 'Ghost'" in (result.error or "")
+    assert "GetWeather" in (result.error or "")
 
 
 def test_a_transient_model_error_fails_the_run_with_no_retrying_provider():
@@ -265,7 +265,7 @@ def test_a_transient_model_error_fails_the_run_with_no_retrying_provider():
     result = executor.run(WeatherAgent(), run)
 
     assert result.status == RunStatus.FAILED
-    assert "rate limited" in result.error
+    assert "rate limited" in (result.error or "")
     assert provider.attempts == 1  # no retry at all without RetryingProvider
 
 
@@ -533,7 +533,7 @@ def test_a_bug_while_seeding_the_run_fails_it_instead_of_stranding_it():
     result = Executor(provider).run(WeatherAgent(), run)
 
     assert result.status == RunStatus.FAILED
-    assert "bug while rendering context" in result.error
+    assert "bug while rendering context" in (result.error or "")
     assert len(provider.calls) == 0  # never reached the step loop
 
 

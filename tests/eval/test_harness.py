@@ -125,7 +125,7 @@ def test_run_evals_reports_pass_and_fail_for_each_case():
     assert results[0].passed is True
     assert results[0].error is None
     assert results[1].passed is False
-    assert "goodbye" in results[1].error
+    assert "goodbye" in (results[1].error or "")
 
 
 def test_to_satisfy_passes_when_judge_returns_pass():

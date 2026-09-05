@@ -39,7 +39,9 @@ def test_save_again_overwrites_the_previous_version():
     run.complete(result="done")
     store.save(run)
 
-    assert store.get(run.id).result == "done"
+    reloaded = store.get(run.id)
+    assert reloaded is not None
+    assert reloaded.result == "done"
     assert len(store.list()) == 1
 
 
@@ -119,12 +121,14 @@ def test_run_store_protocol_is_satisfiable_without_inheritance():
         def get(self, run_id):
             return self._runs.get(run_id)
 
-        def list(self, *, status=None, since=None):
+        def list(self, *, status=None, since=None, agent_name=None, parent_run_id=None):
             return [
                 run
                 for run in self._runs.values()
                 if (status is None or run.status == status)
                 and (since is None or run.created_at >= since)
+                and (agent_name is None or run.agent_name == agent_name)
+                and (parent_run_id is None or run.parent_run_id == parent_run_id)
             ]
 
     store: RunStore = DictBackedStore()

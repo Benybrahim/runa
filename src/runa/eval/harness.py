@@ -116,7 +116,7 @@ def expect(run: Run) -> Expectation:
 class EvalCase:
     name: str
     input: Any
-    check: Callable[[Run], None]
+    check: Callable[[Run], Any]
 
 
 @dataclass

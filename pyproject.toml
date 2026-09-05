@@ -18,6 +18,7 @@ runa = "runa.cli.main:main"
 dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.4",
+    "pyright>=1.1.400",
 ]
 
 [build-system]
@@ -36,3 +37,11 @@ target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.pyright]
+include = ["src", "tests", "examples"]
+# Tool.call is deliberately overridden with a bespoke, concretely-typed
+# signature per subclass (see tool.py's docstring and _schema_from_signature,
+# which derives a Tool's JSON schema from that signature via reflection).
+# That's the documented interface, not an LSP violation pyright should flag.
+reportIncompatibleMethodOverride = false

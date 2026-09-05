@@ -249,6 +249,7 @@ def test_approve_run_resumes_and_persists_the_run(tmp_path):
     store = SQLiteRunStore(db_path)
     saved = store.get(run.id)
     store.close()
+    assert saved is not None
     assert saved.status == RunStatus.RUNNING
     assert saved.tool_calls[0].approved is True
 
@@ -265,6 +266,7 @@ def test_deny_run_fails_and_persists_the_run(tmp_path):
     store = SQLiteRunStore(db_path)
     saved = store.get(run.id)
     store.close()
+    assert saved is not None
     assert saved.status == RunStatus.FAILED
     assert saved.tool_calls[0].approved is False
     assert "not authorized" in saved.events[-1].data["error"]
@@ -289,6 +291,7 @@ def test_cancel_run_cancels_and_persists_a_paused_run(tmp_path):
     store = SQLiteRunStore(db_path)
     saved = store.get(run.id)
     store.close()
+    assert saved is not None
     assert saved.status == RunStatus.CANCELLED
 
 

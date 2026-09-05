@@ -9,6 +9,7 @@ Executor/FakeProvider, to catch example rot without spending API credits.
 import asyncio
 import importlib.util
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -20,8 +21,9 @@ from tests.fakes import FakeAsyncProvider, FakeProvider, FakeStreamingProvider
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 
 
-def _load(name: str):
+def _load(name: str) -> Any:
     spec = importlib.util.spec_from_file_location(name, EXAMPLES_DIR / f"{name}.py")
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

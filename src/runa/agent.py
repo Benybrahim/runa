@@ -203,7 +203,7 @@ class Agent:
         name: str | None = None,
         description: str | None = None,
         executor: Executor | None = None,
-    ) -> Tool:
+    ) -> "DelegateTool":
         """Wrap this Agent as a Tool another Agent can call (manifesto §6).
 
         A parent agent delegates by declaring the sub-agent as an ordinary
@@ -221,7 +221,7 @@ class Agent:
         name: str | None = None,
         description: str | None = None,
         executor: AsyncExecutor | None = None,
-    ) -> Tool:
+    ) -> "AsyncDelegateTool":
         """Wrap this Agent as a Tool for a parent run via AsyncExecutor/
         `run_async()`, the async counterpart to `as_tool()`.
 

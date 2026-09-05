@@ -12,6 +12,7 @@ from typing import (
     get_args,
     get_origin,
     get_type_hints,
+    overload,
     runtime_checkable,
 )
 
@@ -187,6 +188,21 @@ class FunctionTool(Tool):
 
     def schema(self) -> dict[str, Any]:
         return self._schema
+
+
+@overload
+def tool(func: Callable) -> FunctionTool: ...
+
+
+@overload
+def tool(
+    func: None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    requires_approval: bool = False,
+    idempotent: bool = False,
+) -> Callable[[Callable], FunctionTool]: ...
 
 
 def tool(

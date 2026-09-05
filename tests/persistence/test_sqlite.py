@@ -21,6 +21,7 @@ def test_save_and_get_round_trips_a_run():
 
     store.save(run)
     loaded = store.get(run.id)
+    assert loaded is not None
 
     assert loaded is not run
     assert loaded.id == run.id
@@ -54,7 +55,9 @@ def test_save_again_overwrites_the_previous_version():
     run.complete(result="done")
     store.save(run)
 
-    assert store.get(run.id).result == "done"
+    reloaded = store.get(run.id)
+    assert reloaded is not None
+    assert reloaded.result == "done"
     assert len(store.list()) == 1
 
 
@@ -69,6 +72,7 @@ def test_survives_reopening_the_same_database_file(tmp_path):
 
     second_connection = SQLiteRunStore(path)
     loaded = second_connection.get(run.id)
+    assert loaded is not None
 
     assert loaded.id == run.id
     assert loaded.status == RunStatus.RUNNING
@@ -89,6 +93,7 @@ def test_round_trips_messages_tool_calls_artifacts_and_events():
 
     store.save(run)
     loaded = store.get(run.id)
+    assert loaded is not None
 
     assert loaded.messages[0].role == Role.ASSISTANT
     assert loaded.messages[0].tool_calls[0].name == "send_refund"
@@ -113,6 +118,7 @@ def test_round_trips_a_messages_usage():
 
     store.save(run)
     loaded = store.get(run.id)
+    assert loaded is not None
 
     assert loaded.messages[0].usage == {"input_tokens": 10, "output_tokens": 3}
 
@@ -125,6 +131,7 @@ def test_round_trips_a_failed_runs_error():
 
     store.save(run)
     loaded = store.get(run.id)
+    assert loaded is not None
 
     assert loaded.error == "boom"
 
@@ -141,6 +148,7 @@ def test_round_trips_a_tool_calls_non_json_safe_result_as_a_string():
 
     store.save(run)
     loaded = store.get(run.id)
+    assert loaded is not None
 
     assert loaded.tool_calls[0].result == str(artifact)
 
@@ -156,6 +164,7 @@ def test_round_trips_state_and_context_with_a_non_json_safe_value():
 
     store.save(run)
     loaded = store.get(run.id)
+    assert loaded is not None
 
     assert loaded.state.findings == str([artifact])
     assert loaded.context.resources == ["a plain string"]
@@ -175,6 +184,7 @@ def test_round_trips_a_non_json_safe_input_and_result_as_strings():
 
     store.save(run)
     loaded = store.get(run.id)
+    assert loaded is not None
 
     assert loaded.input == str(input_artifact)
     assert loaded.result == str(result_artifact)
@@ -186,6 +196,7 @@ def test_round_trips_agent_nameentity_and_version():
 
     store.save(run)
     loaded = store.get(run.id)
+    assert loaded is not None
 
     assert loaded.agent_name == "ResearchAgent"
     assert loaded.agent_version == "1.2.0"
@@ -211,6 +222,7 @@ def test_round_trips_parent_run_id():
     store.save(parent)
     store.save(child)
     loaded = store.get(child.id)
+    assert loaded is not None
 
     assert loaded.parent_run_id == parent.id
 
@@ -298,6 +310,7 @@ def test_a_tool_call_found_via_run_tool_calls_is_the_same_object_in_its_message(
 
     store.save(run)
     loaded = store.get(run.id)
+    assert loaded is not None
 
     pending = loaded.tool_calls[0]
     pending.approved = True

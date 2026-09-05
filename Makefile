@@ -21,7 +21,7 @@ test:
 check:
 	$(MAKE) format
 	$(MAKE) lint
-#	$(MAKE) typecheck
+	$(MAKE) typecheck
 	$(MAKE) test
 
 hello:

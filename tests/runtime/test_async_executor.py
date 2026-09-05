@@ -201,7 +201,7 @@ def test_a_bug_while_seeding_the_run_fails_it_instead_of_stranding_it():
     result = asyncio.run(AsyncExecutor(provider).run(WeatherAgent(), run))
 
     assert result.status == RunStatus.FAILED
-    assert "bug while rendering context" in result.error
+    assert "bug while rendering context" in (result.error or "")
     assert provider.calls == []
 
 
@@ -417,8 +417,8 @@ def test_a_hallucinated_tool_call_fails_the_run_with_a_clear_message():
     run = asyncio.run(AsyncExecutor(provider).run(WeatherAgent(), Run(input="x")))
 
     assert run.status == RunStatus.FAILED
-    assert "unknown tool 'Ghost'" in run.error
-    assert "GetWeather" in run.error
+    assert "unknown tool 'Ghost'" in (run.error or "")
+    assert "GetWeather" in (run.error or "")
 
 
 def test_retry_strategy_retries_a_flaky_tool_before_succeeding():

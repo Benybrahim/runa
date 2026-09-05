@@ -2,9 +2,10 @@
 
 import json
 from collections.abc import AsyncIterator, Iterator
-from typing import Any
+from typing import Any, cast
 
 import openai
+from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolUnionParam
 
 from runa.core import Message, Role, ToolCall
 from runa.runtime.async_provider import AsyncStream
@@ -113,8 +114,10 @@ class OpenAIProvider:
     ) -> Message:
         response = self.client.chat.completions.create(
             model=model or DEFAULT_MODEL,
-            messages=to_wire_messages(messages),
-            tools=to_wire_tools(tools) if tools else openai.NOT_GIVEN,
+            messages=cast(list[ChatCompletionMessageParam], to_wire_messages(messages)),
+            tools=cast(list[ChatCompletionToolUnionParam], to_wire_tools(tools))
+            if tools
+            else openai.omit,
         )
         return from_wire_message(response)
 
@@ -131,8 +134,12 @@ class OpenAIProvider:
         def generate() -> Iterator[StreamChunk]:
             with self.client.chat.completions.stream(
                 model=model or DEFAULT_MODEL,
-                messages=to_wire_messages(messages),
-                tools=to_wire_tools(tools) if tools else openai.NOT_GIVEN,
+                messages=cast(
+                    list[ChatCompletionMessageParam], to_wire_messages(messages)
+                ),
+                tools=cast(list[ChatCompletionToolUnionParam], to_wire_tools(tools))
+                if tools
+                else openai.omit,
             ) as vendor_stream:
                 for event in vendor_stream:
                     if event.type == "content.delta" and event.delta:
@@ -163,8 +170,10 @@ class AsyncOpenAIProvider:
     ) -> Message:
         response = await self.client.chat.completions.create(
             model=model or DEFAULT_MODEL,
-            messages=to_wire_messages(messages),
-            tools=to_wire_tools(tools) if tools else openai.NOT_GIVEN,
+            messages=cast(list[ChatCompletionMessageParam], to_wire_messages(messages)),
+            tools=cast(list[ChatCompletionToolUnionParam], to_wire_tools(tools))
+            if tools
+            else openai.omit,
         )
         return from_wire_message(response)
 
@@ -182,8 +191,12 @@ class AsyncOpenAIProvider:
         async def generate() -> AsyncIterator[StreamChunk]:
             async with self.client.chat.completions.stream(
                 model=model or DEFAULT_MODEL,
-                messages=to_wire_messages(messages),
-                tools=to_wire_tools(tools) if tools else openai.NOT_GIVEN,
+                messages=cast(
+                    list[ChatCompletionMessageParam], to_wire_messages(messages)
+                ),
+                tools=cast(list[ChatCompletionToolUnionParam], to_wire_tools(tools))
+                if tools
+                else openai.omit,
             ) as vendor_stream:
                 async for event in vendor_stream:
                     if event.type == "content.delta" and event.delta:
