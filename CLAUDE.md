@@ -6,14 +6,10 @@ Read [RUNA.md](./RUNA.md) before making architectural or implementation decision
 
 When a decision requires more context:
 
-* [docs/manifesto.md](personal/manifesto.md) explains why Runa takes this approach.
-* [docs/concepts.md](./docs/concepts.md) defines Runa's core vocabulary.
-* [docs/architecture.md](personal/architecture.md) defines the technical architecture, boundaries, and invariants.
+* [docs/concepts.md](./docs/concepts.md) defines Runa's core vocabulary, including the Tool interface Agents use to act on the world.
 * [docs/getting_started.md](./docs/getting_started.md) describes the intended developer experience.
 * [docs/guides.md](./docs/guides.md) contains practical patterns.
 * [docs/cli.md](./docs/cli.md) is the `runa` command-line reference.
-* [docs/tool.md](./docs/tool.md) defines the Tool interface Agents use to act on the world.
-* [BRAND.md](personal/BRAND.md) defines Runa's identity: positioning, voice, terminology, and visual direction. Read it before writing README/docs copy, CLI-facing text, or anything visual.
 
 Do not duplicate the philosophy from these documents here. This file is the operational reference for development.
 
@@ -22,6 +18,7 @@ Do not duplicate the philosophy from these documents here. This file is the oper
 * `make install`: uv sync
 * `make format`: ruff format
 * `make lint` / `make lint-fix`: ruff check
+* `make typecheck`: pyright (not yet wired into `make check`)
 * `make test`: pytest
 * `make check`: format + lint + test
 * `make hello`: run `examples/hello.py`
