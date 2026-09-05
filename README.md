@@ -10,7 +10,7 @@ Understanding the ARE pattern is key to understanding Runa. ARE divides your
 agent application into three layers: Agent, Execution, and Run, each with a
 specific responsibility.
 
-In Runa, _**The Run**_ is the central unit of work.
+In Runa, the _**Run**_ is the central unit of work.
 
 ## Agent layer
 
@@ -25,7 +25,7 @@ The _**Execution layer**_ is responsible for progressing an agent's work. It
 calls models, invokes tools, applies policies, and determines what happens
 next according to the Agent's declared behavior. In Runa, Execution is
 handled by the [`Executor`](docs/concepts.md#execution)
-driving a [`Strategy`](docs/concepts.md#strategy).
+driving by a [`Strategy`](docs/concepts.md#strategy).
 
 ## Run layer
 
@@ -51,13 +51,13 @@ In addition to that, Runa also comes with:
    with [uv](https://docs.astral.sh/uv/):
 
     ```bash
-    $ uv add git+https://github.com/Benybrahim/runa
+    uv add git+https://github.com/Benybrahim/runa
     ```
 
 2. At the command prompt, create a new Runa application:
 
     ```bash
-    $ runa new myapp
+    runa new myapp
     ```
 
    where "myapp" is the application name.
@@ -66,8 +66,8 @@ In addition to that, Runa also comes with:
 3. Change directory to `myapp`, define an Agent:
 
     ```bash
-    $ cd myapp
-    $ runa generate agent MyAgent
+    cd myapp
+    runa generate agent MyAgent
     ```
    Run with `--help` or `-h` for options.
 
@@ -75,7 +75,7 @@ In addition to that, Runa also comes with:
 4. Run the agent:
 
     ```bash
-    $ runa run MyAgent "..."
+    runa run MyAgent "..."
     ```
 
 5. Follow the guides to start developing your application. You may find
