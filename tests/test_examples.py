@@ -149,7 +149,10 @@ def test_approval_example():
     assert run.result == "Refunded order A123."
 
 
-def test_eval_example():
+def test_eval_example(monkeypatch):
+    # module-level `OpenAIProvider()` construction requires a key to be
+    # present at import time, even though it's swapped for a fake below.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     eval_example = _load("eval")
     fake = FakeProvider(
         [
@@ -177,7 +180,10 @@ def test_eval_example():
     ]
 
 
-def test_plan_and_review_example():
+def test_plan_and_review_example(monkeypatch):
+    # module-level `OpenAIProvider()` construction requires a key to be
+    # present at import time, even though it's swapped for a fake below.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     plan_and_review = _load("plan_and_review")
     fake = FakeProvider(
         [
