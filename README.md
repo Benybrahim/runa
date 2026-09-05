@@ -47,13 +47,11 @@ In addition to that, Runa also comes with:
 
 ## Getting Started
 
-1. Runa hasn't made a tagged release yet. Install from source at the command
-   prompt with [uv](https://docs.astral.sh/uv/):
+1. Runa hasn't made a tagged release yet. Install it straight from the repo
+   with [uv](https://docs.astral.sh/uv/):
 
     ```bash
-    $ git clone https://github.com/Benybrahim/runa
-    $ cd runa
-    $ make install
+    $ uv add git+https://github.com/Benybrahim/runa
     ```
 
 2. At the command prompt, create a new Runa application:

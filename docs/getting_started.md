@@ -91,10 +91,11 @@ Tool, and one Run, which is exactly what the next few sections build.
 
 ### 3.1 Installing Runa
 
-Runa is managed with `uv`. Install it as a project dependency:
+Runa is managed with `uv`. It hasn't made a tagged release yet, so install
+it straight from the repo:
 
 ```bash
-uv add runa
+uv add git+https://github.com/Benybrahim/runa
 ```
 
 Confirm the CLI is available:
