@@ -123,9 +123,13 @@ make check       # format + lint + test
 make hello       # run examples/hello.py
 ```
 
-## Contributing
+## Feedback
 
-Runa is open source, but its core is intentionally opinionated. Read [`RUNA.md`](RUNA.md) before proposing architectural or API changes, then see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the practical workflow, [`GOVERNANCE.md`](GOVERNANCE.md) for how decisions get made, and [`SECURITY.md`](SECURITY.md) to report a vulnerability. Writing or design work should follow [`BRAND.md`](BRAND.md).
+Runa is open source but not open to code contributions — it's maintained as
+a single coherent point of view rather than a collection of independently
+accepted patches. Bug reports and design feedback are genuinely welcome via
+[issues](../../issues); see [`CONTRIBUTING.md`](CONTRIBUTING.md) for how,
+and [`SECURITY.md`](SECURITY.md) to report a vulnerability privately.
 
 ## License
 

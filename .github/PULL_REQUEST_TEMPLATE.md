@@ -1,15 +1,5 @@
-## What
+Runa doesn't accept code contributions — see [`CONTRIBUTING.md`](../CONTRIBUTING.md).
+This PR will be closed unmerged.
 
-<!-- What does this change do? -->
-
-## Why
-
-<!-- Why is this change needed? Link an issue if there is one. -->
-
-## Checklist
-
-- [ ] `make check` passes locally (format + lint + test)
-- [ ] Tests added or updated for behavior changes
-- [ ] Docs updated if this changes a public API or convention
-- [ ] For architectural changes: discussed in an issue first, and consistent
-      with [`RUNA.md`](../RUNA.md)
+If you found a bug or have feedback on the design, please open an issue
+instead — that's genuinely welcome.

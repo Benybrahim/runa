@@ -1,4 +1,3 @@
-Runa_ Architecture Roadmap from MVP to Public Launch.md
 .idea/
 
 # Byte-compiled / optimized / DLL files
@@ -219,3 +218,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+road.md
+recommendation.md
+rails-to-runa.md
