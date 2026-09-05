@@ -27,9 +27,8 @@ in the environment for whichever provider you use.
 `run_store=SQLiteRunStore("runa.db")` makes `runa runs show`/`list` work
 right away: `runa.configure()`'s own default RunStore is in-memory and
 would silently lose every Run the moment this process exits, which the
-generated project shouldn't ask a new developer to discover on their own
-(rails-to-runa.md: "Rails made persistence feel like a native part of
-application programming"). Swap it for another RunStore, or drop it back
+generated project shouldn't ask a new developer to discover on their own. 
+Swap it for another RunStore, or drop it back
 to the library default, as this app's needs change.
 """
 

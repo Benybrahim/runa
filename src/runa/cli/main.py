@@ -1,12 +1,12 @@
 """cli/main.py: the `runa` command-line entry point.
 
 `new` and `generate` are scaffolding (manifesto §2, §9): they write files
-following the app/ convention and never touch the runtime. `eval`, `test`,
-and `runs` do touch it, but only by calling existing library functions
-(`run_project_evals()`, `run_project_tests()`, `timeline()`,
-`approval.approve()`/`deny()`, `Run.cancel()`) against the app in `cwd`; no
-logic lives here that doesn't already exist elsewhere (manifesto §11, §12,
-§14).
+following the app/ convention and never touch the runtime. `run`, `eval`,
+`test`, and `runs` do touch it, but only by calling existing library
+functions (`Agent.run()`, `run_project_evals()`, `run_project_tests()`,
+`timeline()`, `approval.approve()`/`deny()`, `Run.cancel()`) against the
+app in `cwd`; no logic lives here that doesn't already exist elsewhere
+(manifesto §11, §12, §14).
 """
 
 import argparse
@@ -26,6 +26,7 @@ from runa.cli.generate import (
     generate_tool,
 )
 from runa.cli.new import ProjectAlreadyExists, scaffold_project
+from runa.cli.run import AgentNotFound, run_agent
 from runa.cli.runs import (
     RunNotFound,
     approve_run,
@@ -67,6 +68,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "evaluation", help="Generate a new app/evaluations/ case module"
     )
     generate_evaluation_parser.add_argument("name")
+
+    run_parser = subparsers.add_parser("run", help="Run an Agent against an input")
+    run_parser.add_argument("name", help="e.g. Support, or SupportAgent")
+    run_parser.add_argument("input")
 
     subparsers.add_parser("eval", help="Run this app's app/evaluations/ cases")
     subparsers.add_parser("test", help="Run this app's app/tests/ test functions")
@@ -142,6 +147,7 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
         IllegalTransition,
         ProjectAlreadyExists,
         AgentAlreadyExists,
+        AgentNotFound,
         ToolAlreadyExists,
         EvaluationAlreadyExists,
         NotARunaProject,
@@ -166,7 +172,7 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
             f"  cd {project_dir.name}\n"
             "  export OPENAI_API_KEY=...   # or switch main.py to AnthropicProvider\n"
             "  runa generate agent MyAgent\n"
-            "  python main.py"
+            "  runa run MyAgent '...'"
         )
         return 0
 
@@ -175,8 +181,10 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
         print(f"created {agent_file}")
         class_name = args.name if args.name.endswith("Agent") else f"{args.name}Agent"
         print(
-            "\nnext: declare its tools and instructions, then run it from "
-            "main.py, e.g.\n"
+            "\nnext: declare its tools and instructions, then run it, "
+            "either from the CLI:\n"
+            f"  runa run {args.name} '...'\n"
+            "or from main.py:\n"
             f"  from app.agents.{agent_file.stem} import {class_name}\n"
             f"  run = {class_name}.run(...)"
         )
@@ -201,6 +209,10 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
             "EvalCase(...) entries, then\n"
             "  runa eval"
         )
+        return 0
+
+    if args.command == "run":
+        print(run_agent(args.name, args.input, root=cwd))
         return 0
 
     if args.command == "eval":

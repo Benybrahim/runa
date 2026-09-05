@@ -61,6 +61,35 @@ def test_eval_reports_pass_fail_and_exit_code(tmp_path, capsys):
     assert "1/1 passed" in output
 
 
+def test_run_invokes_an_agent_and_prints_its_result(tmp_path, capsys):
+    project_dir = tmp_path / "acme"
+    main(["new", "acme"], cwd=tmp_path)
+    db_path = str(tmp_path / "runa.db")
+    (project_dir / "main.py").write_text(
+        "from runa import configure\n"
+        "from runa.persistence import SQLiteRunStore\n"
+        "from tests.fakes import FakeProvider\n"
+        "from runa.core import Message, Role\n\n"
+        "configure(\n"
+        "    provider=FakeProvider(responses=["
+        'Message(role=Role.ASSISTANT, content="hi there")]),\n'
+        f"    run_store=SQLiteRunStore({db_path!r}),\n"
+        ")\n"
+    )
+    (project_dir / "app" / "agents" / "echo_agent.py").write_text(
+        "from runa import Agent\n\n\n"
+        "class EchoAgent(Agent):\n"
+        '    instructions = "Echo pleasantly."\n'
+    )
+
+    exit_code = main(["run", "Echo", "hello"], cwd=project_dir)
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "COMPLETED" in output.upper()
+    assert "hi there" in output
+
+
 def test_test_reports_pass_fail_and_exit_code(tmp_path, capsys):
     project_dir = tmp_path / "acme"
     main(["new", "acme"], cwd=tmp_path)

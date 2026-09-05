@@ -6,11 +6,13 @@ Read [RUNA.md](./RUNA.md) before making architectural or implementation decision
 
 When a decision requires more context:
 
-* [docs/manifesto.md](./docs/manifesto.md) explains why Runa takes this approach.
+* [docs/manifesto.md](personal/manifesto.md) explains why Runa takes this approach.
 * [docs/concepts.md](./docs/concepts.md) defines Runa's core vocabulary.
-* [docs/architecture.md](./docs/architecture.md) defines the technical architecture, boundaries, and invariants.
+* [docs/architecture.md](personal/architecture.md) defines the technical architecture, boundaries, and invariants.
 * [docs/getting_started.md](./docs/getting_started.md) describes the intended developer experience.
 * [docs/guides.md](./docs/guides.md) contains practical patterns.
+* [docs/cli.md](./docs/cli.md) is the `runa` command-line reference.
+* [docs/tool.md](./docs/tool.md) defines the Tool interface Agents use to act on the world.
 * [BRAND.md](personal/BRAND.md) defines Runa's identity: positioning, voice, terminology, and visual direction. Read it before writing README/docs copy, CLI-facing text, or anything visual.
 
 Do not duplicate the philosophy from these documents here. This file is the operational reference for development.
@@ -30,7 +32,7 @@ Do not duplicate the philosophy from these documents here. This file is the oper
 * Read the relevant Runa documentation before changing architecture or introducing a new abstraction.
 * Prefer the smallest design that satisfies the existing application need.
 * Keep the common path simple; advanced behavior should be opt-in.
-* Preserve Runa's core model: **Agents define behavior; Runs define execution.**
+* Preserve Runa's core model, the Agent-Run-Execution (ARE) pattern: **Agents declare behavior; Execution progresses it; Runs persist it.**
 * Keep provider, persistence, background, observability, and evaluation infrastructure outside the core primitives.
 * Do not introduce graphs, orchestration abstractions, or agent-specific machinery unless ordinary application code cannot express the problem clearly.
 * Prefer Agent behavior and lifecycle hooks before introducing a custom `Strategy`.
@@ -58,7 +60,7 @@ Before introducing a new core abstraction, ask:
 
 1. Is this a recurring application problem?
 2. Does an existing Runa concept already express it?
-3. Does it belong naturally to an Agent, Run, Context, State, or Capability?
+3. Does it belong naturally to an Agent, Execution, Run, Context, State, or Capability?
 4. Does it simplify the common case?
 5. Does it preserve the architectural boundaries?
 6. Does it preserve an escape hatch?

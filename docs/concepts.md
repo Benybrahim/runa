@@ -2,10 +2,13 @@
 
 Runa keeps the developer-facing conceptual model deliberately small.
 
+Runa follows the Agent-Run-Execution (ARE) pattern: Agent declares behavior, Execution progresses it, and Run persists what happened.
+
 The core concepts are:
 
 ```text
 Agent
+Execution
 Run
 Context
 State
@@ -22,6 +25,35 @@ Result
 ```
 
 A Conversation carries state across Runs.
+
+---
+
+# The Agent-Run-Execution (ARE) Pattern
+
+ARE is the pattern Runa is built around. It divides an agent application
+into three layers, each with a specific responsibility:
+
+```text
+Agent
+  ↓ declares behavior
+Execution
+  ↓ progresses it
+Run
+  ↓ persists it
+```
+
+## Why ARE
+
+Agent applications combine ordinary application code with probabilistic
+decision-making, external capabilities, durable execution, and real-world
+consequences. Separating what an agent does (Agent) from how it gets done
+right now (Execution) from what happened (Run) keeps that complexity
+tractable: persistence, background execution, approval, observability, and
+evaluation can all be built around the Run without reaching into how an
+Agent is defined or how Execution is implemented.
+
+One Agent can produce many Runs. Changing an Agent's definition does not
+retroactively change historical Runs.
 
 ---
 
@@ -49,13 +81,27 @@ It is not an execution.
 
 ---
 
-# Run
+# Execution
 
-A Run is one execution of an Agent.
+Execution is what progresses an Agent's behavior: calling the model, invoking tools, applying policy, and deciding what happens next.
 
 ```python
 run = ResearchAgent.run("Research fusion energy.")
 ```
+
+Calling `Agent.run()` is what starts Execution. In Runa's implementation, Execution is the `Executor`/`AsyncExecutor` driving a `Strategy`; most applications never touch either directly.
+
+Execution answers:
+
+> **What is happening right now, and what happens next?**
+
+Execution is a process, not a record. It reads an Agent's declaration and a Run's accumulated state, and it writes new state, events, and actions back onto that Run as it goes.
+
+---
+
+# Run
+
+A Run is the persisted record of one Agent invocation: what Execution has done so far, and what it produced.
 
 The Run answers:
 
@@ -78,22 +124,25 @@ Run
 └── Status
 ```
 
-The Run is the execution boundary for the framework.
+The Run is where Execution's progress is persisted, which makes it the common boundary for the rest of the framework.
 
 Persistence, background execution, observability, approval, retry behavior, and evaluation operate around the Run.
 
 ---
 
-# Agent vs Run
+# Agent, Execution, and Run
 
 This distinction is fundamental.
 
 ```text
 ResearchAgent
-    = behavior definition
+    = behavior declaration
+
+Execution
+    = the process advancing Run #482 right now
 
 Run #482
-    = one execution of that behavior
+    = the persisted record of that invocation
 ```
 
 One Agent can produce many Runs:
@@ -442,7 +491,8 @@ The Run remains the fundamental execution boundary.
 A Conversation is meant to be held across separate Runs, but not across
 *concurrent* ones: two Runs racing against the same Conversation are not
 merged: whichever finishes last silently overwrites the other's turn. See
-architecture.md's Conversation section for what guarantee actually holds.
+[Sharing State Across Runs](guides.md#sharing-state-across-runs) for the
+pattern this implies for concurrent work.
 
 ---
 
@@ -500,6 +550,114 @@ The programming model does not change.
 
 ---
 
+# Persistence
+
+Persistence makes a Run or a Conversation outlive the process that created it.
+
+```text
+Run / Conversation
+      ↓
+    Store
+      ↓
+ later process
+```
+
+A store should be swappable without changing application code:
+`InMemoryRunStore`/`SQLiteRunStore` satisfy the same `RunStore` protocol,
+and `InMemoryConversationStore`/`SQLiteConversationStore` do the same for
+`ConversationStore`.
+
+Persistence should not become a second source of execution truth. What a
+store holds is a snapshot of the Run or Conversation, not a parallel record
+of what happened.
+
+See [Running in the Background](guides.md#running-in-the-background) and
+[Persisting a Conversation](guides.md#persisting-a-conversation) for the
+patterns.
+
+---
+
+# Background Execution
+
+Background execution does not introduce a second kind of work.
+
+```python
+ResearchAgent.run(...)
+ResearchAgent.run_later(...)
+```
+
+Both produce the same conceptual Run. The difference is when and where it
+advances: `run()` progresses it immediately; `run_later()` hands it to a
+Queue instead.
+
+A Queue is infrastructure for scheduling execution. The Run remains the
+unit of work, whether it's driven inline or picked up by a worker later.
+
+See [Running in the Background](guides.md#running-in-the-background) for
+the pattern, including crash recovery.
+
+---
+
+# Observability
+
+Observability is derived from a Run's event history, not maintained as a
+parallel record.
+
+```text
+Execution → Events → Timeline / Notifications / Inspection
+```
+
+The question observability answers is the same one the Event section above
+asks:
+
+> **What happened?**
+
+A subscriber watching a Run live should not be able to affect its
+execution: an observer that raises should degrade to a missed
+notification, not a failed or crashed Run.
+
+See [Inspecting Runs](guides.md#inspecting-runs) for the pattern.
+
+---
+
+# Evaluation
+
+Evaluation measures probabilistic Agent behavior; tests verify
+deterministic invariants.
+
+```text
+Production Agent
+      ↓
+     Run
+      ├── inspect  (tests)
+      └── evaluate (evaluations)
+```
+
+Both operate on the same Agent and Run semantics used in production.
+There is no separate execution path built solely for evaluation.
+
+See [Evaluating Behavior](guides.md#evaluating-behavior) for the pattern.
+
+---
+
+# Approval
+
+Approval is a Run lifecycle transition, not a separate workflow model:
+
+```text
+Running → AwaitingApproval → Approved → Running
+                            → Denied   → Failed / Cancelled
+```
+
+Approval always defers to a human. [Policy](#policy-and-authority) is the
+earlier, programmatic check for rules the application can decide on its
+own; a Policy denial fails the Run before it ever reaches approval.
+
+See [Adding Human Approval](guides.md#adding-human-approval) for the
+pattern.
+
+---
+
 # The Whole Model
 
 The Runa mental model can be summarized as:
@@ -513,16 +671,16 @@ Application
           ▼
         Agent
           │
-          │ defines behavior
+          │ declares behavior
           ▼
-         Run
+      Execution
           │
      ┌────┼────┐
      │    │    │
  Context State Capabilities
           │
           ▼
-       Execution
+         Run
           │
      ┌────┼────┐
      │    │    │
@@ -534,4 +692,4 @@ Application
 
 The framework's center remains simple:
 
-> **Agents define behavior. Runs define execution.**
+> **Agents declare behavior. Execution progresses it. Runs persist it.**

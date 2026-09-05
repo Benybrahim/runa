@@ -1,6 +1,6 @@
 # The RUNA Doctrine
 
-RUNA is an opinionated, integrated framework for building agent applications around the Run: the first-class unit of execution.
+RUNA is an opinionated, integrated framework for building agent applications according to the Agent-Run-Execution (ARE) pattern: Agents declare behavior, Execution progresses it, and Runs persist what happened.
 
 RUNA is inspired by the philosophy that made Rails effective: conventions over configuration, integrated systems over assembled stacks, strong defaults, beautiful code, and developer happiness.
 
@@ -36,13 +36,17 @@ Explicit configuration should be reserved for decisions that are genuinely appli
 
 ---
 
-## 3. The Run Is the Unit of Execution
+## 3. Agent, Execution, and Run
 
-An Agent defines behavior.
+RUNA divides an agent application into three layers, each with a specific responsibility: Agent, Execution, and Run.
 
-A Run represents one execution of that behavior.
+An Agent declares behavior.
 
-The Run is the common boundary for lifecycle, state, events, actions, artifacts, persistence, background execution, approval, and evaluation.
+Execution progresses that behavior: calling the model, invoking tools, applying policy, and deciding what happens next.
+
+A Run persists what happened: identity, lifecycle, state, events, actions, artifacts, and result.
+
+The Run is the common boundary for persistence, background execution, approval, and evaluation, because it is where Execution's progress is recorded.
 
 A Run may be short or long, synchronous or asynchronous, complete or paused.
 
@@ -58,7 +62,7 @@ Developers should not need to construct graphs to express simple agent behavior.
 
 Graphs and workflows are useful when relationships or execution structure are the problem being modeled. They are not the default programming model.
 
-**Agents define behavior. Runs define execution.**
+**Agents declare behavior. Execution progresses it. Runs persist it.**
 
 ---
 
@@ -153,7 +157,7 @@ Before adding a feature to the core framework, ask:
 - Does it make the common case simpler?
 - Does it follow an existing convention?
 - Does it make agent behavior easier to understand?
-- Does it belong naturally to a Run?
+- Does it belong naturally to an Agent, Execution, or Run?
 - Does it make capabilities and authority clearer?
 - Does it improve observability or evaluation?
 - Can Runa provide a strong default?
@@ -165,4 +169,4 @@ If not, it may not belong in the core.
 
 # In One Sentence
 
-> **RUNA is an opinionated, integrated framework for building agent applications around the Run: the first-class unit of execution.**
+> **RUNA is an opinionated, integrated framework for building agent applications according to the Agent-Run-Execution (ARE) pattern: Agents declare behavior, Execution progresses it, and Runs persist what happened.**

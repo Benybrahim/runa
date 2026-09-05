@@ -4,7 +4,7 @@ Reads structure, not configuration: a new agent goes to `app/agents/`
 because that's the convention `runa new` established, not because
 anything was configured to say so (manifesto §2). `tool` and `evaluation`
 follow the same pattern into `app/tools/`/`app/evaluations/`, the two
-generators rails-to-runa.md names as "natural next generators in the same
+generators "natural next generators in the same
 spirit" alongside `agent`.
 
 Every template here is self-contained and immediately importable:

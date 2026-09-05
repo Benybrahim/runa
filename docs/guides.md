@@ -151,6 +151,44 @@ raw history isn't acceptable.
 
 ---
 
+# Persisting a Conversation
+
+A Conversation lives in memory by default, the same as a Run. Save it
+explicitly when it needs to survive a process restart:
+
+```python
+from runa.persistence import SQLiteConversationStore
+
+conversation_store = SQLiteConversationStore("conversations.db")
+conversation = Conversation()
+
+SupportAgent.run("My invoice is wrong.", conversation=conversation)
+conversation_store.save(conversation)
+```
+
+Look it up again, in a later process, by the id you saved:
+
+```python
+conversation = conversation_store.get(conversation_id)  # conversation.id, saved earlier
+
+SupportAgent.run(
+    "Can you explain the correction?",
+    conversation=conversation,
+)
+conversation_store.save(conversation)
+```
+
+Unlike `run_later()` and `application.run_store`, nothing saves a
+Conversation automatically: `ConversationStore` isn't wired into
+`configure()`. Save it yourself after each turn you want to survive a
+restart.
+
+`RunStore` (`SQLiteRunStore`) is the equivalent for a Run; see "Running in
+the Background" and "Inspecting Runs" below for when Runa saves one for
+you and when you need to save it yourself.
+
+---
+
 # Running in the Background
 
 Use `run_later()` when work should not execute as part of the immediate call:
