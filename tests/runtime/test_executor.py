@@ -157,7 +157,7 @@ def test_populated_context_is_seeded_as_a_system_message():
 
     result = executor.run(agent, run)
 
-    # instructions, then context, as separate system messages — both reach
+    # instructions, then context, as separate system messages; both reach
     # the model (the fake provider just records whatever it was given)
     system_messages = [m.content for m in result.messages if m.role == Role.SYSTEM]
     assert system_messages[0] == "Answer weather questions."
@@ -172,7 +172,7 @@ def test_empty_context_adds_no_extra_message():
 
     result = executor.run(agent, run)
 
-    # exactly one SYSTEM message (instructions) — no second one for context
+    # exactly one SYSTEM message (instructions), no second one for context
     system_messages = [m for m in result.messages if m.role == Role.SYSTEM]
     assert len(system_messages) == 1
     assert system_messages[0].content == "Answer weather questions."
@@ -227,7 +227,7 @@ def test_tool_exception_fails_the_run():
 
 def test_a_hallucinated_tool_call_fails_the_run_with_a_clear_message():
     """A model calling a tool name not declared on the Agent used to fail the
-    Run with just `str(KeyError("Ghost"))` — `"'Ghost'"`, with no indication
+    Run with just `str(KeyError("Ghost"))`, `"'Ghost'"`, with no indication
     it was even about a tool call. This should name the problem and list
     what *is* declared, so `run.error`/`runa runs show` are actually useful.
     """
@@ -470,7 +470,7 @@ def test_cancel_requested_mid_loop_stops_the_run_at_the_next_checkpoint():
     assert result.status == RunStatus.CANCELLED
     assert result.events[-1].type == EventType.RUN_CANCELLED
     # the step that requested cancellation still ran its own action to
-    # completion — cancellation is honored at the *next* checkpoint, not
+    # completion; cancellation is honored at the *next* checkpoint, not
     # mid-action
     assert len(provider.calls) == 2
     assert strategy.calls == 2
@@ -501,7 +501,7 @@ def test_agent_hooks_are_called_around_execution():
 def test_a_bug_in_before_run_fails_the_run_instead_of_crashing_and_stranding_it():
     # Before this, an exception here propagated straight out of
     # Executor.run() *and* left the Run stuck at RUNNING forever (run.start()
-    # already ran) — an ambiguous non-terminal state indistinguishable from a
+    # already ran), an ambiguous non-terminal state indistinguishable from a
     # Run still genuinely in progress.
     class BuggyAgent(Agent):
         def before_run(self, run):
@@ -518,7 +518,7 @@ def test_a_bug_in_before_run_fails_the_run_instead_of_crashing_and_stranding_it(
 
 
 def test_a_bug_while_seeding_the_run_fails_it_instead_of_stranding_it():
-    # Before this, seed_run() ran *before* run.start() — an exception there
+    # Before this, seed_run() ran *before* run.start(); an exception there
     # left the Run stuck at QUEUED forever (run.fail() from QUEUED is an
     # IllegalTransition) and propagated straight out of Executor.run()
     # uncaught. That's especially bad for run_later() on a background
@@ -556,7 +556,7 @@ def test_a_bug_in_after_run_does_not_crash_or_falsify_an_already_completed_run(
 ):
     # The Run already reached its real terminal status by the time
     # after_run runs, so a bug there must not be turned into a Run failure
-    # (that would misreport a Run that actually completed) — it's surfaced
+    # (that would misreport a Run that actually completed); it's surfaced
     # as a warning instead.
     class BuggyAgent(Agent):
         def after_run(self, run):

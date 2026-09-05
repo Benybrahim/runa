@@ -62,7 +62,7 @@ def test_run_later_with_thread_queue_completes_once_the_queue_drains():
 
 def test_a_bug_before_the_step_loop_fails_the_run_instead_of_vanishing_on_the_worker():
     # A ThreadPoolExecutor swallows any exception a submitted job raises
-    # unless something calls future.result() — nobody does here, since
+    # unless something calls future.result(); nobody does here, since
     # run_later() is fire-and-forget by design. So an exception that
     # Executor.run() doesn't already convert into run.fail() would
     # otherwise disappear completely: no Run failure, no raised exception,

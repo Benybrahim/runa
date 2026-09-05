@@ -6,7 +6,7 @@ asks the model for a short plan before the tool-use loop starts, records it
 as a PlanArtifact, and feeds it back into the conversation as a system
 message so later steps see it. `review()` asks the model to check the
 draft answer against that plan and returns a (possibly revised) final
-answer — the Executor uses whatever `review()` returns in place of the
+answer; the Executor uses whatever `review()` returns in place of the
 Strategy's draft result, instead of discarding it.
 
 Neither hook needs a new integration: both call the same Provider the Run

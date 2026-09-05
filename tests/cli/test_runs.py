@@ -77,7 +77,7 @@ def test_show_run_raises_for_an_unknown_id(tmp_path):
 
 def test_show_run_does_not_discover_a_run_that_executed_but_was_never_saved(tmp_path):
     """A Run that ran in-process (`timeline(run)` works on it immediately) is
-    not automatically visible to the CLI — only Runs actually persisted to
+    not automatically visible to the CLI: only Runs actually persisted to
     the configured RunStore are. Distinct from an unknown/made-up id: this
     Run is real and has a full event history, just never `store.save()`d."""
     project_dir, _ = _scaffold_with_store(tmp_path)
@@ -210,7 +210,7 @@ def test_list_pending_runs_is_empty_with_no_awaiting_runs(tmp_path):
 def test_list_pending_runs_reports_the_gated_call_not_an_earlier_completed_one(
     tmp_path,
 ):
-    """An earlier, ordinary tool call also has `approved is None` — the
+    """An earlier, ordinary tool call also has `approved is None`; the
     pending-call lookup must not mistake it for the one actually gating
     approval (see `_pending_tool_call`)."""
     project_dir, db_path = _scaffold_with_store(tmp_path)

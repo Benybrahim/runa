@@ -1,14 +1,14 @@
 """judge.py: semantic evaluation via LLM-as-judge (manifesto §12).
 
 `Expectation`'s structural checks in `harness.py` (`to_be_completed`,
-`to_have_called`, `to_contain`, ...) verify facts about a Run's shape —
+`to_have_called`, `to_contain`, ...) verify facts about a Run's shape:
 "tests verify invariants." A `Judge` verifies something a structural check
 can't: whether the agent's answer was actually helpful, factual, or free of
-invented claims — "evaluations measure behavior."
+invented claims: "evaluations measure behavior."
 
 A Judge grades a Run by sending its transcript through the same `Provider`
 contract the Run itself executed with, rather than a separate model client
-(manifesto §17) — no new integration to configure, and whatever Provider an
+(manifesto §17): no new integration to configure, and whatever Provider an
 app already set up via `runa.configure()` works here too.
 """
 
@@ -29,7 +29,7 @@ RUBRIC_FACTUAL = (
 RUBRIC_NOT_HALLUCINATE = (
     "The assistant's final response does not assert anything as fact that "
     "is unsupported by the transcript's tool results or by general "
-    "knowledge — it does not invent details, sources, or outcomes."
+    "knowledge; it does not invent details, sources, or outcomes."
 )
 RUBRIC_GOAL = (
     "The run actually accomplishes what the input asked for: any tool "
@@ -89,7 +89,7 @@ class Judge:
 
     Reuses the `Provider` contract (`complete(messages=..., tools=...,
     model=...)`) that drives Agent execution, so any Provider Runa already
-    knows how to talk to — Anthropic, OpenAI, a scripted test fake — works as
+    knows how to talk to (Anthropic, OpenAI, a scripted test fake) works as
     a judge with no separate client. Always calls with `tools=[]`: a Judge
     never calls tools of its own, it only reasons over the transcript it's
     handed.

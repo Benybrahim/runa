@@ -51,7 +51,7 @@ def last_assistant_message(run: Run) -> Message | None:
     Not necessarily `run.messages[-1]`: once any of a turn's tool_calls have
     been executed, their TOOL-role result messages get appended after it. A
     turn with more than one tool_call needs this to keep finding the turn's
-    still-pending calls after the first result comes back — using
+    still-pending calls after the first result comes back: using
     `run.messages[-1]` directly would see a TOOL message where an ASSISTANT
     one was expected and wrongly conclude the turn has no pending work left,
     calling the model again mid-turn and silently abandoning the rest of the
@@ -66,7 +66,7 @@ class DefaultStrategy:
 
     Call the model, run any tool calls it asks for, feed results back, and
     repeat until the model answers without asking for more tools. Fails the
-    run immediately if a tool call errors — no retry policy of its own; see
+    run immediately if a tool call errors, no retry policy of its own; see
     `RetryStrategy` for one.
     """
 

@@ -164,7 +164,7 @@ def test_eval_example():
     )
     executor = Executor(provider=fake)
     agent = eval_example.WeatherAgent()
-    # the module's `judge` is bound to a real OpenAIProvider at import time —
+    # the module's `judge` is bound to a real OpenAIProvider at import time;
     # swap it for a fake so the "is a helpful answer" case stays offline too.
     eval_example.judge = Judge(
         FakeProvider([Message(role=Role.ASSISTANT, content="PASS")])

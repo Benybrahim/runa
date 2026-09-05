@@ -28,7 +28,7 @@ def test_scaffold_project_writes_a_main_py_that_calls_configure(tmp_path):
 
 def test_scaffold_project_wires_up_a_durable_run_store(tmp_path):
     """`runa runs show`/`list` must work on a fresh project with no extra
-    configuration — the library's own `configure()` default RunStore is
+    configuration: the library's own `configure()` default RunStore is
     in-memory, so the generated main.py has to opt into SQLiteRunStore
     itself, and the db file it writes belongs in .gitignore, not a commit."""
     project_dir = scaffold_project("acme", root=tmp_path)

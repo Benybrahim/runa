@@ -5,11 +5,11 @@ and a vendor's wire format. The runtime depends only on this protocol, never
 on a specific vendor.
 
 `StreamingProvider` is a separate, optional protocol, not a second method
-tacked onto `Provider` — a Provider that only implements `complete()` still
+tacked onto `Provider`: a Provider that only implements `complete()` still
 satisfies `Provider` on its own (every existing `FakeProvider` in tests
 included); one that also implements `stream()` additionally satisfies
 `StreamingProvider`, structurally, with no base class to opt into.
-`Executor.run(..., on_chunk=...)` is what actually calls `stream()` — see
+`Executor.run(..., on_chunk=...)` is what actually calls `stream()`. See
 `runtime/executor.py`.
 """
 
@@ -35,29 +35,29 @@ class Provider(Protocol):
 class RetryingProvider:
     """Wraps a Provider, retrying `complete()` on failure before giving up.
 
-    Without this, any transient failure from the model API itself — a rate
-    limit, a timeout, a dropped connection — fails the whole Run on the
+    Without this, any transient failure from the model API itself (a rate
+    limit, a timeout, a dropped connection) fails the whole Run on the
     first hit: `RetryStrategy` (`runtime/retry.py`) only retries *tool*
     calls, since a tool call can have a real side effect a blind retry
-    might repeat. A model call has no such hazard here — `Executor.
+    might repeat. A model call has no such hazard here: `Executor.
     _call_model` only calls `run.add_message()` with the result *after*
     `complete()` returns, so a failed attempt has written nothing to the
     Run; retrying just repeats the same read-only request.
 
     Retries every exception by default, up to `max_retries` times, with
-    delays that double each attempt starting at `backoff` seconds — the
+    delays that double each attempt starting at `backoff` seconds, the
     same blunt, type-agnostic policy `RetryStrategy` already uses for tool
     calls (no attempt to special-case "transient" vs "permanent" here
     either). Pass `is_retryable` to narrow that down for a specific
     Provider's own exception types (e.g. only `anthropic.RateLimitError`
-    and `anthropic.APIConnectionError`) — those types are vendor-specific
+    and `anthropic.APIConnectionError`); those types are vendor-specific
     and belong at the call site, not in this generic wrapper
     (architecture.md §5: "Provider-specific concepts must remain inside
     provider adapters").
 
     Satisfies `Provider` structurally, so it drops in anywhere a Provider
     is expected: `Executor(provider=RetryingProvider(AnthropicProvider()))`.
-    Wraps `complete()` only — a Provider that also implements `stream()`
+    Wraps `complete()` only: a Provider that also implements `stream()`
     stops satisfying `StreamingProvider` once wrapped, since a partially
     delivered stream can't be safely retried from the start once some
     chunks have already reached `on_chunk`.
@@ -91,7 +91,7 @@ class RetryingProvider:
 
 @dataclass
 class StreamChunk:
-    """One incremental piece of a streamed model response — a text delta."""
+    """One incremental piece of a streamed model response: a text delta."""
 
     delta: str
 
@@ -100,7 +100,7 @@ class Stream:
     """What `StreamingProvider.stream()` returns.
 
     Iterate for `StreamChunk`s as they arrive. `message` holds the same
-    `Message` `complete()` would have returned for the same call — a
+    `Message` `complete()` would have returned for the same call. A
     concrete Provider's `stream()` sets it once its underlying vendor
     stream is exhausted, so read it only after the iterator is exhausted
     (`drain()` does both in one call).
@@ -118,7 +118,7 @@ class Stream:
         for _ in self:
             pass
         assert self.message is not None, (
-            "Stream exhausted without setting `message` — the "
+            "Stream exhausted without setting `message`: the "
             "StreamingProvider that built it has a bug"
         )
         return self.message

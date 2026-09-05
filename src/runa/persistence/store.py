@@ -1,6 +1,6 @@
 """RunStore: makes a Run's status and history durable across process steps.
 
-This is what makes pause/resume and background execution possible at all —
+This is what makes pause/resume and background execution possible at all:
 a paused or awaiting-approval Run has to live somewhere between the request
 that created it and the request that resumes it.
 """
@@ -28,7 +28,7 @@ class InMemoryRunStore:
     """Default RunStore: keeps Runs in a process-local dict.
 
     This is the development default (manifesto: real backends are swapped
-    in via configuration, not code changes) — nothing here survives a
+    in via configuration, not code changes); nothing here survives a
     process restart.
     """
 

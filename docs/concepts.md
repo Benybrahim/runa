@@ -145,15 +145,15 @@ run.context.resources = [kb_article]
 run.context.policies = ["no refunds over $500 without approval"]
 ```
 
-In Runa's implementation, `Run.context` is a `Context` — the same
+In Runa's implementation, `Run.context` is a `Context`, the same
 attribute-accessible container `RunState`/`ConversationState` use for
 State (see below), populated explicitly by application code. Runa does not
 auto-assemble it from Conversation/Resources/Policies/Run state; that
 remains an application-level pattern, not framework machinery.
 
 A non-empty `Context` does reach the Agent, though: it's rendered as a
-second system message, right after `Agent.instructions`, before every Run
-— a generic listing of whatever keys the application set, since Context is
+second system message, right after `Agent.instructions`, before every Run:
+a generic listing of whatever keys the application set, since Context is
 free-form and no key name is treated specially. An empty `Context` (the
 default) adds nothing to what the Agent sees.
 
@@ -217,7 +217,7 @@ Tool
 Capabilities should be visible from the Agent definition.
 
 In Runa's implementation, a `Tool` declared on `Agent.tools` *is* the
-capability declaration — `Tool.tool_name()` already carries the identity
+capability declaration: `Tool.tool_name()` already carries the identity
 this diagram calls Capability. There is no separate `Capability` class
 between Agent and Tool; one would only rename `Tool` without adding
 behavior.
@@ -267,7 +267,7 @@ An Action may require policy checks or approval before execution.
 In Runa's implementation, `ToolCall` (`core/message.py`) is this invocation
 record: `.attempts` counts how many times it's been tried, `.idempotent`
 says whether retrying it is safe, and `.error` records what went wrong.
-There is no separate `Action` class — `ToolCall` already carries what an
+There is no separate `Action` class: `ToolCall` already carries what an
 Action needs to be retried safely.
 
 ---
@@ -296,7 +296,7 @@ An Action and its Effect should not be treated as the same thing.
 This distinction matters for retries, failures, idempotency, auditing, and approval.
 
 In Runa's implementation, `ToolCall.effect: EffectStatus` (`NONE` /
-`OBSERVED` / `UNKNOWN`) is this — a typed field on the same `ToolCall`
+`OBSERVED` / `UNKNOWN`) is this: a typed field on the same `ToolCall`
 rather than a separate object, since an Action and its Effect share one
 identity and lifecycle. A call that raises leaves its effect `UNKNOWN`, not
 `NONE`: the exception doesn't say whether the side effect fired before it
@@ -346,7 +346,7 @@ class FinanceAgent(Agent):
     policies = [block_large_transfers]
 ```
 
-A Policy can veto a call outright — the Run fails without ever routing to
+A Policy can veto a call outright: the Run fails without ever routing to
 a human. This is deliberately separate from `requires_approval`, which
 always defers to a human: Policy is for rules the application can decide
 on its own; approval is for decisions that need a person.
@@ -377,7 +377,7 @@ PolicyDenied
 ArtifactCreated
 ```
 
-There is no separate `ActionProposed` event — `ToolCalled` already fires
+There is no separate `ActionProposed` event: `ToolCalled` already fires
 before a tool executes, which is what that would have recorded.
 
 The event history answers:
@@ -441,7 +441,7 @@ The Run remains the fundamental execution boundary.
 
 A Conversation is meant to be held across separate Runs, but not across
 *concurrent* ones: two Runs racing against the same Conversation are not
-merged — whichever finishes last silently overwrites the other's turn. See
+merged: whichever finishes last silently overwrites the other's turn. See
 architecture.md's Conversation section for what guarantee actually holds.
 
 ---
@@ -490,7 +490,7 @@ Failed
 Cancelled
 ```
 
-This is `RunStatus` in `core/run.py`, exactly — there is no separate
+This is `RunStatus` in `core/run.py`, exactly; there is no separate
 `Waiting` status; a Run that's paused waiting on something external is
 `Paused`, and one blocked on a human decision is `AwaitingApproval`.
 

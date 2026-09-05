@@ -39,7 +39,7 @@ def _scaffold_with_tests(tmp_path, test_source: str, *, responses: int):
 
 def test_run_project_tests_reports_pass_and_fail(tmp_path):
     # each test_* function drives its own Run, so one scripted response is
-    # needed per function collected — alphabetical order matches definition
+    # needed per function collected; alphabetical order matches definition
     # order here (completes_with_hi, then wrong_expectation).
     project_dir = _scaffold_with_tests(tmp_path, _TEST_MODULE, responses=2)
 

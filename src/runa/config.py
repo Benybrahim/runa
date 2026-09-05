@@ -1,7 +1,7 @@
 """config.py: backward-compatible facade over runa.application.
 
 The app-wide Provider/AsyncProvider/RunStore used to live here as bare
-module globals. They now live on `runa.application.application` — a real
+module globals. They now live on `runa.application.application`, a real
 `Application` instance, so an app can construct additional, isolated
 `Application`s instead of being limited to one process-wide set of
 infrastructure (see application.py). This module re-exports that instance

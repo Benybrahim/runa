@@ -2,7 +2,7 @@
 
 Runa distinguishes Run state, Conversation state, and Application state
 rather than hiding them behind one universal memory abstraction. Application
-state is intentionally not modeled here — it belongs to the developer's own
+state is intentionally not modeled here; it belongs to the developer's own
 domain objects (Customer, Order, ResearchProject, ...).
 """
 

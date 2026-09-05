@@ -16,9 +16,9 @@ class Role(StrEnum):
 class EffectStatus(StrEnum):
     """Whether a ToolCall's side effect, if any, is known to have happened.
 
-    A call that raises partway through leaves its effect ambiguous — the
+    A call that raises partway through leaves its effect ambiguous: the
     exception doesn't say whether it fired before or after the underlying
-    side effect took hold — so a failed attempt is UNKNOWN, not NONE.
+    side effect took hold, so a failed attempt is UNKNOWN, not NONE.
     Blindly retrying an UNKNOWN, non-idempotent call risks repeating that
     effect (architecture.md §13); see `Tool.idempotent` and `RetryStrategy`.
     """
@@ -44,7 +44,7 @@ class ToolCall:
     def completed(self) -> bool:
         """Whether this call has been attempted and succeeded.
 
-        Not `self.result is not None` — a Tool can legitimately return
+        Not `self.result is not None`: a Tool can legitimately return
         `None` as its actual result (a call with no meaningful return
         value), which that check would misread as "never ran," leaving the
         Strategy to attempt it again forever. `attempts > 0` marks it as
@@ -66,5 +66,5 @@ class Message:
     # {"input_tokens": 512, "output_tokens": 64}. None for a Message that
     # didn't come from a model call, or from a provider that didn't report
     # usage. Providers normalize their vendor-specific usage shape into
-    # these two keys — see providers/*.py.
+    # these two keys, see providers/*.py.
     usage: dict[str, int] | None = None

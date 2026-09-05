@@ -1,11 +1,11 @@
 """eval.py: check agent behavior with the eval harness.
 
 `run_evals()` drives the same Agent/Executor/Run path as production, not a
-separate mocked harness. The first two cases are invariants — deterministic
+separate mocked harness. The first two cases are invariants: deterministic
 checks against the resulting Run, the same way an application test would
 read it. The third is a behavioral evaluation: `to_be_helpful()` sends the
 Run's transcript to a Judge and grades it, which costs a real model call and
-isn't deterministic — that's the line manifesto §12 draws between tests and
+isn't deterministic; that's the line manifesto §12 draws between tests and
 evals.
 
 Requires OPENAI_API_KEY in the environment.
@@ -35,7 +35,7 @@ class WeatherAgent(Agent):
 
 
 provider = OpenAIProvider()
-judge = Judge(provider)  # reuses the same Provider — no separate judge client
+judge = Judge(provider)  # reuses the same Provider, no separate judge client
 
 cases = [
     EvalCase(

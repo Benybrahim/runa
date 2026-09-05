@@ -1,6 +1,6 @@
 """Artifact: first-class, non-text-only output produced during a Run.
 
-A Tool's `call()` may return an Artifact instead of a plain value — the
+A Tool's `call()` may return an Artifact instead of a plain value: the
 Executor recognizes it by type (manifesto §2: "types are configuration")
 and records it on the Run automatically (see `runtime/executor.py`), so
 "agents create artifacts" (manifesto §10) is a normal consequence of a tool

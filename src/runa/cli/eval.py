@@ -1,8 +1,8 @@
-"""cli/eval.py: `runa eval` — run app/evaluations/ cases.
+"""cli/eval.py: `runa eval`, run app/evaluations/ cases.
 
 Manifesto §12 asks for `agent eval` as a command; this is a thin loop that
 imports each `app/evaluations/` module and hands what it declares to
-`run_evals()` — the same code path production runs through, not a parallel
+`run_evals()`, the same code path production runs through, not a parallel
 CLI-only harness.
 """
 
@@ -28,7 +28,7 @@ def run_project_evals(root: Path) -> list[EvalResult]:
     evaluations_dir = root / "app" / "evaluations"
     if not evaluations_dir.is_dir():
         raise NotARunaProject(
-            f"{evaluations_dir} does not exist — run this from inside a Runa "
+            f"{evaluations_dir} does not exist, run this from inside a Runa "
             "project created with `runa new`"
         )
 

@@ -162,7 +162,7 @@ class AsyncAnthropicProvider:
 
     Satisfies `AsyncProvider` structurally, backed by `anthropic.AsyncAnthropic`
     instead of `anthropic.Anthropic`. Shares the exact same wire-format
-    functions as the sync provider — only the client and the `await` differ.
+    functions as the sync provider; only the client and the `await` differ.
     """
 
     def __init__(
@@ -199,7 +199,7 @@ class AsyncAnthropicProvider:
         model: str | None,
     ) -> AsyncStream:
         """Satisfies `AsyncStreamingProvider` structurally. Not `async def`
-        itself — the request only fires once the returned `AsyncStream` is
+        itself: the request only fires once the returned `AsyncStream` is
         async-iterated."""
         system, wire_messages = to_wire_messages(messages)
 

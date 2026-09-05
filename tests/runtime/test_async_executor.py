@@ -188,7 +188,7 @@ def test_a_bug_in_before_run_fails_the_run_instead_of_crashing_and_stranding_it(
 def test_a_bug_while_seeding_the_run_fails_it_instead_of_stranding_it():
     # Same gap as Executor's equivalent test: seed_run() used to run before
     # run.start(), so an exception there couldn't be turned into run.fail()
-    # (QUEUED -> FAILED is an illegal transition) and escaped uncaught —
+    # (QUEUED -> FAILED is an illegal transition) and escaped uncaught,
     # fatal for a Run driven from a background thread, where nothing would
     # ever observe it.
     class Unstringable:
@@ -403,7 +403,7 @@ def result_error(run: Run) -> str:
 
 
 def test_a_hallucinated_tool_call_fails_the_run_with_a_clear_message():
-    """See the sync `Executor` test of the same name — same fix, same gap:
+    """See the sync `Executor` test of the same name; same fix, same gap:
     an undeclared tool name used to fail the Run with just `"'Ghost'"`.
     """
     provider = FakeAsyncProvider(

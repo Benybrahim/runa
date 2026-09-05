@@ -1,7 +1,7 @@
 """Core primitives: Run, Message, Event, Artifact, State.
 
 Pure data and state-machine logic. No execution, no I/O, no provider
-knowledge — everything else in Runa is defined in terms of these.
+knowledge: everything else in Runa is defined in terms of these.
 """
 
 from runa.core.artifact import (

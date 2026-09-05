@@ -3,11 +3,11 @@
 Reads structure, not configuration: a new agent goes to `app/agents/`
 because that's the convention `runa new` established, not because
 anything was configured to say so (manifesto §2). `tool` and `evaluation`
-follow the same pattern into `app/tools/`/`app/evaluations/` — the two
+follow the same pattern into `app/tools/`/`app/evaluations/`, the two
 generators rails-to-runa.md names as "natural next generators in the same
 spirit" alongside `agent`.
 
-Every template here is self-contained and immediately importable —
+Every template here is self-contained and immediately importable:
 `runa eval`/`runa test` succeed against a freshly generated file (0/0
 cases, an inert stub Agent/Tool) the same way they do against an empty
 `app/evaluations/`/`app/tests/`, rather than crashing until the developer
@@ -86,7 +86,7 @@ def _require_dir(root: Path, *parts: str) -> Path:
     target_dir = root.joinpath(*parts)
     if not target_dir.is_dir():
         raise NotARunaProject(
-            f"{target_dir} does not exist — run this from inside a Runa "
+            f"{target_dir} does not exist, run this from inside a Runa "
             "project created with `runa new`"
         )
     return target_dir
@@ -121,9 +121,9 @@ def generate_tool(name: str, *, root: Path) -> Path:
 def generate_evaluation(name: str, *, root: Path) -> Path:
     """Write a new eval case module into `root/app/evaluations/`.
 
-    Unlike `generate_agent`/`generate_tool`, `name` doesn't become a class —
+    Unlike `generate_agent`/`generate_tool`, `name` doesn't become a class:
     `app/evaluations/` modules are plain scripts declaring module-level
-    `agent`/`cases` (see `cli/eval.py`) — so it only shapes the filename and
+    `agent`/`cases` (see `cli/eval.py`), so it only shapes the filename and
     the placeholder Agent's docstring.
     """
     evaluations_dir = _require_dir(root, "app", "evaluations")

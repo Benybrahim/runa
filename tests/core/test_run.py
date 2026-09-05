@@ -175,4 +175,4 @@ def test_end_driving_lets_the_run_be_driven_again():
     run.begin_driving()
     run.end_driving()
 
-    run.begin_driving()  # does not raise — the claim was released
+    run.begin_driving()  # does not raise: the claim was released

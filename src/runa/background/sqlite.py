@@ -1,14 +1,14 @@
 """SQLiteQueue: a Queue that survives a process crash.
 
 `ThreadQueue` keeps enqueued jobs only in the thread pool's own in-memory
-queue — if the process dies mid-job, that job (and anything still waiting
+queue: if the process dies mid-job, that job (and anything still waiting
 behind it) is gone, and nothing records it was ever there. SQLiteQueue
 additionally journals each job's `run_id` to a SQLite table before
 submitting it to the thread pool, clearing the row once the job finishes.
 
-It can't persist the job closure itself — an Agent and Executor hold live
-resources (model clients, API keys) that don't survive a process boundary
-— so recovery after a crash isn't automatic. On restart, call `pending()`
+It can't persist the job closure itself: an Agent and Executor hold live
+resources (model clients, API keys) that don't survive a process boundary,
+so recovery after a crash isn't automatic. On restart, call `pending()`
 to find run ids a previous process left mid-flight, look each one up in a
 RunStore, and resubmit it with `enqueue_run()`.
 """
@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS pending_jobs (
 class SQLiteQueue:
     """Queue backed by a bounded thread pool, journaled to SQLite at `path`.
 
-    Same protocol as `ThreadQueue` — swapping one for the other at
-    `run_later(queue=...)` is a one-line change — plus `DurableQueue`'s
+    Same protocol as `ThreadQueue`: swapping one for the other at
+    `run_later(queue=...)` is a one-line change, plus `DurableQueue`'s
     `enqueue_run()`/`pending()`, which `run_later()` uses automatically.
     """
 
@@ -40,7 +40,7 @@ class SQLiteQueue:
         # threads at once (the sqlite3 docs say as much). Every job here
         # runs on a ThreadPoolExecutor worker and clears its own journal row
         # in `wrapped()` below, concurrently with `enqueue_run()`/`pending()`
-        # on whatever thread calls those — so every access is serialized
+        # on whatever thread calls those, so every access is serialized
         # through `self._lock`.
         self._lock = threading.Lock()
         with self._lock:
@@ -90,7 +90,7 @@ class SQLiteQueue:
         worker thread mid-job with no cleanup unless the application calls
         this from its own signal handler (see docs/guides.md, "Shutting
         Down a Background Queue"). `recover_pending()` is what makes that
-        survivable regardless — the journal row this job's `wrapped()`
+        survivable regardless: the journal row this job's `wrapped()`
         never got to clear is exactly what it looks for on next startup.
         """
         self._executor.shutdown(wait=wait)

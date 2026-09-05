@@ -1,11 +1,11 @@
 """streaming.py: print the model's answer as it streams in.
 
-`Provider.complete()` always returns one whole `Message` — for a chat-shaped
+`Provider.complete()` always returns one whole `Message`; for a chat-shaped
 consumer that wants to show text as it's generated, `Executor.run(...,
 on_chunk=...)` is the opt-in path: pass a `StreamingProvider` (both
 `AnthropicProvider` and `OpenAIProvider` implement one) and a callback.
 The Run's messages, events, and final state end up identical to the
-non-streaming path — `on_chunk` only changes what's observed while a
+non-streaming path; `on_chunk` only changes what's observed while a
 CallModel step is in flight, so it composes with tools, retries, and
 approval exactly like the plain `run()` does.
 

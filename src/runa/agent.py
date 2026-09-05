@@ -63,8 +63,8 @@ class Agent:
     def agent_name(cls) -> str:
         """Stable identity stamped onto every Run this Agent produces.
 
-        Defaults to the class name — same fallback `Tool.tool_name()` uses
-        — so provenance (architecture.md §14) works without any
+        Defaults to the class name, same fallback `Tool.tool_name()` uses,
+        so provenance (architecture.md §14) works without any
         configuration; override `name` when the class name isn't the
         identity you want persisted (e.g. across a rename).
         """
@@ -114,7 +114,7 @@ class Agent:
     def check_policies(self, run: Run, tool_call: ToolCall) -> bool:
         """Run declared policies against a pending tool call.
 
-        Returns False if any policy vetoes the call — a programmatic
+        Returns False if any policy vetoes the call: a programmatic
         allow/deny check the Executor runs before a gated call can even
         reach approval, so a call can be blocked without ever routing to a
         human (architecture.md §3's Decision -> Capability -> Policy ->
@@ -134,7 +134,7 @@ class Agent:
 
         Override to customize. Return a value to replace the Strategy's
         draft result with it (manifesto §6's "reflection"); return `None`
-        (the default — an override that falls off the end returns `None`
+        (the default; an override that falls off the end returns `None`
         automatically) to leave it as the Strategy decided.
         """
         return None
@@ -153,7 +153,7 @@ class Agent:
         """Run this agent against `input` and return the completed Run.
 
         Uses the app-wide default Provider (see `runa.configure()`) unless
-        an `Executor` is given explicitly — the escape hatch for an agent
+        an `Executor` is given explicitly: the escape hatch for an agent
         that needs a specific provider, strategy, or max_steps.
 
         Pass `conversation` to continue a prior exchange: its history is
@@ -177,7 +177,7 @@ class Agent:
         Uses the app-wide default AsyncProvider (`runa.configure(provider=...,
         async_provider=...)`) unless an `AsyncExecutor` is given explicitly.
         Independent tool calls the model asks for in one turn run
-        concurrently — see `AsyncExecutor` for the exact rule.
+        concurrently; see `AsyncExecutor` for the exact rule.
         """
         executor = executor or AsyncExecutor(provider=application.async_provider)
         return await executor.run(cls(), Run(input=input, conversation=conversation))
@@ -207,7 +207,7 @@ class Agent:
         """Wrap this Agent as a Tool another Agent can call (manifesto §6).
 
         A parent agent delegates by declaring the sub-agent as an ordinary
-        tool — `tools = [ResearchAgent.as_tool()]` — no new Strategy needed:
+        tool (`tools = [ResearchAgent.as_tool()]`), no new Strategy needed:
         `DefaultStrategy`'s existing tool-use loop already covers it once an
         Agent can be handed in as a Tool. For a parent driven by
         `AsyncExecutor`/`run_async()`, see `as_async_tool()`.
@@ -223,15 +223,15 @@ class Agent:
         executor: AsyncExecutor | None = None,
     ) -> Tool:
         """Wrap this Agent as a Tool for a parent run via AsyncExecutor/
-        `run_async()` — the async counterpart to `as_tool()`.
+        `run_async()`, the async counterpart to `as_tool()`.
 
         `DelegateTool.call()` is a plain function, so under AsyncExecutor it
-        runs via `asyncio.to_thread` — one thread per delegate, not true
-        concurrency. `AsyncDelegateTool.call()` is `async def` and delegates
+        runs via `asyncio.to_thread` (one thread per delegate, not true
+        concurrency). `AsyncDelegateTool.call()` is `async def` and delegates
         through `AsyncExecutor` instead, so when a model turn requests
         several sub-agents at once, AsyncExecutor's existing `asyncio.gather`
         batching (see its docstring) runs them as genuine concurrent async
-        I/O. Only usable with `AsyncExecutor` — like any async-only tool,
+        I/O. Only usable with `AsyncExecutor`; like any async-only tool,
         `Executor` rejects it outright rather than mishandling it silently.
         """
         return AsyncDelegateTool(
@@ -240,22 +240,22 @@ class Agent:
 
 
 class DelegateTool(Tool):
-    """Runs an Agent as a Tool call — the delegation strategy from manifesto §6.
+    """Runs an Agent as a Tool call: the delegation strategy from manifesto §6.
 
     `call()` runs the wrapped Agent synchronously against `input`, using the
     app-wide default Provider (`runa.configure()`) unless an `executor` is
-    given, and returns its `Run.result` — the same value the sub-agent's own
+    given, and returns its `Run.result`, the same value the sub-agent's own
     `.run()` would return. A run that doesn't complete raises, which the
     parent's `Executor` turns into an ordinary `TOOL_FAILED` event, so a
     delegate's failure is visible the same way any other tool's is.
 
     The sub-agent's own `Run` isn't threaded into the parent Run's event log
-    — the two are separate executions — but it stays reachable on
+    (the two are separate executions), but it stays reachable on
     `self.last_run` after each call, as the escape hatch for inspecting a
     delegated run directly (manifesto §15), e.g. `timeline(tool.last_run)`.
     Its `parent_run_id` also records the parent Run's id (architecture.md
     §15), so the lineage survives being persisted and read back later, not
-    just while `self` stays in memory — see `ParentRunAware`.
+    just while `self` stays in memory. See `ParentRunAware`.
     """
 
     def __init__(
@@ -297,7 +297,7 @@ class DelegateTool(Tool):
 
 
 class AsyncDelegateTool(Tool):
-    """The async counterpart to `DelegateTool` — see `Agent.as_async_tool()`.
+    """The async counterpart to `DelegateTool`. See `Agent.as_async_tool()`.
 
     `call()` is `async def` and runs the wrapped Agent through an
     `AsyncExecutor`, using the app-wide default AsyncProvider

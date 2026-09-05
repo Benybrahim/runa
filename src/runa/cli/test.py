@@ -1,10 +1,10 @@
-"""cli/test.py: `runa test` — run app/tests/ test functions.
+"""cli/test.py: `runa test`, run app/tests/ test functions.
 
 Manifesto §12 asks for `agent test` alongside `agent eval`: tests verify
 invariants with plain `assert` statements against a Run, evals measure
 behavior with `expect(run).to_...()`. `run_project_evals` (cli/eval.py)
 already covers the eval half; this covers the other one with the same
-shape — import every `app/tests/` module and run its `test_*` functions,
+shape: import every `app/tests/` module and run its `test_*` functions,
 catching AssertionError instead of crashing so a full report comes back in
 one pass.
 
@@ -37,7 +37,7 @@ def run_project_tests(root: Path) -> list[TestResult]:
     tests_dir = root / "app" / "tests"
     if not tests_dir.is_dir():
         raise NotARunaProject(
-            f"{tests_dir} does not exist — run this from inside a Runa "
+            f"{tests_dir} does not exist, run this from inside a Runa "
             "project created with `runa new`"
         )
 

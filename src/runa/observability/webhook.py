@@ -1,6 +1,6 @@
 """observability/webhook.py: ship each Event to an HTTP endpoint as it happens.
 
-A `Subscriber` — the same protocol `instrument()` already notifies — that
+A `Subscriber`, the same protocol `instrument()` already notifies, that
 POSTs a JSON payload per Event. External export is therefore an additional
 subscriber, not a new subsystem: attach it with
 `instrument(run, webhook("https://..."))` alongside, or instead of, any
@@ -32,7 +32,7 @@ def webhook(
     """Build a Subscriber that POSTs each Event to `url` as JSON.
 
     Pass the `run_id` you're instrumenting, since `Event` itself doesn't
-    carry one — it's the receiving end's only way to tell events from
+    carry one; it's the receiving end's only way to tell events from
     different runs apart.
     """
     queue = queue or InlineQueue()

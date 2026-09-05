@@ -1,6 +1,6 @@
 """observability/notifications.py: a timeline view and a live notification bus.
 
-Both are read-only surfaces over `Run.events` (manifesto §8) — nothing here
+Both are read-only surfaces over `Run.events` (manifesto §8); nothing here
 computes state the Run doesn't already have. `instrument()` wraps `run.emit`
 on the instance so subscribers are notified as Events happen, without
 `core/` needing to know observability exists.
@@ -92,13 +92,13 @@ def instrument(run: Run, subscriber: Subscriber) -> Callable[[], None]:
     notified, in the order they were attached.
 
     A subscriber that raises (a webhook endpoint that's down, a bug in
-    application code) does not fail or crash the Run — the event is already
+    application code) does not fail or crash the Run: the event is already
     recorded on `run.events` by the time `subscriber` runs, and observability
     must not be able to affect execution (architecture.md §10: "should not
     duplicate execution logic"). Without this, an exception here would
-    propagate out of whatever emitted the event — including `run.start()`
+    propagate out of whatever emitted the event, including `run.start()`
     and other lifecycle transitions the Executor's own step loop doesn't
-    wrap in a try/except — defeating `Executor.run()`'s guarantee to convert
+    wrap in a try/except, defeating `Executor.run()`'s guarantee to convert
     failures into a failed Run rather than crash. The exception is instead
     surfaced as a `RuntimeWarning`, so a broken subscriber stays visible
     without corrupting the Run it's attached to.
@@ -111,8 +111,8 @@ def instrument(run: Run, subscriber: Subscriber) -> Callable[[], None]:
             subscriber(event)
         except Exception as exc:  # noqa: BLE001
             warnings.warn(
-                f"subscriber raised {exc!r} handling {event.type.value} event "
-                "— ignored, since observability must not affect Run execution",
+                f"subscriber raised {exc!r} handling {event.type.value} event, "
+                "ignored: observability must not affect Run execution",
                 RuntimeWarning,
                 stacklevel=2,
             )

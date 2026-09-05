@@ -219,6 +219,5 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-road.md
-recommendation.md
-rails-to-runa.md
+# custom
+personal/

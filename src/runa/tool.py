@@ -53,8 +53,8 @@ def _type_schema(annotation: Any) -> dict[str, Any]:
     Handles the shapes manifesto §9's "structured inputs" implies beyond
     flat scalars: `list[T]` (recurses into `T`), `X | None` (unwraps to
     `X`), `Enum` subclasses (an enum of their values), and dataclasses
-    (a nested object built from their fields). Anything else — a bare
-    `list`/`dict` with no type args, `Any`, an unrecognized annotation —
+    (a nested object built from their fields). Anything else (a bare
+    `list`/`dict` with no type args, `Any`, an unrecognized annotation)
     falls back to "string", the same default as before.
     """
     annotation = _unwrap_optional(annotation)
@@ -106,14 +106,14 @@ def _schema_from_signature(
 class ParentRunAware(Protocol):
     """A Tool that wants to know which Run it's being called from.
 
-    A separate, optional protocol — like `StreamingProvider`/`DurableQueue`
-    elsewhere in Runa — not a method every Tool must implement. The Executor
+    A separate, optional protocol, like `StreamingProvider`/`DurableQueue`
+    elsewhere in Runa, not a method every Tool must implement. The Executor
     calls `bind_parent_run_id()` right before `call()` for any Tool that
     satisfies this, structurally, with no base class to opt into.
     `DelegateTool`/`AsyncDelegateTool` (see agent.py) use it to stamp the
     sub-agent's Run with `parent_run_id`, so delegation lineage
     (architecture.md §15) survives being written to a RunStore and read back
-    later — not just while the parent tool instance stays in memory.
+    later, not just while the parent tool instance stays in memory.
 
     Deliberately narrower than handing a Tool the whole parent `Run`: a
     delegate only needs the parent's id for lineage, not read access to its
@@ -139,7 +139,7 @@ class Tool:
     name: str | None = None
     description: str = ""
     requires_approval: bool = False
-    idempotent: bool = False  # safe to retry on error — see runtime/retry.py
+    idempotent: bool = False  # safe to retry on error, see runtime/retry.py
 
     def call(self, **kwargs: Any) -> Any:
         raise NotImplementedError

@@ -1,5 +1,5 @@
-Runa doesn't accept code contributions — see [`CONTRIBUTING.md`](../CONTRIBUTING.md).
+Runa doesn't accept code contributions: see [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 This PR will be closed unmerged.
 
 If you found a bug or have feedback on the design, please open an issue
-instead — that's genuinely welcome.
+instead. That's genuinely welcome.

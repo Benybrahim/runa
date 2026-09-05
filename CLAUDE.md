@@ -9,22 +9,21 @@ When a decision requires more context:
 * [docs/manifesto.md](./docs/manifesto.md) explains why Runa takes this approach.
 * [docs/concepts.md](./docs/concepts.md) defines Runa's core vocabulary.
 * [docs/architecture.md](./docs/architecture.md) defines the technical architecture, boundaries, and invariants.
-* [docs/rails-to-runa.md](./docs/rails-to-runa.md) explains the Rails inspiration and conceptual mapping.
 * [docs/getting_started.md](./docs/getting_started.md) describes the intended developer experience.
 * [docs/guides.md](./docs/guides.md) contains practical patterns.
-* [BRAND.md](./BRAND.md) defines Runa's identity: positioning, voice, terminology, and visual direction. Read it before writing README/docs copy, CLI-facing text, or anything visual.
+* [BRAND.md](personal/BRAND.md) defines Runa's identity: positioning, voice, terminology, and visual direction. Read it before writing README/docs copy, CLI-facing text, or anything visual.
 
 Do not duplicate the philosophy from these documents here. This file is the operational reference for development.
 
 ## Commands
 
-* `make install` — uv sync
-* `make format` — ruff format
-* `make lint` / `make lint-fix` — ruff check
-* `make test` — pytest
-* `make check` — format + lint + test
-* `make hello` — run `examples/hello.py`
-* `make examples` — run every example in `examples/`
+* `make install`: uv sync
+* `make format`: ruff format
+* `make lint` / `make lint-fix`: ruff check
+* `make test`: pytest
+* `make check`: format + lint + test
+* `make hello`: run `examples/hello.py`
+* `make examples`: run every example in `examples/`
 
 ## Development Principles
 
@@ -40,6 +39,7 @@ Do not duplicate the philosophy from these documents here. This file is the oper
 * Keep capabilities and authority explicit. Intelligence does not imply authority.
 * Prefer existing abstractions over creating new ones. Add a new abstraction only when the codebase reveals a recurring problem.
 * Preserve escape hatches. Convenience APIs must not prevent direct access to underlying Runa primitives or integrations.
+* Do not use ""—"" in any file.
 
 ## Code Conventions
 

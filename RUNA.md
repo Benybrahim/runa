@@ -1,6 +1,6 @@
 # The RUNA Doctrine
 
-RUNA is an opinionated, integrated framework for building agent applications around the Run—the first-class unit of execution.
+RUNA is an opinionated, integrated framework for building agent applications around the Run: the first-class unit of execution.
 
 RUNA is inspired by the philosophy that made Rails effective: conventions over configuration, integrated systems over assembled stacks, strong defaults, beautiful code, and developer happiness.
 
@@ -165,4 +165,4 @@ If not, it may not belong in the core.
 
 # In One Sentence
 
-> **RUNA is an opinionated, integrated framework for building agent applications around the Run—the first-class unit of execution.**
+> **RUNA is an opinionated, integrated framework for building agent applications around the Run: the first-class unit of execution.**

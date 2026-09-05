@@ -4,12 +4,12 @@ need bytes.
 Not a generic `dataclasses.asdict`/`**data` round-trip: Artifact is
 polymorphic (five concrete subclasses), and a `ToolCall` is shared by
 identity between `Run.tool_calls` and the assistant `Message` that produced
-it — `approve()`/`deny()` mutate the copy in `Run.tool_calls` and rely on
+it: `approve()`/`deny()` mutate the copy in `Run.tool_calls` and rely on
 the same object showing up in the message the Strategy inspects next. Both
 of those need explicit handling that a generic round-trip can't recover.
 
-`Conversation` has neither concern — its messages aren't examined for
-identity the way a Run's are — so its (de)serialization is a plain nested
+`Conversation` has neither concern; its messages aren't examined for
+identity the way a Run's are, so its (de)serialization is a plain nested
 walk that reuses `_tool_call_to_dict`/`_tool_call_from_dict` below.
 """
 
@@ -68,8 +68,8 @@ def _artifact_from_dict(data: dict[str, Any]) -> Artifact:
 def _json_safe(value: Any) -> Any:
     """`value` unchanged if it's already JSON-safe, else its `str()`.
 
-    A Tool's return value isn't constrained to be JSON-serializable — it may
-    be an `Artifact` or any other plain Python object — but `ToolCall.result`
+    A Tool's return value isn't constrained to be JSON-serializable (it may
+    be an `Artifact` or any other plain Python object), but `ToolCall.result`
     holds whatever the Tool actually returned (application code inspects it
     directly, e.g. to get the real Artifact back), so it can't be coerced at
     the point of assignment. Persistence still needs *something* writable:
@@ -80,12 +80,12 @@ def _json_safe(value: Any) -> Any:
     `Run.input` and `Run.result` get the same treatment for the same reason:
     `Agent.run(input: Any, ...)` places no constraint on `input`, and
     architecture.md §2 explicitly expects `Result` to hold structured,
-    application-defined objects, not just text — `agent.review()` can return
+    application-defined objects, not just text; `agent.review()` can return
     any value as the Run's final result. A Run round-tripped through a store
     loses the original object's type either way once it isn't JSON-safe (a
     dataclass decoded back from JSON is a plain dict, not that dataclass);
     the choice here is only between that degraded-but-present `str()` form
-    and losing the whole Run to a `save()` that raises — the latter is worse
+    and losing the whole Run to a `save()` that raises: the latter is worse
     for a value the application may not control (e.g. `input` handed in by a
     caller) and, unlike a raise inside a request/response cycle, can fail
     silently when it happens on a background queue's worker thread.
@@ -98,7 +98,7 @@ def _json_safe(value: Any) -> Any:
 
 
 def _json_safe_dict(mapping: dict[str, Any]) -> dict[str, Any]:
-    """`_json_safe` applied per value — for State/Context, the other places
+    """`_json_safe` applied per value, for State/Context, the other places
     the docs invite application code to put an arbitrary object (e.g.
     `run.state.findings`, `run.context.resources`). One bad value falls back
     to its `str()`; the rest of the mapping still round-trips normally.

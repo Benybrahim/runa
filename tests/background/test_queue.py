@@ -18,7 +18,7 @@ class FarewellAgent(Agent):
 class FakeDurableQueue:
     """A DurableQueue whose `pending()` is scripted, for recover_pending tests.
 
-    `enqueue_run()` runs the job immediately, like InlineQueue — recovery
+    `enqueue_run()` runs the job immediately, like InlineQueue; recovery
     tests only need to see the resumed Run's end state, not a real
     background thread.
     """
@@ -111,8 +111,8 @@ def test_run_later_stamps_agent_provenance_before_the_job_runs():
 
 
 class DeferredDurableQueue:
-    """A DurableQueue whose `enqueue_run()` doesn't run the job immediately —
-    unlike `FakeDurableQueue` above — so a test can inspect state between
+    """A DurableQueue whose `enqueue_run()` doesn't run the job immediately,
+    unlike `FakeDurableQueue` above, so a test can inspect state between
     queuing and dispatch, the way a process crash would leave things.
     """
 
@@ -144,7 +144,7 @@ def test_run_later_saves_to_the_default_run_store_before_a_durable_queue_dispatc
 
     run_later(agent, run, executor, queue=queue)
 
-    # saved while still QUEUED — the job hasn't run yet
+    # saved while still QUEUED: the job hasn't run yet
     saved = store.get(run.id)
     assert saved is not None
     assert saved.status == RunStatus.QUEUED

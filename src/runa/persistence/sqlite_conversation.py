@@ -1,6 +1,6 @@
 """SQLiteConversationStore: a ConversationStore that survives a process restart.
 
-Same protocol as InMemoryConversationStore — swapping one for the other is
+Same protocol as InMemoryConversationStore: swapping one for the other is
 a one-line change at the call site (manifesto: real backends are swapped in
 via configuration, not code changes). Mirrors SQLiteRunStore (sqlite.py): a
 Conversation is stored as a single JSON blob per row.

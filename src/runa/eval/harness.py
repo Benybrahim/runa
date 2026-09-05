@@ -1,17 +1,17 @@
 """eval/harness.py: run agents against cases and assert on the resulting Run.
 
 An eval case exercises the same `Agent`/`Executor`/`Run` code path as
-production (manifesto §8) — `run_evals()` is a thin loop around
+production (manifesto §8); `run_evals()` is a thin loop around
 `executor.run()`, not a parallel mock harness. `expect(run).to_...()` reads
 the same `Run` a test would, so eval assertions and application invariants
 share one vocabulary.
 
 `Expectation` holds both halves of manifesto §12. `to_be_completed`,
-`to_have_result`, `to_contain`, and `to_have_called` verify invariants —
+`to_have_result`, `to_contain`, and `to_have_called` verify invariants:
 deterministic facts about the Run's shape, cheap enough for `test`-style
 checks. `to_satisfy` and its named rubrics (`to_be_helpful`, `to_be_factual`,
 `not_to_hallucinate`, `to_meet_the_goal`, see `eval/judge.py`) measure
-behavior — a real, non-deterministic model call grading what the agent
+behavior: a real, non-deterministic model call grading what the agent
 actually did.
 """
 
@@ -81,7 +81,7 @@ class Expectation:
         """Grade this Run against `rubric` with an LLM judge (manifesto §12).
 
         Unlike the structural checks above, this makes a real model request
-        and its result is not deterministic — reserve it for
+        and its result is not deterministic; reserve it for
         `app/evaluations/` cases, not `test`-style invariants. Defaults to a
         `Judge` backed by `runa.configure()`'s default Provider; pass `judge`
         explicitly to grade with a different model, or a `FakeProvider` in

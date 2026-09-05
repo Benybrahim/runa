@@ -1,6 +1,6 @@
 """AsyncExecutor: the async counterpart to `Executor` (see `executor.py`).
 
-Same Run state machine, same `Strategy` protocol, same Agent hooks — only
+Same Run state machine, same `Strategy` protocol, same Agent hooks; only
 *how* actions are carried out differs: model calls go through an
 `AsyncProvider`, and independent pending tool calls run concurrently instead
 of one at a time.
@@ -40,7 +40,7 @@ from runa.tool import ParentRunAware
 
 if TYPE_CHECKING:
     # Agent.run_async() constructs an AsyncExecutor, so a runtime import here
-    # would cycle back through agent.py — this is used for type hints only.
+    # would cycle back through agent.py; this is used for type hints only.
     from runa.agent import Agent
 
 
@@ -50,7 +50,7 @@ class AsyncExecutor:
     Behaves exactly like `Executor`, with one difference: when a Strategy
     step asks to call a tool, this Executor also gathers up any *other*
     pending, never-attempted tool call from the same assistant message and
-    runs all of them concurrently via `asyncio.gather` — the common case of
+    runs all of them concurrently via `asyncio.gather`, the common case of
     a model turn requesting several independent tools at once. A tool call
     that's already mid-retry (has its own `error` set) is left for its own
     `Strategy.step()` vetting, same as in `Executor`. Approval-gated calls
@@ -58,14 +58,14 @@ class AsyncExecutor:
     ones finish, the Run pauses into AWAITING_APPROVAL exactly as it would
     with `Executor`.
 
-    A `Tool.call` may be a plain function or an `async def` — this Executor
+    A `Tool.call` may be a plain function or an `async def`: this Executor
     awaits async tools directly and runs sync ones via `asyncio.to_thread`
     so they can't block the event loop. `Executor` (the sync one) rejects an
     async tool outright rather than silently mishandling it.
 
     Also checks `run.cancel_requested` once per step, exactly like
-    `Executor` — see `Run.request_cancel()`. `timeout` is the same per-call,
-    step-boundary wall-clock budget as `Executor.timeout` — see there.
+    `Executor`; see `Run.request_cancel()`. `timeout` is the same per-call,
+    step-boundary wall-clock budget as `Executor.timeout`; see there.
     """
 
     def __init__(
@@ -88,24 +88,24 @@ class AsyncExecutor:
         *,
         on_chunk: Callable[[StreamChunk], Any | Awaitable[Any]] | None = None,
     ) -> Run:
-        """Drive `run` to completion. See `Executor.run` for `on_chunk` — same
+        """Drive `run` to completion. See `Executor.run` for `on_chunk`: same
         contract here, except `on_chunk` may itself be `async def`; a plain
         callable works too, and its return value (if any) is ignored.
         Requires `self.provider` to satisfy `AsyncStreamingProvider`; raises
         `TypeError` otherwise.
 
-        A no-op if `run` is already terminal — see `Executor.run`.
+        A no-op if `run` is already terminal; see `Executor.run`.
 
         A bug while seeding the Run, or in `before_run`/`plan`, fails the Run
         with that exception as `Run.error`, rather than stranding it at
         RUNNING forever; a bug in `after_run` is surfaced as a
         `RuntimeWarning` instead, since the Run has already reached its real
-        terminal status by then — see `Executor.run`'s docstring for why the
+        terminal status by then; see `Executor.run`'s docstring for why the
         two cases differ, and for why this matters especially for a Run
         driven from a background thread.
 
         Raises `RunAlreadyDriving` if another Executor is already driving
-        this same Run object — see `Run.begin_driving()`.
+        this same Run object; see `Run.begin_driving()`.
         """
         if run.is_terminal:
             return run
@@ -150,7 +150,7 @@ class AsyncExecutor:
                     agent.after_run(run)
                 except Exception as exc:  # Run already terminal; don't falsify it
                     warnings.warn(
-                        f"after_run raised {exc!r} — ignored, Run {run.id} "
+                        f"after_run raised {exc!r}, ignored: Run {run.id} "
                         f"already reached a terminal status "
                         f"({run.status.value})",
                         RuntimeWarning,
@@ -197,7 +197,7 @@ class AsyncExecutor:
             if not isinstance(self.provider, AsyncStreamingProvider):
                 raise TypeError(
                     f"{type(self.provider).__name__} does not implement "
-                    "AsyncStreamingProvider.stream() — on_chunk requires a "
+                    "AsyncStreamingProvider.stream(): on_chunk requires a "
                     "streaming-capable Provider"
                 )
             stream = self.provider.stream(
@@ -223,11 +223,11 @@ class AsyncExecutor:
 
         `named_tool_call` is whatever the Strategy explicitly vetted this
         step (honoring e.g. RetryStrategy's per-call attempt gating). A
-        sibling only joins the batch if it's never been attempted — a
+        sibling only joins the batch if it's never been attempted: a
         sibling already mid-retry gets its own vetting on a later step.
 
         Siblings come from the turn's assistant message via
-        `last_assistant_message`, not `run.messages[-1]` directly — once any
+        `last_assistant_message`, not `run.messages[-1]` directly: once any
         sibling in this turn has already executed (e.g. one batch ran, an
         approval gate paused the rest, and the run was then resumed),
         `run.messages[-1]` is that sibling's TOOL-role result message, not
@@ -263,12 +263,12 @@ class AsyncExecutor:
             run.require_approval(blocked[0].id)
 
     async def _call_tool(self, agent: "Agent", run: Run, tool_call: ToolCall) -> None:
-        """Run one tool call — see `Executor._call_tool` for the Artifact dispatch."""
+        """Run one tool call. See `Executor._call_tool` for the Artifact dispatch."""
         tools = agent.resolved_tools()
         tool = tools.get(tool_call.name)
         if tool is None:
             raise ValueError(
-                f"model called unknown tool {tool_call.name!r} — declared "
+                f"model called unknown tool {tool_call.name!r}, declared "
                 f"tools are: {sorted(tools) or '(none)'}"
             )
         tool_call.idempotent = tool.idempotent
@@ -290,7 +290,7 @@ class AsyncExecutor:
         except Exception as exc:
             # The exception doesn't say whether the underlying side effect
             # fired before it was raised, so the effect is UNKNOWN, not
-            # NONE — see EffectStatus and RetryStrategy.
+            # NONE. See EffectStatus and RetryStrategy.
             tool_call.error = str(exc)
             tool_call.effect = EffectStatus.UNKNOWN
             run.emit(
@@ -318,7 +318,7 @@ class AsyncExecutor:
             EventType.TOOL_COMPLETED,
             tool=tool_call.name,
             tool_call_id=tool_call.id,
-            # `content`, not the raw `tool_call.result` — see Executor's
+            # `content`, not the raw `tool_call.result`. See Executor's
             # equivalent for why (Event.data must stay JSON-serializable).
             result=content,
             effect=EffectStatus.OBSERVED.value,

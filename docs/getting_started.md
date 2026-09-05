@@ -52,7 +52,7 @@ evaluation <Name>` do the same for `app/tools/` and `app/evaluations/`.
 ## 2. Configure the Application
 
 Runa keeps application-wide infrastructure in one place: an `Application`.
-It owns the shared runtime an Agent needs but shouldn't have to repeat —
+It owns the shared runtime an Agent needs but shouldn't have to repeat:
 today that's the model provider and the Run store; persistence, execution,
 telemetry, and other infrastructure grow the same `Application` rather than
 becoming their own configuration path.
@@ -65,7 +65,7 @@ from runa import configure
 configure(provider="openai")
 ```
 
-The string is shorthand for `OpenAIProvider()` — the exact provider depends
+The string is shorthand for `OpenAIProvider()`; the exact provider depends
 on the model service your application uses (`"anthropic"` for
 `AnthropicProvider()`, and so on). Pass a provider instance directly instead
 when it needs its own configuration:
@@ -78,8 +78,8 @@ configure(provider=OpenAIProvider(base_url="..."))
 
 Configuration should be application-level rather than repeated across every Agent.
 
-`configure(...)` is sugar for configuring the default `Application` —
-`runa.application` — that every Agent resolves its provider from:
+`configure(...)` is sugar for configuring the default `Application`
+(`runa.application`) that every Agent resolves its provider from:
 
 ```python
 import runa
@@ -89,7 +89,7 @@ assert runa.application.provider is not None
 ```
 
 Construct an explicit `Application()` instead when you need isolated
-infrastructure — most commonly in tests, where a `FakeProvider` on one
+infrastructure, most commonly in tests, where a `FakeProvider` on one
 `Application` should never leak into another test's:
 
 ```python
@@ -209,8 +209,8 @@ class ResearchAgent(Agent):
     tools = [web_search]
 ```
 
-For a tool that needs more than a function body — approval, idempotency, or
-other class-level configuration — subclass `Tool` instead:
+For a tool that needs more than a function body (approval, idempotency, or
+other class-level configuration), subclass `Tool` instead:
 
 ```python
 from runa import Tool
@@ -295,7 +295,7 @@ async or the work benefits from concurrent I/O:
 run = await ResearchAgent.run_async("Produce a detailed report on fusion energy.")
 ```
 
-`run_async()` is still awaited by the caller — it is not background
+`run_async()` is still awaited by the caller; it is not background
 execution. It drives the same Run through an `AsyncExecutor`/`AsyncProvider`
 instead of `Executor`/`Provider`, so tools and model calls run as async I/O,
 and independent tool calls from one model turn run concurrently.
@@ -304,17 +304,17 @@ Three execution modes, one Run:
 
 ```text
 agent.run(...)
-    synchronous execution — the caller blocks until the Run finishes
+    synchronous execution: the caller blocks until the Run finishes
 
 agent.run_async(...)
-    asynchronous execution — the caller awaits the Run; I/O runs concurrently
+    asynchronous execution: the caller awaits the Run; I/O runs concurrently
 
 agent.run_later(...)
-    background execution — the caller gets the Run immediately; a Queue
+    background execution: the caller gets the Run immediately; a Queue
     advances it
 ```
 
-Each produces the same `Run`, moving through the same lifecycle — only how
+Each produces the same `Run`, moving through the same lifecycle; only how
 and when it advances differs.
 
 ---
@@ -366,12 +366,12 @@ Evaluation should exercise the same Agent and Run semantics used by the applicat
 The generated project wires both into the CLI:
 
 ```bash
-runa test    # app/tests/ — deterministic invariants
-runa eval    # app/evaluations/ — probabilistic behavior
+runa test    # app/tests/, deterministic invariants
+runa eval    # app/evaluations/, probabilistic behavior
 ```
 
 You can also inspect a Run's execution directly from the CLI, once it's
-been saved to a `RunStore` — automatic for `run_later()` given a
+been saved to a `RunStore`: automatic for `run_later()` given a
 `DurableQueue`, or call `runa.application.run_store.save(run)` yourself after a
 synchronous `run` (or a backgrounded one on the default `InlineQueue`):
 

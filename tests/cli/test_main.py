@@ -260,8 +260,8 @@ def test_running_outside_a_runa_app_directory_prints_a_clean_error(tmp_path, cap
 def test_a_broken_main_py_prints_a_clean_error_instead_of_a_traceback(tmp_path, capsys):
     """The common early-project case: `main.py`'s `configure()` builds a real
     Provider (e.g. `OpenAIProvider()`), which fails fast without an API key.
-    Every app-loading command — including ones like `runs list` that never
-    touch the Provider — used to surface that as a raw multi-frame traceback
+    Every app-loading command, including ones like `runs list` that never
+    touch the Provider, used to surface that as a raw multi-frame traceback
     through contextlib/importlib. It should read like the other clean,
     operator-input errors this module already handles.
     """

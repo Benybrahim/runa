@@ -1,6 +1,6 @@
 """AsyncProvider: the async counterpart to `Provider` (see `provider.py`).
 
-A separate protocol, not a change to `Provider` — a sync and an async client
+A separate protocol, not a change to `Provider`: a sync and an async client
 for the same vendor API are genuinely different objects, so a Provider is
 either one or the other, never both.
 
@@ -29,7 +29,7 @@ class AsyncProvider(Protocol):
 
 @dataclass
 class AsyncRetryingProvider:
-    """The async counterpart to `RetryingProvider` (see `provider.py`) — same
+    """The async counterpart to `RetryingProvider` (see `provider.py`), same
     retry policy, `await`ed instead of blocking: any exception retried by
     default, up to `max_retries` times, doubling `backoff` seconds each
     attempt, with `is_retryable` as the escape hatch for a specific
@@ -67,7 +67,7 @@ class AsyncStream:
     """The async counterpart to `Stream` (see `provider.py`).
 
     `async for chunk in stream` for deltas as they arrive; `message` is set
-    once the underlying vendor stream is exhausted — read it only after
+    once the underlying vendor stream is exhausted; read it only after
     the iterator is exhausted (`drain()` does both in one call).
     """
 
@@ -83,7 +83,7 @@ class AsyncStream:
         async for _ in self:
             pass
         assert self.message is not None, (
-            "AsyncStream exhausted without setting `message` — the "
+            "AsyncStream exhausted without setting `message`: the "
             "AsyncStreamingProvider that built it has a bug"
         )
         return self.message
@@ -98,7 +98,7 @@ class AsyncStreamingProvider(Protocol):
         tools: list[dict[str, Any]],
         model: str | None,
     ) -> AsyncStream:
-        """Not `async def` — returns an `AsyncStream` immediately; the
+        """Not `async def`: returns an `AsyncStream` immediately; the
         request itself only fires once that AsyncStream is iterated, same
         as `Stream`."""
         ...

@@ -31,7 +31,7 @@ from runa.tool import ParentRunAware
 
 if TYPE_CHECKING:
     # Agent.run()/.run_later() construct an Executor, so a runtime import here
-    # would cycle back through agent.py — this is used for type hints only.
+    # would cycle back through agent.py; this is used for type hints only.
     from runa.agent import Agent
 
 
@@ -39,19 +39,19 @@ class Executor:
     """Drives a Strategy against a Run.
 
     Seeds the initial messages, calls the model, executes tools, and applies
-    the Strategy's decisions until the Run leaves RUNNING — either because it
+    the Strategy's decisions until the Run leaves RUNNING, either because it
     reached a terminal status, or because it paused for background handoff
     or an approval gate (see `background/` and `approval.py`). Calling `run`
     again on a paused Run resumes it from where it left off.
 
-    Checks `run.cancel_requested` once per step, alongside `max_steps` — a
+    Checks `run.cancel_requested` once per step, alongside `max_steps`: a
     Run cancelled from another thread via `run.request_cancel()` (e.g. one
     being driven by a `ThreadQueue` job) stops at the next step boundary
     rather than mid-call; see `Run.request_cancel()` for why that flag, and
     not calling `run.cancel()` directly, is the safe way to ask.
 
     `timeout`, like `max_steps`, is a per-call budget checked at that same
-    step boundary — not a preemptive, mid-call deadline. It bounds one
+    step boundary, not a preemptive, mid-call deadline. It bounds one
     `run()` call's wall-clock time (from when this call starts driving the
     Run, not from `Run.created_at`), so a Run resumed later after a long
     pause (background handoff, approval) gets a fresh budget rather than
@@ -59,30 +59,30 @@ class Executor:
 
     Agent hooks fire in one fixed order: seeding, then `before_run` and
     `plan` once, before the first Strategy step; `review` once, when the
-    Strategy decides to Complete — its return value replaces the Strategy's
+    Strategy decides to Complete, its return value replaces the Strategy's
     draft result unless it returns `None` (manifesto §6's "reflection");
     `after_run` once the Run reaches a terminal status. Resuming a paused
-    Run skips seeding/`before_run`/`plan` — they're a start-of-run setup
+    Run skips seeding/`before_run`/`plan`: they're a start-of-run setup
     phase, not re-run on every resume.
 
     A bug while seeding the Run (`seed_run`) or in `before_run`/`plan` fails
     the Run with that exception as `Run.error`, same as a bug in the
-    Strategy loop itself — `run.start()` moves the Run to RUNNING *before*
+    Strategy loop itself: `run.start()` moves the Run to RUNNING *before*
     any of the three runs, so leaving an exception there unhandled would
     strand the Run at RUNNING forever instead of a terminal status,
-    indistinguishable from one still genuinely in progress — and, for a Run
+    indistinguishable from one still genuinely in progress, and, for a Run
     driven from a background thread (`run_later()` on a `ThreadQueue`/
     `SQLiteQueue`), an exception that isn't caught here would otherwise
     vanish into the thread pool with nothing to observe it. `after_run` runs
     after the Run already reached its real terminal status (COMPLETED/
     FAILED/CANCELLED), so a bug there can't be turned into a Run failure
-    without falsifying that outcome — it's instead surfaced as a
+    without falsifying that outcome; it's instead surfaced as a
     `RuntimeWarning` and otherwise ignored, the same treatment
     `instrument()` gives a raising subscriber.
 
     If `run.conversation` is set, its history is seeded in ahead of this
     Run's own input, and this Run's messages are folded back into it once
-    the Run reaches a terminal status — that's what lets a later Run pick
+    the Run reaches a terminal status; that's what lets a later Run pick
     up the conversation where this one left off (see `Agent.run`).
     """
 
@@ -110,19 +110,19 @@ class Executor:
 
         Pass `on_chunk` to receive `StreamChunk` text deltas as each model
         call streams in, instead of only seeing the whole `Message` once
-        it's done — the Run's messages, events, and final state end up
+        it's done. The Run's messages, events, and final state end up
         identical either way; `on_chunk` only changes what's observed while
         a CallModel step is in flight. Requires `self.provider` to satisfy
         `StreamingProvider`; raises `TypeError` otherwise.
 
-        A no-op if `run` is already terminal — there's nothing left to
+        A no-op if `run` is already terminal: there's nothing left to
         drive, so `before_run`/`plan`/`after_run` don't fire again and
         `run.conversation` isn't re-recorded. Without this check, calling
         `run()` a second time on an already-completed Run would silently
         re-invoke `after_run` (see `Run.is_terminal`).
 
         Raises `RunAlreadyDriving` if another Executor is already driving
-        this same Run object — see `Run.begin_driving()`.
+        this same Run object; see `Run.begin_driving()`.
         """
         if run.is_terminal:
             return run
@@ -167,7 +167,7 @@ class Executor:
                     agent.after_run(run)
                 except Exception as exc:  # Run already terminal; don't falsify it
                     warnings.warn(
-                        f"after_run raised {exc!r} — ignored, Run {run.id} "
+                        f"after_run raised {exc!r}, ignored: Run {run.id} "
                         f"already reached a terminal status "
                         f"({run.status.value})",
                         RuntimeWarning,
@@ -214,7 +214,7 @@ class Executor:
             if not isinstance(self.provider, StreamingProvider):
                 raise TypeError(
                     f"{type(self.provider).__name__} does not implement "
-                    "StreamingProvider.stream() — on_chunk requires a "
+                    "StreamingProvider.stream(): on_chunk requires a "
                     "streaming-capable Provider"
                 )
             stream = self.provider.stream(
@@ -236,7 +236,7 @@ class Executor:
 
         If `tool.call()` returns an `Artifact`, it's recorded on the Run via
         `run.add_artifact()` and its `summary()` becomes the tool result the
-        model sees — a plain value keeps working exactly as before, via
+        model sees; a plain value keeps working exactly as before, via
         `str(result)` (manifesto §10: artifacts are a type of tool result,
         not a separate API).
         """
@@ -260,12 +260,12 @@ class Executor:
         tool = tools.get(tool_call.name)
         if tool is None:
             raise ValueError(
-                f"model called unknown tool {tool_call.name!r} — declared "
+                f"model called unknown tool {tool_call.name!r}, declared "
                 f"tools are: {sorted(tools) or '(none)'}"
             )
         if inspect.iscoroutinefunction(tool.call):
             raise TypeError(
-                f"{tool.tool_name()!r} defines an async call() — run this Agent with "
+                f"{tool.tool_name()!r} defines an async call(): run this Agent with "
                 "AsyncExecutor instead of Executor"
             )
         tool_call.idempotent = tool.idempotent
@@ -284,7 +284,7 @@ class Executor:
         except Exception as exc:
             # The exception doesn't say whether the underlying side effect
             # fired before it was raised, so the effect is UNKNOWN, not
-            # NONE — see EffectStatus and RetryStrategy.
+            # NONE. See EffectStatus and RetryStrategy.
             tool_call.error = str(exc)
             tool_call.effect = EffectStatus.UNKNOWN
             run.emit(
@@ -311,7 +311,7 @@ class Executor:
             EventType.TOOL_COMPLETED,
             tool=tool_call.name,
             tool_call_id=tool_call.id,
-            # `content`, not the raw `tool_call.result` — a Tool may return
+            # `content`, not the raw `tool_call.result`: a Tool may return
             # an arbitrary object (e.g. an Artifact), which Event.data must
             # stay JSON-serializable for (persistence, webhook export);
             # `content` is the same already-stringified/summarized value

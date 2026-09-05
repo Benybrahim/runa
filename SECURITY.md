@@ -4,7 +4,7 @@
 
 If you believe you've found a security vulnerability in Runa, please report it privately rather than opening a public issue.
 
-The preferred channel is [GitHub's private vulnerability reporting](https://github.com/Benybrahim/runa/security/advisories/new) on this repository ("Security" tab → "Report a vulnerability"). This repository does not yet have a dedicated security email or bug bounty program — private reporting through GitHub is the mechanism available today.
+The preferred channel is [GitHub's private vulnerability reporting](https://github.com/Benybrahim/runa/security/advisories/new) on this repository ("Security" tab → "Report a vulnerability"). This repository does not yet have a dedicated security email or bug bounty program: private reporting through GitHub is the mechanism available today.
 
 Please include:
 

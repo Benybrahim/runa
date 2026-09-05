@@ -10,7 +10,7 @@ def test_tool_call_completed_reflects_a_successful_attempt():
 
 
 def test_tool_call_completed_is_true_even_when_the_result_is_none():
-    # A Tool can legitimately return None — that's not "never ran".
+    # A Tool can legitimately return None: that's not "never ran".
     call = ToolCall(name="send_email", arguments={"to": "a@b.com"})
     call.attempts += 1
     call.result = None

@@ -148,7 +148,7 @@ class AsyncOpenAIProvider:
 
     Satisfies `AsyncProvider` structurally, backed by `openai.AsyncOpenAI`
     instead of `openai.OpenAI`. Shares the exact same wire-format functions
-    as the sync provider — only the client and the `await` differ.
+    as the sync provider; only the client and the `await` differ.
     """
 
     def __init__(self, client: openai.AsyncOpenAI | None = None) -> None:
@@ -176,7 +176,7 @@ class AsyncOpenAIProvider:
         model: str | None,
     ) -> AsyncStream:
         """Satisfies `AsyncStreamingProvider` structurally. Not `async def`
-        itself — the request only fires once the returned `AsyncStream` is
+        itself: the request only fires once the returned `AsyncStream` is
         async-iterated."""
 
         async def generate() -> AsyncIterator[StreamChunk]:

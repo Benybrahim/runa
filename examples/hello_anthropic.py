@@ -1,6 +1,6 @@
 """hello_anthropic.py: the smallest complete Runa app, on AnthropicProvider.
 
-Identical to hello.py except for the Provider — swapping OpenAIProvider for
+Identical to hello.py except for the Provider: swapping OpenAIProvider for
 AnthropicProvider is the only change an app needs to switch model vendors
 (manifesto §17: components are integrated through one Provider contract, not
 wired together per vendor).

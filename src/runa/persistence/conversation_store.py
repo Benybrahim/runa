@@ -1,6 +1,6 @@
 """ConversationStore: makes Conversation history and state durable.
 
-Mirrors RunStore (store.py) — a Conversation spans separate `Agent.run()`
+Mirrors RunStore (store.py): a Conversation spans separate `Agent.run()`
 calls the way a paused Run spans separate Executor invocations, so it
 needs the same "look it up again later" durability.
 """
@@ -20,7 +20,7 @@ class InMemoryConversationStore:
     """Default ConversationStore: keeps Conversations in a process-local dict.
 
     This is the development default (manifesto: real backends are swapped
-    in via configuration, not code changes) — nothing here survives a
+    in via configuration, not code changes); nothing here survives a
     process restart.
     """
 

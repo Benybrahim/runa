@@ -88,7 +88,7 @@ def test_generate_evaluation_writes_a_self_contained_valid_module(tmp_path):
     assert "agent = _WeatherPlaceholder()" in content
     assert "cases: list[EvalCase] = [" in content
 
-    # The generated module must actually import cleanly — a freshly
+    # The generated module must actually import cleanly: a freshly
     # generated eval file that can't even be imported would break `runa
     # eval` immediately, before the developer has touched a single TODO.
     namespace: dict = {}

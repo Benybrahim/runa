@@ -1,4 +1,4 @@
-"""runa.config is now a backward-compatible facade over runa.application —
+"""runa.config is now a backward-compatible facade over runa.application;
 see test_application.py for the Application/Config behavior itself. These
 tests only check the facade still wires through correctly.
 """

@@ -92,7 +92,7 @@ def test_pending_survives_reopening_the_same_database(tmp_path):
     path = str(tmp_path / "queue.db")
     queue = SQLiteQueue(path)
     # Simulate a previous process that journaled a run and crashed before
-    # its job could clear the row — write the row directly rather than
+    # its job could clear the row; write the row directly rather than
     # going through enqueue_run(), which would race its own worker thread
     # against the close() below.
     queue._connection.execute(
@@ -124,7 +124,7 @@ def test_run_later_saves_the_terminal_status_once_a_durable_job_completes(
     tmp_path, monkeypatch
 ):
     # Before this, run_later() only saved the Run once, as QUEUED, before
-    # dispatch — nothing wrote the COMPLETED status back, so the store (and
+    # dispatch, nothing wrote the COMPLETED status back, so the store (and
     # `runa runs show <id>`) would show the Run as forever QUEUED even
     # though it finished successfully.
     run_store = SQLiteRunStore(str(tmp_path / "runs.db"))
@@ -147,7 +147,7 @@ def test_run_later_saves_a_failed_status_once_a_durable_job_fails(
     tmp_path, monkeypatch
 ):
     # Same gap as above, but for failure: a background Run that errors out
-    # must not leave the store silently claiming it's still QUEUED — that
+    # must not leave the store silently claiming it's still QUEUED; that
     # would hide the failure from anyone inspecting the store.
     run_store = SQLiteRunStore(str(tmp_path / "runs.db"))
     monkeypatch.setattr(application.config, "run_store", run_store)
@@ -191,7 +191,7 @@ def test_recover_pending_resumes_a_run_orphaned_by_a_crashed_process(tmp_path):
     executor = Executor(provider)
 
     recovered = recover_pending(queue, run_store, executor, agents=[GreeterAgent])
-    # enqueue_run() dispatches to the thread pool and returns immediately —
+    # enqueue_run() dispatches to the thread pool and returns immediately;
     # wait for it to drain before checking pending(), without closing the
     # connection pending() itself needs.
     queue._executor.shutdown(wait=True)
@@ -208,7 +208,7 @@ def test_recover_pending_reruns_a_non_idempotent_tool_call_that_already_fired(
     tmp_path,
 ):
     # Characterizes a real limitation, not a bug to "fix" here: run_later()
-    # only ever persists the Run's pre-dispatch QUEUED snapshot — nothing
+    # only ever persists the Run's pre-dispatch QUEUED snapshot; nothing
     # checkpoints progress once a Run starts executing. So recover_pending()
     # restarts a crashed Run from the beginning rather than resuming it
     # mid-flight, and a non-idempotent tool call the crashed process already
@@ -233,7 +233,7 @@ def test_recover_pending_reruns_a_non_idempotent_tool_call_that_already_fired(
 
     # Simulate the previous process: it journaled the run, persisted it as
     # QUEUED (the only save that ever happens before completion), and then
-    # actually charged the card — before crashing without ever recording
+    # actually charged the card, before crashing without ever recording
     # that this happened anywhere durable.
     run = Run(input="charge 100", agent_name="BillingAgent")
     run.queue()
@@ -266,4 +266,4 @@ def test_recover_pending_reruns_a_non_idempotent_tool_call_that_already_fired(
     queue._executor.shutdown(wait=True)
     queue.close(wait=False)
 
-    assert charges == [100, 100]  # charged twice — the crashed run restarted
+    assert charges == [100, 100]  # charged twice: the crashed run restarted

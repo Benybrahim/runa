@@ -188,8 +188,8 @@ def test_instrument_supports_multiple_subscribers():
 
 def test_a_raising_subscriber_does_not_fail_or_crash_the_run():
     # Before this, an exception from a subscriber (e.g. a webhook endpoint
-    # that's down) propagated straight out of Executor.run() — including
-    # from run.start(), which fires outside the Executor's own try/except —
+    # that's down) propagated straight out of Executor.run(), including
+    # from run.start(), which fires outside the Executor's own try/except,
     # defeating the guarantee that Run execution converts failures into a
     # failed Run rather than crashing the caller.
     provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])

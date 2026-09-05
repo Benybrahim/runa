@@ -1,6 +1,6 @@
 """ThreadQueue: runs enqueued jobs on a background thread pool.
 
-Same `Queue` protocol as `InlineQueue` — swapping one for the other at
+Same `Queue` protocol as `InlineQueue`: swapping one for the other at
 `run_later(queue=...)` is a one-line change, not a code change. Unlike
 `InlineQueue`, `enqueue()` returns before the job has run: the `Run` it's
 driving is left `QUEUED`, not yet at its next pause point. `Run` isn't
@@ -26,7 +26,7 @@ class ThreadQueue:
         """Stop accepting new jobs; `wait=True` blocks until running jobs finish.
 
         A normal process exit already waits for in-flight jobs without
-        calling this — that's `ThreadPoolExecutor`'s own `atexit` behavior.
+        calling this: that's `ThreadPoolExecutor`'s own `atexit` behavior.
         `SIGTERM` bypasses it, killing a worker thread mid-job with no
         cleanup; call this from your own signal handler if that matters
         (see docs/guides.md, "Shutting Down a Background Queue").

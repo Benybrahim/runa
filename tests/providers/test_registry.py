@@ -12,7 +12,7 @@ from tests.fakes import FakeAsyncProvider, FakeProvider
 @pytest.fixture(autouse=True)
 def _fake_api_keys(monkeypatch):
     """Constructing a real provider only needs *a* key present, not a valid
-    one — no network call happens until `.complete()`."""
+    one: no network call happens until `.complete()`."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 

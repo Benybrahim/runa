@@ -2,7 +2,7 @@
 
 `Agent.as_tool()` wraps an Agent as an ordinary Tool: the parent agent
 declares it in `tools` like any other capability, and delegation reuses
-DefaultStrategy's existing tool-use loop — no new Strategy needed.
+DefaultStrategy's existing tool-use loop, no new Strategy needed.
 
 Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/delegate.py

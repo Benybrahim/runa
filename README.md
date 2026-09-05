@@ -1,18 +1,57 @@
-<div align="center">
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/brand/mark-dark.svg">
-  <img src="assets/brand/mark.svg" width="40" height="40" alt="Runa">
-</picture>
-
-# Runa
-
-**The application framework for agentic AI.**
-
-Run agents, not loops.
-
-</div>
+# Welcome to Runa
 
 ---
+
+## What's Runa?
+
+Runa is an agent application framework that includes everything needed to build and run reliable, stateful agents according to the Agent-Run-Execution (ARE) pattern.
+
+Understanding the ARE pattern is key to understanding Runa. ARE divides your agent application into three parts: Agent, Run, and Execution, each with a specific responsibility.
+
+### Agent layer
+
+The Agent layer defines behavior: instructions, tools, hooks, and policies. In Runa, an Agent is an ordinary Python class, not a running process; defining `ResearchAgent` doesn't execute anything by itself, the same way defining a Rails model doesn't touch the database until you call it. See [`docs/concepts.md`](docs/concepts.md) for the full definition.
+
+### Run layer
+
+The Run layer represents execution. Calling an Agent produces a `Run`, with its own identity, lifecycle, events, state, result, and artifacts. Everything else in Runa (saving a Run, resuming it, watching it, grading it) is a layer that reads or advances that same `Run`. See [`docs/architecture.md`](docs/architecture.md) for the full breakdown.
+
+## Frameworks and libraries
+
+The `Executor`/`AsyncExecutor` that drives a Run, and the `Provider` adapters that call a model, can each be used independently of the rest of Runa.
+
+In addition to that, Runa also comes with:
+
+* Persistence, to save and resume a Run or a Conversation across process restarts
+* Background execution, to run a Run off the request path and check on it later
+* Approval, to route a tool call to a human before it executes
+* Observability, to watch a Run live or replay its event history afterward
+* Evaluation, a harness to grade Agent behavior against cases, distinct from deterministic tests
+* A CLI (`runa new`, `runa generate`, `runa test`, `runa eval`, `runa runs`), to scaffold and operate an application
+
+## Getting Started
+
+Runa hasn't made a tagged release yet. Install from source at the command prompt with [uv](https://docs.astral.sh/uv/):
+
+```bash
+$ git clone https://github.com/Benybrahim/runa
+$ cd runa
+$ make install
+```
+
+At the command prompt, create a new Runa application:
+
+```bash
+$ uv run runa new myapp
+```
+
+where "myapp" is the application name.
+
+Change directory to myapp, define an Agent, and run it:
+
+```bash
+$ cd myapp
+```
 
 ```python
 from runa import Agent, configure, tool
@@ -36,101 +75,24 @@ print(run.result)
 # "It's sunny and 22C in Tokyo right now."
 ```
 
-## Why Runa
+Follow the guides to start developing your application. You may find the following resources handy:
 
-A model API and a loop get an agent running. A real application needs more: state, persistence, background execution, retries, human approval, observability, evaluation. Most agent code ends up assembling those separately, project by project.
-
-Runa is not another SDK for calling a model. It's the application layer above one — a coherent framework, not an assembled stack.
-
-## The Runa idea
-
-Everything in Runa is organized around one object: the **Run**.
-
-```text
-Agent               defines behavior
-  ↓
-Run                 represents one execution
-  ↓
-events · state · result · artifacts
-  ↓
-persistence · background execution · observability · evaluation
-```
-
-An Agent is an ordinary class — instructions, tools, hooks. Calling it produces a `Run`, and everything else in the framework — saving it, resuming it, watching it, grading it — is a layer that reads or advances that same `Run`. See [`docs/architecture.md`](docs/architecture.md) for the full breakdown.
-
-## Application structure
-
-```text
-myapp/
-├── main.py                # entry point — the one place that calls configure()
-├── app/
-│   ├── agents/             # Agent subclasses
-│   ├── tools/               # Tool subclasses
-│   ├── resources/            # shared resources (clients, config)
-│   ├── evaluations/          # eval cases — runa eval
-│   └── tests/                # deterministic tests — runa test
-```
-
-`runa new myapp` scaffolds this layout. `runa generate agent Research` adds `app/agents/research_agent.py` the same way; `generate tool` and `generate evaluation` follow suit.
-
-## Developer workflow
-
-```bash
-runa new myapp              # scaffold a new application
-runa generate agent Research
-runa test                   # app/tests/ — deterministic invariants
-runa eval                   # app/evaluations/ — probabilistic behavior, graded by a Judge
-runa runs show <id>         # replay a Run's timeline
-runa runs list --status failed
-```
-
-## Philosophy
-
-Runa is intentionally opinionated:
-
-```text
-Agents define behavior. Runs define execution.
-Convention over configuration.
-One lifecycle, many strategies.
-State is explicit.
-Observability and evaluation are defaults.
-Provide sharp knives.
-```
-
-The full set of principles lives in [`RUNA.md`](RUNA.md).
-
-## Status
-
-The core API — `Agent`, `Run`, `Executor`/`AsyncExecutor`, persistence, background execution, approval, observability, evaluation, and the CLI — is implemented and tested, and is stable enough to build against. Runa is still young: expect the surface to keep growing (durable/remote persistence backends, richer strategies, additional providers) without changing these foundations.
-
-## Documentation
-
-* [`docs/getting_started.md`](docs/getting_started.md) — a guided first application
-* [`docs/concepts.md`](docs/concepts.md) — Runa's core vocabulary
-* [`docs/architecture.md`](docs/architecture.md) — the technical architecture and layer boundaries
-* [`docs/guides.md`](docs/guides.md) — practical patterns
-* [`docs/manifesto.md`](docs/manifesto.md) — why Runa takes this approach
-* [`docs/rails-to-runa.md`](docs/rails-to-runa.md) — the Rails inspiration, mapped concept by concept
-* [`RUNA.md`](RUNA.md) — the framework's design principles
-
-## Development
-
-Runa uses [uv](https://docs.astral.sh/uv/) and targets Python 3.14.
-
-```bash
-make install     # uv sync
-make check       # format + lint + test
-make hello       # run examples/hello.py
-```
+* [Getting Started with Runa](docs/getting_started.md)
+* [Runa Concepts](docs/concepts.md)
+* [The Runa Architecture](docs/architecture.md)
+* [Runa Guides](docs/guides.md)
+* [The Runa Manifesto](docs/manifesto.md)
 
 ## Feedback
 
-Runa is open source but not open to code contributions — it's maintained as
-a single coherent point of view rather than a collection of independently
-accepted patches. Bug reports and design feedback are genuinely welcome via
-[issues](../../issues); see [`CONTRIBUTING.md`](CONTRIBUTING.md) for how,
-and [`SECURITY.md`](SECURITY.md) to report a vulnerability privately.
+Runa is open source, but it's not open to code contributions: it's maintained as a single coherent point of view rather than a collection of independently accepted patches. Pull requests are closed unmerged; check out [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full policy.
+
+Bug reports and design feedback are genuinely welcome. Please open an [issue](../../issues).
+
+Trying to report a possible security vulnerability in Runa? Please check out [`SECURITY.md`](SECURITY.md) for guidelines about how to proceed.
+
+Everyone interacting in Runa's codebase, issue tracker, and any chat rooms is expected to follow the [Runa code of conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
-[MIT](LICENSE)
+Runa is released under the [MIT License](LICENSE).

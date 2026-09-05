@@ -30,8 +30,8 @@ class FakeProvider:
 class FakeStreamingProvider:
     """A scripted `StreamingProvider`: same contract as `FakeProvider`, plus
     `stream()`. Splits each response's `.content` into one-character
-    `StreamChunk`s before delivering the same `Message` `complete()` would
-    — a response with only `tool_calls` and no `.content` streams zero
+    `StreamChunk`s before delivering the same `Message` `complete()` would;
+    a response with only `tool_calls` and no `.content` streams zero
     chunks, matching how a real tool-call turn carries little or no text.
     """
 

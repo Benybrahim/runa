@@ -44,7 +44,7 @@ def test_record_replaces_rather_than_accumulates():
 
 def test_concurrent_record_calls_never_tear_or_interleave_messages():
     """Many threads racing `record()` must each see a coherent, single
-    Run's messages — never a mix of two Runs' messages spliced together.
+    Run's messages, never a mix of two Runs' messages spliced together.
     Which Run's `record()` finishes last is unspecified (see the
     last-write-wins test below); that it's *one whole Run's* messages,
     not a corrupted blend, is what the lock in `record()` guarantees."""

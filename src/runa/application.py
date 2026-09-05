@@ -1,8 +1,8 @@
 """Application: the app-wide configuration boundary (RUNA.md §2, §5).
 
-A Runa application shares one set of runtime infrastructure — model
-provider, run persistence, and (later) execution, telemetry, logging,
-hooks, serialization — across every Agent it runs. `Application` is the
+A Runa application shares one set of runtime infrastructure (model
+provider, run persistence, and, later, execution, telemetry, logging,
+hooks, serialization) across every Agent it runs. `Application` is the
 object that owns that infrastructure; `Config` is the plain data it holds.
 Structuring it as a dataclass rather than separate globals means new shared
 infrastructure is a new `Config` field, not a new module-level variable
@@ -10,7 +10,7 @@ threaded through every call site that needs it.
 
 `application` (module-level, below) is the default `Application`, created
 once at import time. `runa.configure(**options)` is convenience sugar for
-`application.configure(**options)` — most applications talk to exactly one
+`application.configure(**options)`; most applications talk to exactly one
 Application and never construct their own. `Agent.run()` and friends
 (agent.py) resolve their provider from this default instance so a provider
 is not threaded through every call.
@@ -19,11 +19,11 @@ Construct `Application()` explicitly for tests, or any scenario that needs
 an isolated set of infrastructure: each instance owns its own `Config`, so
 configuring one instance never leaks into another (see
 tests/test_application.py). Its provider/async_provider/run_store can be
-passed straight into an `Executor`/`AsyncExecutor` — the same escape hatch
-`Agent.run(executor=...)` already exposes — so an isolated Application
+passed straight into an `Executor`/`AsyncExecutor`, the same escape hatch
+`Agent.run(executor=...)` already exposes, so an isolated Application
 doesn't need any Agent-level API of its own to be useful.
 
-A model provider is an application-level dependency, not a per-agent one —
+A model provider is an application-level dependency, not a per-agent one:
 most applications talk to exactly one. `async_provider` is a separate slot
 rather than something derived from `provider`: a sync client
 (`anthropic.Anthropic`) and an async one (`anthropic.AsyncAnthropic`) are
@@ -97,7 +97,7 @@ class Application:
     def configure(self, **options: object) -> None:
         """Set one or more `Config` fields explicitly.
 
-        Only the options passed are touched — anything already configured
+        Only the options passed are touched: anything already configured
         and left out of this call keeps its current value (so
         `configure(provider=...)` alone never resets an already-configured
         `run_store`). Raises `InvalidConfiguration` for a keyword that
@@ -105,7 +105,7 @@ class Application:
         loudly instead of being silently ignored.
 
         `provider`/`async_provider` accept either a `Provider`/`AsyncProvider`
-        instance or its ergonomic string alias (`provider="openai"`) — the
+        instance or its ergonomic string alias (`provider="openai"`); the
         alias is resolved to an instance right here, so `self.config` and
         everything downstream only ever sees a real Provider (see
         `runa.providers.registry.resolve_provider`). An unrecognized alias

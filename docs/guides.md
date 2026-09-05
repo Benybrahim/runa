@@ -39,7 +39,7 @@ class ResearchAgent(Agent):
 ```
 
 Reach for the `Tool` base class when a tool needs more than a function body
-provides — approval, idempotency, or other class-level configuration:
+provides: approval, idempotency, or other class-level configuration:
 
 ```python
 from runa import Tool
@@ -94,9 +94,9 @@ run.context.policies = ["no refunds over $500 without approval"]
 ResearchAgent.run(run.input, executor=Executor(provider=..., ...))
 ```
 
-A non-empty Context reaches the Agent as a second system message, right after `Agent.instructions` — a plain listing of whatever keys are set. No key name is treated specially; Context stays free-form, the same way Run State and Conversation State do.
+A non-empty Context reaches the Agent as a second system message, right after `Agent.instructions`: a plain listing of whatever keys are set. No key name is treated specially; Context stays free-form, the same way Run State and Conversation State do.
 
-An empty Context (the default) adds nothing — most simple agents never need one.
+An empty Context (the default) adds nothing; most simple agents never need one.
 
 If a different shape belongs in the prompt than the default listing gives, don't populate `run.context`; build the message directly in `before_run`/`plan` instead.
 
@@ -124,7 +124,7 @@ Conversation state survives across these executions.
 
 Run state does not.
 
-Only sequence Runs against a shared Conversation this way — finish one (including
+Only sequence Runs against a shared Conversation this way: finish one (including
 the `record()` that happens at the end of `.run()`) before starting the next.
 Two Runs launched concurrently against the same Conversation (e.g. via
 `run_later()` on a `ThreadQueue`) are not merged: each seeds its history from
@@ -132,12 +132,12 @@ the Conversation as it stood when that Run started, and whichever finishes
 last silently overwrites the other's turn. Give concurrent Runs their own
 Conversations and merge deliberately instead.
 
-A Conversation's history has no built-in limit — every Run's turn is added
+A Conversation's history has no built-in limit; every Run's turn is added
 on top of the last, forever. Eventually that history is large enough that
 the model API itself rejects it (a Provider error, which fails the Run
-cleanly rather than crashing — but the Conversation stays stuck failing
+cleanly rather than crashing, but the Conversation stays stuck failing
 every Run after that until something trims it). Runa doesn't truncate or
-summarize this automatically — that would mean building the kind of
+summarize this automatically; that would mean building the kind of
 agent-specific memory system the framework deliberately avoids.
 `conversation.messages` is a plain list, so manage it the way any
 application-owned list would be managed:
@@ -161,7 +161,7 @@ run = ResearchAgent.run_later("Produce a detailed report.")
 
 The returned object represents the same conceptual unit of work as `run()`.
 
-For durable background execution, configure a persistent Run store and an appropriate Queue — `configure(provider=..., run_store=SQLiteRunStore(...))`. `run_later()` saves the Run there itself when queuing onto a `DurableQueue` — once before dispatch (so recovery has something to find after a crash) and again once the Run reaches its next pause point (completion, failure, or an approval gate), so `runa runs show <id>` reflects what actually happened instead of the Run's last-queued status. No extra wiring needed beyond `configure()`.
+For durable background execution, configure a persistent Run store and an appropriate Queue: `configure(provider=..., run_store=SQLiteRunStore(...))`. `run_later()` saves the Run there itself when queuing onto a `DurableQueue`, once before dispatch (so recovery has something to find after a crash) and again once the Run reaches its next pause point (completion, failure, or an approval gate), so `runa runs show <id>` reflects what actually happened instead of the Run's last-queued status. No extra wiring needed beyond `configure()`.
 
 Do not create a separate “job object” in application code just because execution happens later.
 
@@ -175,18 +175,18 @@ from runa import recover_pending
 recover_pending(queue, run_store, executor, agents=[ResearchAgent])
 ```
 
-This restarts a recovered Run from the beginning, not from wherever the crashed process reached — nothing checkpoints progress once a Run starts executing, only before dispatch and at its next pause point. Any tool call the crashed process already completed runs again. Only pass `agents` whose tools are all `idempotent = True`, or a real side effect (a charge, an email, a ticket) can happen twice.
+This restarts a recovered Run from the beginning, not from wherever the crashed process reached: nothing checkpoints progress once a Run starts executing, only before dispatch and at its next pause point. Any tool call the crashed process already completed runs again. Only pass `agents` whose tools are all `idempotent = True`, or a real side effect (a charge, an email, a ticket) can happen twice.
 
 ## Shutting Down a Background Queue
 
 `ThreadQueue`/`SQLiteQueue` run jobs on a `ThreadPoolExecutor`. A normal
-process exit — the script falls off the end, or `sys.exit()` — already
+process exit (the script falls off the end, or `sys.exit()`) already
 waits for in-flight jobs to finish before the interpreter actually
 terminates; that's Python's own `ThreadPoolExecutor` behavior, not
 something Runa adds, and it works even if the application never calls
 `queue.close()`.
 
-`SIGTERM` — how Docker, Kubernetes, and systemd all ask a process to stop —
+`SIGTERM` (how Docker, Kubernetes, and systemd all ask a process to stop)
 does not go through that same path. With no handler installed, the default
 action for SIGTERM is immediate termination: whatever a worker thread was
 doing (mid-tool-call, mid-model-call) simply stops, with no chance to run
@@ -206,7 +206,7 @@ signal.signal(signal.SIGTERM, handle_sigterm)
 ```
 
 Registering a signal handler is an application decision, not something
-Runa does on the application's behalf — a web server or job runner already
+Runa does on the application's behalf: a web server or job runner already
 managing its own SIGTERM handling shouldn't have Runa silently install a
 competing one.
 
@@ -214,7 +214,7 @@ For work where losing in-flight progress to `SIGKILL` (which no signal
 handler can intercept at all) is unacceptable, durability is the real
 answer, not a longer grace period: use a `DurableQueue` (`SQLiteQueue`) and
 call `recover_pending()` at the next startup, as above. A `SIGTERM` handler
-and `DurableQueue` recovery address different failure windows — the handler
+and `DurableQueue` recovery address different failure windows: the handler
 covers an orderly stop with time to finish; recovery covers whatever the
 handler didn't reach in time, or a harder kill that skipped it entirely.
 
@@ -235,7 +235,7 @@ for entry in timeline(run):
 ```
 
 The CLI reads the same information back from a `RunStore` instead, so it
-only sees Runs that were actually saved there — `run_later()` saves
+only sees Runs that were actually saved there: `run_later()` saves
 automatically, but only when given a `DurableQueue` (see "Running in the
 Background" above; that's what lets `runa runs show` follow background
 work after a crash). A plain synchronous `Agent.run()`, and `run_later()`
@@ -258,7 +258,7 @@ runa runs pending
 
 `runs list` filters by `--status`, `--since`, `--agent-name`, and
 `--parent-run-id`. `runs pending` lists Runs paused in
-`AWAITING_APPROVAL` — see "Adding Human Approval" below for
+`AWAITING_APPROVAL`; see "Adding Human Approval" below for
 `runs approve`/`runs deny`.
 
 A useful inspection question is:
@@ -353,7 +353,7 @@ runa runs approve <run_id> <tool_call_id>
 runa runs deny <run_id> <tool_call_id> --reason "not authorized"
 ```
 
-Or from application code, via `runa.approve()`/`runa.deny()` — see
+Or from application code, via `runa.approve()`/`runa.deny()`; see
 `approval.py`.
 
 ---
@@ -409,7 +409,7 @@ The Run is the application-level unit of work.
 
 # Cancelling a Run
 
-A Run being driven in-process — for example by a `ThreadQueue` job — should
+A Run being driven in-process (for example by a `ThreadQueue` job) should
 be cancelled by requesting it, not by mutating the Run directly:
 
 ```python
@@ -421,8 +421,8 @@ the actual cancellation itself, at the next step boundary. Calling
 `run.cancel()` directly from a different thread than the one driving the Run
 races that loop and can raise `IllegalTransition`.
 
-A Run with no live Executor driving it — one saved to a `RunStore` while
-`CREATED`, `QUEUED`, `PAUSED`, or `AWAITING_APPROVAL` — has no owning thread
+A Run with no live Executor driving it (one saved to a `RunStore` while
+`CREATED`, `QUEUED`, `PAUSED`, or `AWAITING_APPROVAL`) has no owning thread
 to race, so it can be cancelled directly:
 
 ```bash
@@ -439,7 +439,7 @@ runa runs cancel <run_id>
 executor = Executor(provider, timeout=30)  # seconds
 ```
 
-Like `max_steps`, this is checked at the step boundary, not preemptively — a slow model or tool call already in flight still finishes before the next check can fail the Run. A Run that exceeds either bound fails with a clear error rather than hanging or looping forever.
+Like `max_steps`, this is checked at the step boundary, not preemptively: a slow model or tool call already in flight still finishes before the next check can fail the Run. A Run that exceeds either bound fails with a clear error rather than hanging or looping forever.
 
 The budget is per `run()` call, not per Run: resuming a paused Run (background handoff, approval) starts a fresh timeout rather than counting time spent waiting.
 
@@ -495,7 +495,7 @@ class ChargeCard(Tool):
     def call(self, order_id: str, amount: float) -> str: ...
 ```
 
-A tool call that raises leaves its effect unknown — there is no way to tell whether the side effect happened before the exception did. `RetryStrategy` only retries a failed call when its tool opts in with `idempotent = True`; otherwise it fails on the first error rather than risking a duplicate charge or a duplicate email.
+A tool call that raises leaves its effect unknown: there is no way to tell whether the side effect happened before the exception did. `RetryStrategy` only retries a failed call when its tool opts in with `idempotent = True`; otherwise it fails on the first error rather than risking a duplicate charge or a duplicate email.
 
 A retry should not accidentally duplicate a side effect.
 
@@ -517,12 +517,12 @@ configure(provider=RetryingProvider(AnthropicProvider(), max_retries=3))
 
 This is safe by construction, not just by convention: `Executor._call_model`
 only writes the response to `Run.messages` once `complete()` returns, so a
-failed attempt hasn't changed anything a retry could duplicate — unlike a
+failed attempt hasn't changed anything a retry could duplicate, unlike a
 tool call, no `idempotent` flag is needed here.
 
 By default every exception is retried, with exponential backoff starting at
-`backoff` seconds. To retry only specific failures — e.g. a provider's own
-rate-limit or connection-error types — pass `is_retryable`:
+`backoff` seconds. To retry only specific failures (e.g. a provider's own
+rate-limit or connection-error types), pass `is_retryable`:
 
 ```python
 import anthropic
@@ -537,7 +537,7 @@ configure(
 )
 ```
 
-Only `complete()` is retried — a `RetryingProvider` wrapping a streaming
+Only `complete()` is retried: a `RetryingProvider` wrapping a streaming
 Provider no longer satisfies `StreamingProvider`, since a partially
 delivered stream can't be safely restarted once some chunks have already
 reached `on_chunk`.
@@ -631,4 +631,4 @@ Do I actually need a new abstraction?
 
 Prefer the smallest model that clearly expresses the application.
 
-> **Add abstractions when the application reveals a recurring problem—not because the framework has a place to put them.**
+> **Add abstractions when the application reveals a recurring problem, not because the framework has a place to put them.**

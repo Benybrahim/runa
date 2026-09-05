@@ -1,10 +1,10 @@
 """cli/main.py: the `runa` command-line entry point.
 
-`new` and `generate` are scaffolding (manifesto §2, §9) — they write files
+`new` and `generate` are scaffolding (manifesto §2, §9): they write files
 following the app/ convention and never touch the runtime. `eval`, `test`,
 and `runs` do touch it, but only by calling existing library functions
 (`run_project_evals()`, `run_project_tests()`, `timeline()`,
-`approval.approve()`/`deny()`, `Run.cancel()`) against the app in `cwd` — no
+`approval.approve()`/`deny()`, `Run.cancel()`) against the app in `cwd`; no
 logic lives here that doesn't already exist elsewhere (manifesto §11, §12,
 §14).
 """
@@ -88,7 +88,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--since", default=None, help="ISO 8601 timestamp; only Runs at or after it"
     )
     runs_list_parser.add_argument(
-        "--agent-name", default=None, help="e.g. ResearchAgent — see Agent.name"
+        "--agent-name", default=None, help="e.g. ResearchAgent, see Agent.name"
     )
     runs_list_parser.add_argument(
         "--parent-run-id", default=None, help="only Runs delegated from this Run"
@@ -119,7 +119,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
     """Parse argv and dispatch, converting operator-input errors into a clean
-    message on stderr and exit code 1 instead of a raw Python traceback —
+    message on stderr and exit code 1 instead of a raw Python traceback:
     a mistyped run id or tool_call_id, or running outside a Runa app
     directory, is routine CLI usage, not a Runa bug. Anything else (a real
     bug, in Runa or in the app's own code) still propagates with its full
@@ -134,9 +134,7 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
     except ModuleNotFoundError as exc:
         if exc.name != "main":
             raise
-        print(
-            f"error: no main.py found in {cwd} — is this a Runa app?", file=sys.stderr
-        )
+        print(f"error: no main.py found in {cwd}, is this a Runa app?", file=sys.stderr)
         return 1
     except (
         RunNotFound,

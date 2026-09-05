@@ -15,7 +15,7 @@ from runa.core.state import RunState
 
 if TYPE_CHECKING:
     # Only Executor._seed reads Run.conversation, and Conversation.record
-    # takes a Run — an unconditional import here would cycle.
+    # takes a Run; an unconditional import here would cycle.
     from runa.core.conversation import Conversation
 
 
@@ -83,7 +83,7 @@ class Run:
         # Not a dataclass field: a lock can't be meaningfully copied,
         # compared, or serialized, and run_from_dict() reconstructs a Run
         # through this same __init__/__post_init__ path, so every instance
-        # — freshly created or deserialized — gets its own.
+        # (freshly created or deserialized) gets its own.
         self._drive_lock = threading.Lock()
         self._driving = False
 
@@ -92,14 +92,14 @@ class Run:
         Executor/AsyncExecutor at the start of `run()`.
 
         A Run has no concurrency control of its own over `add_message`/
-        `emit`/status transitions — two Executors advancing the same Run
+        `emit`/status transitions: two Executors advancing the same Run
         object at once would otherwise interleave their steps with no
         error at all, silently duplicating model calls and tool side
         effects instead of failing loudly. Raises `RunAlreadyDriving` if
         another Executor is already driving this Run.
 
         This only catches this one framework entry point being called
-        twice on the same in-memory object — not two separate `Run`
+        twice on the same in-memory object, not two separate `Run`
         objects loaded for the same persisted `run_id` (that hazard is a
         `RunStore`/application concern; see also `ThreadQueue`'s docstring,
         which already warns against reading a queued Run from another
@@ -110,7 +110,7 @@ class Run:
             if self._driving:
                 raise RunAlreadyDriving(
                     f"Run {self.id} is already being driven by another "
-                    "Executor — two Executors cannot advance the same Run "
+                    "Executor: two Executors cannot advance the same Run "
                     "object concurrently"
                 )
             self._driving = True
@@ -118,7 +118,7 @@ class Run:
     def end_driving(self) -> None:
         """Release the claim `begin_driving()` took. Always call this in a
         `finally`, so a Run stays drivable again after its Executor call
-        returns — including when that call raised."""
+        returns, including when that call raised."""
         with self._drive_lock:
             self._driving = False
 
@@ -178,14 +178,14 @@ class Run:
         """Ask a Run being driven elsewhere to stop at its next checkpoint.
 
         Only `Run.status`/`Run.events` mutation is owned by whichever thread
-        is actively driving the Run through `Executor.run()` — calling
+        is actively driving the Run through `Executor.run()`: calling
         `cancel()` directly from another thread would race that loop and can
         raise `IllegalTransition` if it wins the race after the Run has
         already reached a terminal status. Setting this flag is safe from
         any thread at any time; `Executor.run()` checks it once per step and
         performs the actual `cancel()` transition itself, on its own thread,
         the same way `max_steps` already bounds the loop. A Run that isn't
-        currently being driven (CREATED/QUEUED/PAUSED/AWAITING_APPROVAL —
+        currently being driven (CREATED/QUEUED/PAUSED/AWAITING_APPROVAL,
         e.g. one sitting in a RunStore) has no owning thread to race, so
         `cancel()` there works directly; see `runa runs cancel`.
         """

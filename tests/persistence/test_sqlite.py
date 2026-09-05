@@ -130,7 +130,7 @@ def test_round_trips_a_failed_runs_error():
 
 
 def test_round_trips_a_tool_calls_non_json_safe_result_as_a_string():
-    # A Tool may return an Artifact (or any object) — ToolCall.result holds
+    # A Tool may return an Artifact (or any object); ToolCall.result holds
     # it as-is, but persistence can't; it should fall back to str() rather
     # than raise and lose the whole Run.
     store = SQLiteRunStore(":memory:")
@@ -164,7 +164,7 @@ def test_round_trips_state_and_context_with_a_non_json_safe_value():
 def test_round_trips_a_non_json_safe_input_and_result_as_strings():
     # Same concern again, for Run.input and Run.result: Agent.run(input:
     # Any, ...) places no constraint on input, and architecture.md §2
-    # expects Result to hold structured objects, not just text — save()
+    # expects Result to hold structured objects, not just text; save()
     # must not crash and lose the whole Run over either one.
     store = SQLiteRunStore(":memory:")
     input_artifact = TextArtifact(text="the input")

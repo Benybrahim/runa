@@ -1,15 +1,15 @@
-"""cli/runs.py: `runa runs show/list/pending/approve/deny` — the Run store over argv.
+"""cli/runs.py: `runa runs show/list/pending/approve/deny`, the Run store over argv.
 
 Manifesto §11 asks that "what happened?" have an answer without adding
 tracing code to every agent; §14 asks that human approval be part of the
 runtime, not a Python-only API. Both are thin wiring over functions that
-already exist — `application.run_store`, `timeline()`, `approval.approve()`/
-`deny()` — this module only exposes them to argv. Only useful once an app
+already exist (`application.run_store`, `timeline()`, `approval.approve()`/
+`deny()`); this module only exposes them to argv. Only useful once an app
 configures a durable `RunStore` (see `application.py`), since the default is
 in-memory and won't outlive the process that created the run.
 
 Approving or denying here only moves the Run's status (see `approval.py`
-docstring) — it does not execute the tool. Resuming actual execution is the
+docstring); it does not execute the tool. Resuming actual execution is the
 same as resuming any other paused Run: call the Executor again with the
 Agent that produced it.
 """
@@ -33,7 +33,7 @@ def format_run_timeline(run: Run) -> str:
     agent = run.agent_name or "unknown agent"
     if run.agent_version:
         agent += f"@{run.agent_version}"
-    header = f"Run {run.id} ({run.status.value}) — {agent}"
+    header = f"Run {run.id} ({run.status.value}): {agent}"
     if run.parent_run_id:
         header += f" (delegated from {run.parent_run_id})"
     lines = [header, ""]
@@ -73,9 +73,9 @@ def list_runs(
 ) -> str:
     """List Runs in the app's RunStore, optionally filtered by `status`,
     `since` (an ISO 8601 timestamp; only Runs created at or after it match),
-    `agent_name` (the Agent that produced the Run — see `Agent.name`), and/or
-    `parent_run_id` (only Runs delegated from that Run — see `ParentRunAware`
-    — e.g. to list everything a given Run spawned).
+    `agent_name` (the Agent that produced the Run, see `Agent.name`), and/or
+    `parent_run_id` (only Runs delegated from that Run, see `ParentRunAware`,
+    e.g. to list everything a given Run spawned).
     """
     parsed_status = RunStatus(status) if status is not None else None
     parsed_since = datetime.fromisoformat(since) if since is not None else None
@@ -93,7 +93,7 @@ def _pending_tool_call(run: Run) -> ToolCall | None:
     """The tool call an AWAITING_APPROVAL Run is paused on, if any.
 
     Identified via the Run's last APPROVAL_REQUIRED event, not by scanning
-    for `approved is None` — every tool call defaults to `approved=None`,
+    for `approved is None`: every tool call defaults to `approved=None`,
     including ordinary, already-completed calls that were never
     approval-gated. A Run with an earlier ordinary call and a later gated
     one would otherwise report the wrong call here: a human approving from
@@ -142,7 +142,7 @@ def approve_run(run_id: str, tool_call_id: str, *, root: Path) -> str:
         run = _get_run(store, run_id)
         approve(run, tool_call_id)
         store.save(run)
-    return f"approved {tool_call_id} on run {run_id} — now {run.status.value}"
+    return f"approved {tool_call_id} on run {run_id}, now {run.status.value}"
 
 
 def deny_run(run_id: str, tool_call_id: str, *, root: Path, reason: str = "") -> str:
@@ -152,17 +152,17 @@ def deny_run(run_id: str, tool_call_id: str, *, root: Path, reason: str = "") ->
         run = _get_run(store, run_id)
         deny(run, tool_call_id, reason=reason)
         store.save(run)
-    return f"denied {tool_call_id} on run {run_id} — now {run.status.value}"
+    return f"denied {tool_call_id} on run {run_id}, now {run.status.value}"
 
 
 def cancel_run(run_id: str, *, root: Path) -> str:
     """Cancel a saved Run and persist its cancelled status.
 
-    Only meaningful for a Run with no live Executor driving it — one sitting
+    Only meaningful for a Run with no live Executor driving it: one sitting
     in the RunStore as CREATED, QUEUED, PAUSED, or AWAITING_APPROVAL (e.g.
     idle in a background queue, or paused for approval). A Run currently
     being driven in-process should be cancelled with `Run.request_cancel()`
-    instead, so the owning Executor performs the transition itself — see
+    instead, so the owning Executor performs the transition itself, see
     `Run.request_cancel()`. Raises `IllegalTransition` (from `run.cancel()`)
     if the saved Run has already reached a terminal status.
     """

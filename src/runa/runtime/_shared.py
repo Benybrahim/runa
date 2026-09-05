@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def render_context(context: Context) -> str:
     """A plain "key: value" rendering of `context`, one line per entry.
 
-    Context is deliberately free-form (architecture.md §2) — any key an
+    Context is deliberately free-form (architecture.md §2): any key an
     application sets should reach the Agent the same generic way, with
     nothing in the framework interpreting specific key names specially. An
     application whose Context needs a different shape in the prompt keeps
@@ -30,7 +30,7 @@ def render_context(context: Context) -> str:
 def seed_run(agent: "Agent", run: Run) -> None:
     # Stamped here, not in Agent.run()/run_later()/DelegateTool, so every
     # Run gets provenance (architecture.md §14) regardless of how it was
-    # constructed — including a Run driven straight through Executor as
+    # constructed, including a Run driven straight through Executor as
     # an escape hatch, and a sub-agent's own Run under delegation.
     run.agent_name = agent.agent_name()
     run.agent_version = agent.version

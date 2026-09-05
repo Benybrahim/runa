@@ -1,6 +1,6 @@
 """SQLiteRunStore: a RunStore that survives a process restart.
 
-Same protocol as InMemoryRunStore — swapping one for the other is a
+Same protocol as InMemoryRunStore: swapping one for the other is a
 one-line change at the call site (manifesto: real backends are swapped in
 via configuration, not code changes). A Run is stored as a single JSON blob
 per row; `status`, `agent_name`, and `parent_run_id` are pulled out into
@@ -32,8 +32,8 @@ class SQLiteRunStore:
     `check_same_thread=False` only lifts sqlite3's same-thread check; it does
     not make one Connection object safe to call from multiple threads at
     once (the sqlite3 docs say as much). A background Run store is used from
-    exactly that way — a `Queue` worker thread saves a Run while another
-    thread lists or reads — so every access below is serialized through
+    exactly that way: a `Queue` worker thread saves a Run while another
+    thread lists or reads, so every access below is serialized through
     `self._lock`.
     """
 

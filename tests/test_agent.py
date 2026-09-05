@@ -429,7 +429,7 @@ def test_an_async_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
 def test_async_delegate_tools_run_concurrently_under_async_executor():
     """AsyncDelegateTool delegates through AsyncExecutor instead of a thread,
     so two independent delegate calls in one model turn run as genuine
-    concurrent async I/O — see AsyncExecutor's docstring for the batching
+    concurrent async I/O; see AsyncExecutor's docstring for the batching
     this rides on."""
 
     class SlowAsyncProvider:

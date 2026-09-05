@@ -32,7 +32,7 @@ def test_errored_idempotent_tool_call_fails_once_retries_are_exhausted():
 
 def test_errored_non_idempotent_tool_call_fails_immediately():
     # Not idempotent: the exception left its effect unknown, so repeating
-    # it risks duplicating a real side effect — no retry even though
+    # it risks duplicating a real side effect: no retry even though
     # attempts are well within max_retries.
     run = Run(input="hi")
     call = ToolCall(name="charge_card", error="timeout", attempts=1)
