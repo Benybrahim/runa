@@ -8,6 +8,79 @@ The examples assume the normal Runa model:
 Agent → Run → Outcome
 ```
 
+Each guide covers one problem end to end. For the vocabulary they build on
+(Agent, Execution, Run, Context, State, Capability), see
+[concepts.md](./concepts.md).
+
+## Start Here
+
+* [Defining an Agent](#defining-an-agent)
+* [Building a Tool](#building-a-tool)
+* [Structuring Application State](#structuring-application-state)
+* [Giving the Agent Context](#giving-the-agent-context)
+
+## State & Conversations
+
+* [Sharing State Across Runs](#sharing-state-across-runs)
+* [Persisting a Conversation](#persisting-a-conversation)
+
+## Background Execution & Observability
+
+* [Running in the Background](#running-in-the-background)
+* [Inspecting Runs](#inspecting-runs)
+
+## Testing & Evaluation
+
+* [Evaluating Behavior](#evaluating-behavior)
+
+## Safety & Control
+
+* [Adding Human Approval](#adding-human-approval)
+* [Making External Actions Safe](#making-external-actions-safe)
+* [Cancelling a Run](#cancelling-a-run)
+* [Bounding a Run's Wall-Clock Time](#bounding-a-runs-wall-clock-time)
+* [Retrying Transient Model Errors](#retrying-transient-model-errors)
+
+## Composing Agents
+
+* [Delegating to Another Agent](#delegating-to-another-agent)
+* [Handling Long-Running Work](#handling-long-running-work)
+* [Choosing Between Agent Hooks and Strategy](#choosing-between-agent-hooks-and-strategy)
+* [When to Use a Graph](#when-to-use-a-graph)
+
+## Staying Simple
+
+* [Keeping the Agent Definition Readable](#keeping-the-agent-definition-readable)
+* [A Practical Rule](#a-practical-rule)
+
+---
+
+# Defining an Agent
+
+An Agent is instructions plus the tools it's allowed to use.
+
+```python
+from runa import Agent
+
+
+class ResearchAgent(Agent):
+    instructions = """
+    Research questions carefully.
+    Prefer reliable sources.
+    """
+```
+
+Give it a Run:
+
+```python
+run = ResearchAgent.run("What's the capital of France?")
+```
+
+That's a complete Agent. Everything else in this document extends it: tools,
+state, context, background execution, approval. See
+[concepts.md](./concepts.md) for what an Agent is (a definition, not an
+execution) and how it relates to Run and Execution.
+
 ---
 
 # Building a Tool

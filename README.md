@@ -1,7 +1,5 @@
 # Welcome to Runa
 
----
-
 ## What's Runa?
 
 Runa is an agent application framework that includes everything needed to
