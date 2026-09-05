@@ -10,33 +10,7 @@ RUNA exists to make that complexity feel natural.
 
 ---
 
-## 1. Optimize for Developer Happiness
-
-Building an agent should begin with intent, not infrastructure.
-
-The common path should be simple. Complexity should be available when the application needs it, but it should not be the price of getting started.
-
-RUNA should let developers describe what an agent does without first assembling its runtime.
-
----
-
-## 2. Convention Over Configuration
-
-Agent applications contain recurring patterns.
-
-Agents have capabilities. Runs have state. Executions produce events and artifacts. Runs can be persisted, resumed, evaluated, and observed.
-
-Developers should not repeatedly configure these relationships.
-
-RUNA uses conventions so that structure, names, and types carry meaning.
-
-Explicit configuration should be reserved for decisions that are genuinely application-specific.
-
-**Define the application once. Let the framework carry the conventions forward.**
-
----
-
-## 3. Agent, Execution, and Run
+## 1. Agent, Execution, and Run
 
 RUNA divides an agent application into three layers, each with a specific responsibility: Agent, Execution, and Run.
 
@@ -54,7 +28,7 @@ The execution model remains the same.
 
 ---
 
-## 4. Agents Are Objects
+## 2. Agents Are Objects
 
 Agents should be ordinary application objects with responsibilities, behavior, and capabilities.
 
@@ -63,6 +37,32 @@ Developers should not need to construct graphs to express simple agent behavior.
 Graphs and workflows are useful when relationships or execution structure are the problem being modeled. They are not the default programming model.
 
 **Agents declare behavior. Execution progresses it. Runs persist it.**
+
+---
+
+## 3. Optimize for Developer Happiness
+
+Building an agent should begin with intent, not infrastructure.
+
+The common path should be simple. Complexity should be available when the application needs it, but it should not be the price of getting started.
+
+RUNA should let developers describe what an agent does without first assembling its runtime.
+
+---
+
+## 4. Convention Over Configuration
+
+Agent applications contain recurring patterns.
+
+Agents have capabilities. Runs have state. Executions produce events and artifacts. Runs can be persisted, resumed, evaluated, and observed.
+
+Developers should not repeatedly configure these relationships.
+
+RUNA uses conventions so that structure, names, and types carry meaning.
+
+Explicit configuration should be reserved for decisions that are genuinely application-specific.
+
+**Define the application once. Let the framework carry the conventions forward.**
 
 ---
 
