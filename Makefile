@@ -29,7 +29,6 @@ hello:
 
 examples:
 	uv run python examples/hello.py
-	uv run python examples/hello_anthropic.py
 	uv run python examples/conversation.py
 	uv run python examples/background.py
 	uv run python examples/approval.py

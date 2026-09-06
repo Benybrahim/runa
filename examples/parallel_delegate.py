@@ -9,24 +9,31 @@ network call at a time. No special wiring needed: a bare class in
 `DelegateAgent(WeatherAgent)` only exists as the escape hatch for
 overriding a delegation's `executor` explicitly.
 
+A Return delegate (both of these are) runs its own nested Run, with its own
+Provider resolved from its own `model`, independently of the delegating
+Agent's: all three classes here declare one.
+
 Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/parallel_delegate.py
 """
 
 import asyncio
 
-from runa import Agent, OpenAIProvider, configure
+from runa import Agent
 
 
 class WeatherAgent(Agent):
+    model = "gpt-5-nano"
     instructions = "Answer weather questions concisely."
 
 
 class NewsAgent(Agent):
+    model = "gpt-5-nano"
     instructions = "Summarize one plausible top headline for a city, concisely."
 
 
 class BriefingAgent(Agent):
+    model = "gpt-5-nano"
     instructions = (
         "Given a city, call both WeatherAgent and NewsAgent, then combine "
         "their answers into a short morning briefing."
@@ -35,7 +42,5 @@ class BriefingAgent(Agent):
 
 
 if __name__ == "__main__":
-    configure(provider=OpenAIProvider())
-
     run = asyncio.run(BriefingAgent.run("Tokyo"))
     print(run.result)

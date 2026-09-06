@@ -15,6 +15,7 @@ Each guide covers one problem end to end. For the vocabulary they build on
 ## Start Here
 
 * [Defining an Agent](#defining-an-agent)
+* [Choosing a Model Provider](#choosing-a-model-provider)
 * [Building a Tool](#building-a-tool)
 * [Structuring Application State](#structuring-application-state)
 * [Surfacing State to the Model](#surfacing-state-to-the-model)
@@ -80,6 +81,52 @@ That's a complete Agent. Everything else in this document extends it: tools,
 state, background execution, approval. See
 [concepts.md](./concepts.md) for what an Agent is (a definition, not an
 execution) and how it relates to Run and Execution.
+
+---
+
+# Choosing a Model Provider
+
+Set `model` on the Agent and Runa infers which Provider to route it
+through, no `configure()` call required:
+
+```python
+class ResearchAgent(Agent):
+    model = "gpt-5.6"  # or "claude-sonnet-4"
+    instructions = "Research questions carefully."
+```
+
+A `"gpt-"`/`"o"`-prefixed name resolves to `OpenAIProvider`, a
+`"claude-"`-prefixed name to `AnthropicProvider`
+(`providers.registry.resolve_provider_for_model`); each just needs its
+matching API key (`OPENAI_API_KEY`/`ANTHROPIC_API_KEY`) in the environment.
+This inference only runs when nothing was configured explicitly: an
+explicit `configure(provider=...)` (or an `Executor` passed directly)
+always wins over whatever `model` says.
+
+Reach for `configure(provider=...)` instead once you need something
+inference can't give you:
+
+```python
+from runa import configure
+from runa.providers import OpenAIProvider
+
+configure(provider=OpenAIProvider(client=my_custom_client))
+```
+
+* a non-default client (custom `base_url`, org id, a shared `httpx` client)
+* a Provider that isn't `OpenAIProvider`/`AnthropicProvider` at all,
+  anything satisfying the `Provider` protocol (`async def complete(*,
+  messages, tools, model) -> Message`) drops in the same way
+* wrapping the Provider, e.g. in `RetryingProvider` (see
+  [Retrying Transient Model Errors](#retrying-transient-model-errors))
+
+A Run's Provider is fixed once, from the top-level Agent's own `model` at
+its `.run()`/`.run_sync()`/`.run_stream()`/`.run_later()` call. An Agent
+transferred into mid-Run (see
+[Delegating to Another Agent](#delegating-to-another-agent)) keeps using
+that same Provider, so only the Agent starting the Run needs a `model`; a
+Return-style delegate (`delegations = [OtherAgent]`) runs its own nested
+Run and resolves its own Provider from `OtherAgent.model` independently.
 
 ---
 
@@ -650,7 +697,9 @@ A retry should not accidentally duplicate a side effect.
 
 # Retrying Transient Model Errors
 
-`RetryStrategy` covers tool calls, not the model call itself. A rate limit,
+Builds on explicit `configure(provider=...)`, see
+[Choosing a Model Provider](#choosing-a-model-provider) if you haven't set
+one up yet. `RetryStrategy` covers tool calls, not the model call itself. A rate limit,
 timeout, or dropped connection from the model API fails the whole Run
 immediately unless the Provider `Executor` actually drives is wrapped in
 `RetryingProvider`:

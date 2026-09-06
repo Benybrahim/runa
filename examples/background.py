@@ -9,7 +9,7 @@ Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/background.py
 """
 
-from runa import Agent, OpenAIProvider, configure, tool
+from runa import Agent, tool
 
 
 @tool
@@ -18,12 +18,11 @@ def get_weather(city: str) -> str:
 
 
 class WeatherAgent(Agent):
+    model = "gpt-5-nano"
     instructions = "Answer weather questions using the get_weather tool."
     tools = [get_weather]
 
 
 if __name__ == "__main__":
-    configure(provider=OpenAIProvider())
-
     run = WeatherAgent.run_later("What's the weather in Kyoto?")
     print(run.status, run.result)

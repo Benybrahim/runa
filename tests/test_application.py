@@ -147,6 +147,60 @@ def test_agent_run_raises_a_clear_error_when_no_provider_is_configured():
         SimpleAgent.run_sync("hello")
 
 
+def test_provider_for_prefers_an_explicitly_configured_provider_over_the_model():
+    configured = FakeProvider(responses=[])
+    application.configure(provider=configured)
+
+    assert application.provider_for("claude-sonnet-4") is configured
+
+
+def test_provider_for_infers_a_provider_from_the_model_when_unconfigured(
+    monkeypatch,
+):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    provider = application.provider_for("claude-sonnet-4")
+
+    from runa.providers import AnthropicProvider
+
+    assert isinstance(provider, AnthropicProvider)
+
+
+def test_provider_for_raises_a_clear_error_when_model_is_unrecognized():
+    with pytest.raises(ProviderNotConfigured, match="unrecognized-model"):
+        application.provider_for("unrecognized-model")
+
+
+def test_provider_for_raises_a_clear_error_when_neither_is_available():
+    with pytest.raises(ProviderNotConfigured):
+        application.provider_for(None)
+
+
+def test_agent_run_infers_a_provider_from_its_declared_model_with_no_configure_call(
+    monkeypatch,
+):
+    """End-to-end: `Agent.run_sync()` must reach `provider_for(cls.model)`
+    on its own, with zero `runa.configure(provider=...)` call. Stubs out
+    `resolve_provider_for_model` so this stays a FakeProvider test, not a
+    real network call to Anthropic."""
+    import sys
+
+    application_module = sys.modules["runa.application"]
+
+    fake = FakeProvider([Message(role=Role.ASSISTANT, content="hi")])
+    monkeypatch.setattr(
+        application_module, "resolve_provider_for_model", lambda model: fake
+    )
+
+    class ClaudeAgent(Agent):
+        model = "claude-sonnet-4"
+
+    run = ClaudeAgent.run_sync("hello")
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "hi"
+
+
 def test_agent_run_still_accepts_an_explicit_executor_without_any_configuration():
     from runa.runtime import Executor
 

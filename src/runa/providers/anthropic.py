@@ -119,6 +119,11 @@ class AnthropicProvider:
         self.client = client or anthropic.AsyncAnthropic()
         self.max_tokens = max_tokens
 
+    @classmethod
+    def supports(cls, model: str) -> bool:
+        """See `OpenAIProvider.supports` for why this is a classmethod."""
+        return model.startswith("claude-")
+
     async def complete(
         self,
         *,

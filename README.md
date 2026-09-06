@@ -15,17 +15,15 @@ In Runa, the _**Run**_ is the central unit of work.
 ## Agent layer
 
 The _**Agent layer**_ declares the behavior and capabilities of an agent, such
-as its instructions, tools, hooks, policies, and delegation, and encapsulates
-the business logic specific to your application. In Runa, Agents are
-ordinary Python classes derived from [`Agent`](docs/concepts.md#agent) that define how a kind of agent should behave when invoked. An Agent is a reusable declaration, not a unit of work.
+as its instructions, tools, delegations, policies and hooks. In Runa, Agents are
+ordinary Python classes derived from [`Agent`](docs/concepts.md#agent) that define how a kind of agent should behave when invoked.
 
 ## Execution layer
 
 The _**Execution layer**_ is responsible for progressing an agent's work. It
 calls models, invokes tools, applies policies, and determines what happens
 next according to the Agent's declared behavior. In Runa, Execution is
-handled by the [`Executor`](docs/concepts.md#execution)
-driving by a [`Strategy`](docs/concepts.md#strategy).
+handled by the [`Executor`](docs/concepts.md#execution) class.
 
 ## Run layer
 
@@ -51,7 +49,9 @@ In addition to that, Runa also comes with:
    with [uv](https://docs.astral.sh/uv/):
 
     ```bash
-    uv add git+https://github.com/Benybrahim/runa
+    git clone https://github.com/Benybrahim/runa.git
+    cd runa
+    make install
     ```
 
 2. At the command prompt, create a new Runa application:

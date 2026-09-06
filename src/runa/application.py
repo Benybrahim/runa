@@ -39,7 +39,11 @@ from dataclasses import dataclass, field, fields
 from typing import cast
 
 from runa.persistence.store import InMemoryRunStore, RunStore
-from runa.providers.registry import resolve_provider
+from runa.providers.registry import (
+    UnknownModelProvider,
+    resolve_provider,
+    resolve_provider_for_model,
+)
 from runa.runtime.provider import Provider
 
 
@@ -129,6 +133,32 @@ class Application:
                 "Executor explicitly, e.g. Judge(my_provider)"
             )
         return self.config.provider
+
+    def provider_for(self, model: str | None) -> Provider:
+        """Resolve the Provider an Agent call should use, given its declared
+        `model` (`Agent.model`, possibly `None`).
+
+        An explicitly configured provider (`configure(provider=...)`)
+        always wins, matching `.provider` above. Only when none is
+        configured does `model` get consulted: it's inferred to a Provider
+        via `providers.registry.resolve_provider_for_model` (e.g.
+        `"gpt-5.6"` -> `OpenAIProvider`), which is what lets
+        `Agent(model="gpt-5.6")` run with no `configure()` call at all.
+        Raises `ProviderNotConfigured` if neither resolves.
+        """
+        if self.config.provider is not None:
+            return self.config.provider
+        if model is not None:
+            try:
+                return resolve_provider_for_model(model)
+            except UnknownModelProvider as exc:
+                raise ProviderNotConfigured(str(exc)) from exc
+        raise ProviderNotConfigured(
+            "call runa.configure(provider=...) before Agent.run()/"
+            ".run_sync()/.run_stream()/.run_later(), set Agent.model to a "
+            'recognized model name (e.g. "gpt-5.6", "claude-sonnet-4"), '
+            "or pass an Executor explicitly, e.g. Judge(my_provider)"
+        )
 
     @property
     def run_store(self) -> RunStore:

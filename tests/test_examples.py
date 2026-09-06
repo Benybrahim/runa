@@ -54,25 +54,6 @@ def test_hello_example():
     assert run.result == "It's sunny in Tokyo."
 
 
-def test_hello_anthropic_example():
-    hello_anthropic = _load("hello_anthropic")
-    fake = FakeProvider(
-        [
-            Message(
-                role=Role.ASSISTANT,
-                tool_calls=[ToolCall(name="get_weather", arguments={"city": "Tokyo"})],
-            ),
-            Message(role=Role.ASSISTANT, content="It's sunny in Tokyo."),
-        ]
-    )
-    configure(provider=fake)
-
-    run = hello_anthropic.WeatherAgent.run_sync("What's the weather in Tokyo?")
-
-    assert run.status == RunStatus.COMPLETED
-    assert run.result == "It's sunny in Tokyo."
-
-
 def test_conversation_example():
     conversation_example = _load("conversation")
     fake = FakeProvider(

@@ -9,16 +9,15 @@ Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/conversation.py
 """
 
-from runa import Agent, Conversation, OpenAIProvider, configure
+from runa import Agent, Conversation
 
 
 class SupportAgent(Agent):
+    model = "gpt-5-nano"
     instructions = "Help customers with their orders. Be concise."
 
 
 if __name__ == "__main__":
-    configure(provider=OpenAIProvider())
-
     conversation = Conversation()
 
     first = SupportAgent.run_sync(

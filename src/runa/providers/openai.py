@@ -111,6 +111,18 @@ class OpenAIProvider:
     def __init__(self, client: openai.AsyncOpenAI | None = None) -> None:
         self.client = client or openai.AsyncOpenAI()
 
+    @classmethod
+    def supports(cls, model: str) -> bool:
+        """Whether this Provider is the one to route `model` through.
+
+        A classmethod, not an instance check: it has to run before a
+        Provider is constructed (`providers.registry.resolve_provider_for_model`
+        tries each known Provider in turn), and construction itself
+        requires an API key, which inference shouldn't demand just to rule
+        a candidate out.
+        """
+        return model.startswith(("gpt-", "o"))
+
     async def complete(
         self,
         *,

@@ -208,7 +208,7 @@ class Agent:
         into it once the Run completes, so the next `await .run(...,
         conversation=conversation)` call picks up where this one left off.
         """
-        executor = executor or Executor(provider=application.provider)
+        executor = executor or Executor(provider=application.provider_for(cls.model))
         return await executor.run(cls(), Run(input=input, conversation=conversation))
 
     @classmethod
@@ -262,7 +262,7 @@ class Agent:
         explicitly) to satisfy `StreamingProvider`, the same requirement
         `Executor.run`'s `on_chunk` has.
         """
-        executor = executor or Executor(provider=application.provider)
+        executor = executor or Executor(provider=application.provider_for(cls.model))
         run = Run(input=input, conversation=conversation)
         queue: asyncio.Queue[StreamChunk | None] = asyncio.Queue()
 
@@ -288,7 +288,7 @@ class Agent:
         conversation: Conversation | None = None,
     ) -> Run:
         """Queue this agent's run for background execution. See `Agent.run`."""
-        executor = executor or Executor(provider=application.provider)
+        executor = executor or Executor(provider=application.provider_for(cls.model))
         run = Run(input=input, conversation=conversation)
         return _run_later(cls(), run, executor, queue=queue)
 
@@ -376,7 +376,9 @@ class DelegateAgent(Tool):
         # It's still an accepted parameter so tool_call.arguments (which may
         # explicitly carry transfer=false) can always be splatted straight
         # into call() without a KeyError.
-        executor = self._executor or Executor(provider=application.provider)
+        executor = self._executor or Executor(
+            provider=application.provider_for(self._agent_cls.model)
+        )
         run = await executor.run(
             self._agent_cls(), Run(input=input, parent_run_id=self._parent_run_id)
         )

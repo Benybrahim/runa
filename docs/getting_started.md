@@ -182,6 +182,15 @@ inspect later.
 > instance directly, as `main.py` already does, once it needs its own
 > `base_url`, client, or other settings.
 
+> **NOTE:** For a quick script that doesn't need a durable `run_store` or
+> `runa eval`/`runa test` (both always resolve their Provider from this
+> `configure()` call, regardless of any Agent's `model`), you can skip
+> this section's `configure()` call entirely: set `model = "gpt-5-nano"`
+> (or a `"claude-"` model) directly on the Agent, and Runa infers the
+> matching Provider from the name, as long as its API key is in the
+> environment. See
+> [Choosing a Model Provider](guides.md#choosing-a-model-provider).
+
 ---
 
 ## 5. Hello, Runa!
