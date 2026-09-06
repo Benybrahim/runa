@@ -10,9 +10,10 @@ deserializing every row.
 
 import sqlite3
 import threading
+from collections.abc import Mapping
 from datetime import datetime
 
-from runa.core import Run, RunStatus
+from runa.core import Artifact, Run, RunStatus
 from runa.persistence.serialize import run_from_json, run_to_json
 
 _SCHEMA = """
@@ -37,11 +38,24 @@ class SQLiteRunStore:
     exactly that way: a `Queue` worker thread saves a Run while another
     thread lists or reads, so every access below is serialized through
     `self._lock`.
+
+    `artifact_resolver`, if given, maps a stored `Artifact.artifact_type()` tag
+    to the class to reconstruct it as, for `Artifact` subclasses this store
+    holds that shouldn't be resolved by importing a `module.ClassName` path
+    out of the row's own data (see `persistence/serialize.py`). A store this
+    application fully controls can rely on the zero-config import fallback
+    instead and leave this unset.
     """
 
-    def __init__(self, path: str) -> None:
+    def __init__(
+        self,
+        path: str,
+        *,
+        artifact_resolver: Mapping[str, type[Artifact]] | None = None,
+    ) -> None:
         self._connection = sqlite3.connect(path, check_same_thread=False)
         self._lock = threading.Lock()
+        self._artifact_resolver = artifact_resolver
         with self._lock:
             self._connection.execute(_SCHEMA)
             self._connection.commit()
@@ -74,7 +88,9 @@ class SQLiteRunStore:
             row = self._connection.execute(
                 "SELECT data FROM runs WHERE id = ?", (run_id,)
             ).fetchone()
-        return run_from_json(row[0]) if row else None
+        if row is None:
+            return None
+        return run_from_json(row[0], artifact_resolver=self._artifact_resolver)
 
     def list(
         self,
@@ -107,7 +123,10 @@ class SQLiteRunStore:
             query += " WHERE " + " AND ".join(clauses)
         with self._lock:
             rows = self._connection.execute(query, params).fetchall()
-        return [run_from_json(row[0]) for row in rows]
+        return [
+            run_from_json(row[0], artifact_resolver=self._artifact_resolver)
+            for row in rows
+        ]
 
     def close(self) -> None:
         with self._lock:

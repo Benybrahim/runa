@@ -373,10 +373,14 @@ class Executor:
         """Run one tool call.
 
         If `tool.call()` returns an `Artifact`, it's recorded on the Run via
-        `run.add_artifact()` and its `summary()` becomes the tool result the
-        model sees; a plain value keeps working exactly as before, via
-        `str(result)` (manifesto §10: artifacts are a type of tool result,
-        not a separate API).
+        `run.add_artifact()` *before* `summary()` is called to build the
+        tool result message: the Artifact's durable existence on the Run
+        must not depend on its textual representation succeeding, so a
+        `summary()` that raises still leaves the Artifact recorded (the Run
+        then fails via the step loop's exception handling, same as any
+        other bug here, but doesn't lose the Artifact). A plain value keeps
+        working exactly as before, via `str(result)` (manifesto §10:
+        artifacts are a type of tool result, not a separate API).
 
         A Return delegation (`DelegateAgent`, a `DelegatesToAgent`) spawns
         its own nested Run rather than running inline; that Run's id isn't

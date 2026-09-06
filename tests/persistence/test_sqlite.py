@@ -1,7 +1,9 @@
 import threading
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from runa.core import (
+    Artifact,
     EffectStatus,
     Event,
     EventType,
@@ -13,6 +15,31 @@ from runa.core import (
     ToolCall,
 )
 from runa.persistence import SQLiteRunStore
+
+
+@dataclass(kw_only=True)
+class NoteArtifact(Artifact):
+    """An application-defined Artifact with a stable, non-path tag, used to
+    exercise `SQLiteRunStore(artifact_resolver=...)`."""
+
+    text: str
+
+    @classmethod
+    def artifact_type(cls) -> str:
+        return "note:v1"
+
+
+def test_artifact_resolver_resolves_a_stable_tag_across_store_reads():
+    store = SQLiteRunStore(":memory:", artifact_resolver={"note:v1": NoteArtifact})
+    run = Run(input="hi")
+    run.add_artifact(NoteArtifact(text="hello"))
+    store.save(run)
+
+    loaded = store.get(run.id)
+
+    assert loaded is not None
+    assert isinstance(loaded.artifacts[0], NoteArtifact)
+    assert loaded.artifacts[0].text == "hello"
 
 
 def test_save_and_get_round_trips_a_run():

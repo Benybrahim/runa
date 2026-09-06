@@ -1,65 +1,91 @@
 """Explicit Run/Conversation <-> JSON conversion, for store backends that
 need bytes.
 
-Not a generic `dataclasses.asdict`/`**data` round-trip: Artifact is
-polymorphic (five concrete subclasses), and a `ToolCall` is shared by
-identity between `Run.tool_calls` and the assistant `Message` that produced
-it: `approve()`/`deny()` mutate the copy in `Run.tool_calls` and rely on
-the same object showing up in the message the Strategy inspects next. Both
-of those need explicit handling that a generic round-trip can't recover.
+Not a generic `dataclasses.asdict`/`**data` round-trip: a `ToolCall` is
+shared by identity between `Run.tool_calls` and the assistant `Message`
+that produced it: `approve()`/`deny()` mutate the copy in `Run.tool_calls`
+and rely on the same object showing up in the message the Strategy inspects
+next. That needs explicit handling a generic round-trip can't recover.
+
+Artifact is open-ended: RUNA core defines `Artifact`, `TextArtifact`,
+`DataArtifact`, `FileArtifact`, but applications are expected to subclass
+`Artifact` directly for their own domain output (see `core/artifact.py`),
+so this module can't hold a closed registry of known types. Each artifact
+is tagged with `Artifact.artifact_type()`, its *durable* identity, which by
+default is a dotted `module.ClassName` path but need not be: an
+application can override it to decouple the tag from wherever the class
+currently lives (see `core/artifact.py`'s docstring). Resolving a tag back
+to a class is a two-step lookup (`_resolve_artifact_class` below): an
+optional, entirely application-owned `artifact_resolver` mapping first, then a
+`module.ClassName` import as the zero-config fallback. RUNA never
+populates that mapping itself.
+
+That import fallback trusts the store's contents enough to import a name
+from it, the same trust a `RunStore`'s caller already places in whatever
+wrote it; this is a convenience for a store under the application's own
+control, not a hardened interchange format. A store that may hold artifact
+data from outside that control should pass an explicit `artifact_resolver`
+mapping (e.g. via `SQLiteRunStore(path, artifact_resolver=...)`) and not rely
+on the import fallback at all.
 
 `Conversation` has neither concern; its messages aren't examined for
-identity the way a Run's are, so its (de)serialization is a plain nested
-walk that reuses `_tool_call_to_dict`/`_tool_call_from_dict` below.
+identity the way a Run's are, and it never holds Artifacts directly, so its
+(de)serialization is a plain nested walk that reuses
+`_tool_call_to_dict`/`_tool_call_from_dict` below.
 """
 
+import importlib
 import json
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
 from runa.core import (
-    ActionArtifact,
     Artifact,
-    CitationSetArtifact,
     Conversation,
-    DataArtifact,
     EffectStatus,
     Event,
     EventType,
-    FileArtifact,
     Message,
-    PlanArtifact,
     Role,
     Run,
     RunStatus,
-    TextArtifact,
     ToolCall,
 )
 from runa.core.state import ConversationState, RunState
 
-_ARTIFACT_TYPES: dict[str, type[Artifact]] = {
-    "text": TextArtifact,
-    "data": DataArtifact,
-    "file": FileArtifact,
-    "citation_set": CitationSetArtifact,
-    "plan": PlanArtifact,
-    "action": ActionArtifact,
-}
-
 
 def _artifact_to_dict(artifact: Artifact) -> dict[str, Any]:
-    for kind, cls in _ARTIFACT_TYPES.items():
-        if type(artifact) is cls:
-            data = dict(vars(artifact))
-            data["created_at"] = artifact.created_at.isoformat()
-            data["kind"] = kind
-            return data
-    raise TypeError(f"unknown artifact type: {type(artifact)!r}")
+    data = dict(vars(artifact))
+    data["created_at"] = artifact.created_at.isoformat()
+    data["type"] = artifact.artifact_type()
+    return data
 
 
-def _artifact_from_dict(data: dict[str, Any]) -> Artifact:
+def _resolve_artifact_class(
+    type_tag: str, artifact_resolver: Mapping[str, type[Artifact]] | None
+) -> type[Artifact]:
+    if artifact_resolver is not None and type_tag in artifact_resolver:
+        return artifact_resolver[type_tag]
+    module_name, _, class_name = type_tag.rpartition(".")
+    try:
+        if not module_name:
+            raise ImportError("not a 'module.ClassName' path")
+        return getattr(importlib.import_module(module_name), class_name)
+    except (ImportError, AttributeError) as exc:
+        raise LookupError(
+            f"cannot resolve artifact type {type_tag!r}: not found in the "
+            "supplied artifact_resolver mapping, and it isn't an importable "
+            "'module.ClassName' path either"
+        ) from exc
+
+
+def _artifact_from_dict(
+    data: dict[str, Any],
+    artifact_resolver: Mapping[str, type[Artifact]] | None = None,
+) -> Artifact:
     data = dict(data)
-    cls = _ARTIFACT_TYPES[data.pop("kind")]
+    cls = _resolve_artifact_class(data.pop("type"), artifact_resolver)
     data["created_at"] = datetime.fromisoformat(data["created_at"])
     return cls(**data)
 
@@ -167,8 +193,19 @@ def run_to_dict(run: Run) -> dict[str, Any]:
     }
 
 
-def run_from_dict(data: dict[str, Any]) -> Run:
-    """Reconstruct a Run from a dict produced by `run_to_dict`."""
+def run_from_dict(
+    data: dict[str, Any],
+    *,
+    artifact_resolver: Mapping[str, type[Artifact]] | None = None,
+) -> Run:
+    """Reconstruct a Run from a dict produced by `run_to_dict`.
+
+    `artifact_resolver` maps a stored `Artifact.artifact_type()` tag to the
+    class to reconstruct it as; an application supplies it when it isn't
+    relying on the tag being an importable `module.ClassName` path (see the
+    module docstring). Consulted before the import fallback, so it can also
+    redirect a tag whose original class has since moved or been renamed.
+    """
     tool_calls_by_id = {
         tc_id: _tool_call_from_dict(tc) for tc_id, tc in data["tool_calls"].items()
     }
@@ -206,7 +243,9 @@ def run_from_dict(data: dict[str, Any]) -> Run:
             for e in data["events"]
         ],
         tool_calls=list(tool_calls_by_id.values()),
-        artifacts=[_artifact_from_dict(a) for a in data["artifacts"]],
+        artifacts=[
+            _artifact_from_dict(a, artifact_resolver) for a in data["artifacts"]
+        ],
         result=data["result"],
         error=data["error"],
         status=RunStatus(data["status"]),
@@ -218,8 +257,12 @@ def run_to_json(run: Run) -> str:
     return json.dumps(run_to_dict(run))
 
 
-def run_from_json(raw: str) -> Run:
-    return run_from_dict(json.loads(raw))
+def run_from_json(
+    raw: str,
+    *,
+    artifact_resolver: Mapping[str, type[Artifact]] | None = None,
+) -> Run:
+    return run_from_dict(json.loads(raw), artifact_resolver=artifact_resolver)
 
 
 def conversation_to_dict(conversation: Conversation) -> dict[str, Any]:
