@@ -1,19 +1,29 @@
 """Logic shared by `Executor` (see `runtime/executor.py`).
 
-`seed_run` and `tool_schemas` don't touch any Executor instance state, so
-they live here rather than as methods on the class.
+`seed_run`, `model_context`, and `tool_schemas` don't touch any Executor
+instance state, so they live here rather than as methods on the class.
 """
 
 from typing import TYPE_CHECKING, Any
 
-from runa.core import EffectStatus, EventType, Message, Role, Run, ToolCall
+from runa.core import (
+    Conversation,
+    EffectStatus,
+    EventType,
+    Message,
+    Role,
+    Run,
+    ToolCall,
+)
 from runa.tool import DelegatesToAgent
 
 if TYPE_CHECKING:
     from runa.agent import Agent
 
 
-def seed_run(agent: "Agent", run: Run) -> None:
+def seed_run(
+    agent: "Agent", run: Run, conversation: Conversation | None = None
+) -> None:
     # Stamped here, not in Agent.run()/run_later()/DelegateAgent, so every
     # Run gets provenance (architecture.md §14) regardless of how it was
     # constructed, including a Run driven straight through Executor as
@@ -24,11 +34,36 @@ def seed_run(agent: "Agent", run: Run) -> None:
     # agent_name, so provenance and "who's currently driving" stay distinct.
     run.active_agent_name = agent.agent_name()
     run.agent_version = agent.version
+    run.conversation_id = conversation.id if conversation is not None else None
     if agent.instructions:
         run.add_message(Message(role=Role.SYSTEM, content=agent.instructions))
-    if run.conversation is not None:
-        run.messages.extend(run.conversation.messages)
     run.add_message(Message(role=Role.USER, content=str(run.input)))
+
+
+def model_context(run: Run, conversation: Conversation | None) -> list[Message]:
+    """The messages to send to the model for `run`'s next call.
+
+    A projection assembled at call time, not a stored object (RUNA.md):
+    this Run's own system prompt (if any), then the Conversation's durable
+    cross-Run history, then the rest of this Run's own messages. Neither
+    `run.messages` nor `conversation.messages` is mutated to build this;
+    recomputing it on every call means a Run paused mid-flight sees any
+    turns recorded into `conversation` in the meantime, rather than a
+    stale copy taken when the Run started.
+
+    The system prompt, if `seed_run` added one, is always `run.messages[0]`
+    (nothing runs before it); history is inserted right after it rather
+    than prepended in front of it, so the model still sees its
+    instructions first. A later SYSTEM message from a Transfer delegation
+    (see `transfer_agent`) isn't touched by this: it isn't `run.messages[0]`,
+    so it stays wherever it naturally falls in "the rest of this Run's own
+    messages", in the order it was actually added.
+    """
+    if conversation is None:
+        return list(run.messages)
+    if run.messages and run.messages[0].role == Role.SYSTEM:
+        return [run.messages[0], *conversation.messages, *run.messages[1:]]
+    return [*conversation.messages, *run.messages]
 
 
 def tool_schemas(agent: "Agent") -> list[dict[str, Any]]:

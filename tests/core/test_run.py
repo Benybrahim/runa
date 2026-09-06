@@ -29,6 +29,11 @@ def test_new_run_has_no_parent_by_default():
     assert run.parent_run_id is None
 
 
+def test_new_run_has_no_conversation_by_default():
+    run = Run(input="hello")
+    assert run.conversation_id is None
+
+
 def test_start_transitions_to_running_and_emits_event():
     run = Run(input="hello")
     run.start()

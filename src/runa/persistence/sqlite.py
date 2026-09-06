@@ -3,8 +3,9 @@
 Same protocol as InMemoryRunStore: swapping one for the other is a
 one-line change at the call site (manifesto: real backends are swapped in
 via configuration, not code changes). A Run is stored as a single JSON blob
-per row; `status`, `agent_name`, and `parent_run_id` are pulled out into
-their own columns so `list()` can filter without deserializing every row.
+per row; `status`, `agent_name`, `parent_run_id`, and `conversation_id` are
+pulled out into their own columns so `list()` can filter without
+deserializing every row.
 """
 
 import sqlite3
@@ -21,6 +22,7 @@ CREATE TABLE IF NOT EXISTS runs (
     created_at TEXT NOT NULL,
     agent_name TEXT,
     parent_run_id TEXT,
+    conversation_id TEXT,
     data TEXT NOT NULL
 )
 """
@@ -48,17 +50,20 @@ class SQLiteRunStore:
         with self._lock:
             self._connection.execute(
                 "INSERT INTO runs "
-                "(id, status, created_at, agent_name, parent_run_id, data) "
-                "VALUES (?, ?, ?, ?, ?, ?) "
+                "(id, status, created_at, agent_name, parent_run_id, "
+                "conversation_id, data) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(id) DO UPDATE SET status = excluded.status, "
                 "created_at = excluded.created_at, agent_name = excluded.agent_name, "
-                "parent_run_id = excluded.parent_run_id, data = excluded.data",
+                "parent_run_id = excluded.parent_run_id, "
+                "conversation_id = excluded.conversation_id, data = excluded.data",
                 (
                     run.id,
                     run.status.value,
                     run.created_at.isoformat(),
                     run.agent_name,
                     run.parent_run_id,
+                    run.conversation_id,
                     run_to_json(run),
                 ),
             )
@@ -78,6 +83,7 @@ class SQLiteRunStore:
         since: datetime | None = None,
         agent_name: str | None = None,
         parent_run_id: str | None = None,
+        conversation_id: str | None = None,
     ) -> list[Run]:
         query = "SELECT data FROM runs"
         clauses: list[str] = []
@@ -94,6 +100,9 @@ class SQLiteRunStore:
         if parent_run_id is not None:
             clauses.append("parent_run_id = ?")
             params.append(parent_run_id)
+        if conversation_id is not None:
+            clauses.append("conversation_id = ?")
+            params.append(conversation_id)
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         with self._lock:

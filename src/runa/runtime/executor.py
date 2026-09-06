@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, Any
 
 from runa.core import (
     Artifact,
+    Conversation,
     EffectStatus,
     EventType,
     Message,
@@ -33,7 +34,7 @@ from runa.core import (
     RunStatus,
     ToolCall,
 )
-from runa.runtime._shared import seed_run, tool_schemas, transfer_agent
+from runa.runtime._shared import model_context, seed_run, tool_schemas, transfer_agent
 from runa.runtime.provider import Provider, StreamChunk, StreamingProvider
 from runa.runtime.strategy import (
     Action,
@@ -95,10 +96,15 @@ class Executor:
     `RuntimeWarning` and otherwise ignored, the same treatment
     `instrument()` gives a raising subscriber.
 
-    If `run.conversation` is set, its history is seeded in ahead of this
-    Run's own input, and this Run's messages are folded back into it once
-    the Run reaches a terminal status; that's what lets a later Run pick
-    up the conversation where this one left off (see `Agent.run`).
+    If a `conversation` is passed to `run()`, its history is prepended
+    ahead of this Run's own messages when assembling each model call (see
+    `_shared.model_context`), and this Run's own messages are appended to
+    it once the Run reaches a terminal status; that's what lets a later
+    Run pick up the conversation where this one left off (see `Agent.run`).
+    Runa never stores that history on the Run itself: `Run.conversation_id`
+    records which Conversation this Run belongs to, but the live
+    `Conversation` object is a call-time collaborator, passed alongside
+    `run`, the same way `on_chunk` is.
     """
 
     def __init__(
@@ -119,9 +125,16 @@ class Executor:
         agent: "Agent",
         run: Run,
         *,
+        conversation: Conversation | None = None,
         on_chunk: Callable[[StreamChunk], Any | Awaitable[Any]] | None = None,
     ) -> Run:
         """Drive `run` to completion. See the class docstring for the hook order.
+
+        Pass `conversation` to seed this Run's model calls with its prior
+        history and fold this Run's own messages back into it once `run`
+        is terminal (see `_shared.model_context`/`Conversation.record`).
+        The `Conversation` is a call-time collaborator, not stored on
+        `run`: only `run.conversation_id` persists that relationship.
 
         Pass `on_chunk` to receive `StreamChunk` text deltas as each model
         call streams in, instead of only seeing the whole `Message` once
@@ -134,12 +147,12 @@ class Executor:
 
         A no-op if `run` is already terminal: there's nothing left to
         drive, so `before_run`/`after_run` don't fire again and
-        `run.conversation` isn't re-recorded. Without this check, calling
+        `conversation` isn't re-recorded. Without this check, calling
         `run()` a second time on an already-completed Run would silently
         re-invoke `after_run` (see `Run.is_terminal`).
 
         Raises `RunAlreadyDriving` if another Executor is already driving
-        this same Run object; see `Run.begin_driving()`.
+        this same Run object; see `runtime.driving.DrivingGuard`.
         """
         if run.is_terminal:
             return run
@@ -149,7 +162,7 @@ class Executor:
             if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
                 run.start()
                 try:
-                    seed_run(agent, run)
+                    seed_run(agent, run, conversation)
                     agent.before_run(run)
                 except Exception as exc:  # same guarantee as the step loop below
                     run.fail(error=str(exc))
@@ -173,7 +186,9 @@ class Executor:
 
                 try:
                     action = self.strategy.step(run)
-                    agent = await self._apply(agent, run, action, on_chunk)
+                    agent = await self._apply(
+                        agent, run, action, conversation, on_chunk
+                    )
                 except Exception as exc:  # convert into a failed Run, not a crash
                     run.fail(error=str(exc))
                     break
@@ -189,8 +204,8 @@ class Executor:
                         RuntimeWarning,
                         stacklevel=2,
                     )
-                if run.conversation is not None:
-                    run.conversation.record(run)
+                if conversation is not None:
+                    conversation.record(run)
         finally:
             run.end_driving()
         return run
@@ -200,6 +215,7 @@ class Executor:
         agent: "Agent",
         run: Run,
         action: Action,
+        conversation: Conversation | None,
         on_chunk: Callable[[StreamChunk], Any] | None,
     ) -> "Agent":
         """Apply one Strategy decision, returning the Agent driving `run` next.
@@ -208,7 +224,7 @@ class Executor:
         a `transfer=true` delegation: see `_call_tools`/`transfer_agent`.
         """
         if isinstance(action, CallModel):
-            await self._call_model(agent, run, on_chunk)
+            await self._call_model(agent, run, conversation, on_chunk)
         elif isinstance(action, CallTool):
             return await self._call_tools(agent, run, action.tool_call)
         elif isinstance(action, Complete):
@@ -223,13 +239,15 @@ class Executor:
         self,
         agent: "Agent",
         run: Run,
+        conversation: Conversation | None,
         on_chunk: Callable[[StreamChunk], Any] | None,
     ) -> None:
         run.emit(EventType.MODEL_CALLED, model=agent.model)
         schemas = tool_schemas(agent)
+        context = model_context(run, conversation)
         if on_chunk is None:
             message = await self.provider.complete(
-                messages=run.messages, tools=schemas, model=agent.model
+                messages=context, tools=schemas, model=agent.model
             )
         else:
             if not isinstance(self.provider, StreamingProvider):
@@ -239,7 +257,7 @@ class Executor:
                     "streaming-capable Provider"
                 )
             stream = self.provider.stream(
-                messages=run.messages, tools=schemas, model=agent.model
+                messages=context, tools=schemas, model=agent.model
             )
             async for chunk in stream:
                 result = on_chunk(chunk)

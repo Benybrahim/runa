@@ -236,7 +236,8 @@ def test_run_with_a_conversation_carries_history_into_the_next_run():
     )
 
     assert second.status == RunStatus.COMPLETED
-    # second call's messages: system, first user+assistant turn, new user turn
+    # the model context for the second call: system, first turn's history
+    # (from the Conversation), new user turn
     contents = [m.content for m in provider.calls[1]["messages"]]
     assert contents == [
         "Be terse.",
@@ -245,6 +246,12 @@ def test_run_with_a_conversation_carries_history_into_the_next_run():
         "And the temperature?",
     ]
     assert conversation.messages[-1].content == "22 degrees."
+
+    # Run.messages holds only this Run's own turns, not a copy of the
+    # inherited history: the boundary between Run and Conversation.
+    second_contents = [m.content for m in second.messages]
+    assert second_contents == ["Be terse.", "And the temperature?", "22 degrees."]
+    assert second.conversation_id == conversation.id
 
 
 def test_delegate_agent_defaults_name_and_description_from_the_agent():

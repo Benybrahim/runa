@@ -481,7 +481,11 @@ The Run remains the fundamental execution boundary.
 
 A Conversation is meant to be held across separate Runs, but not across
 *concurrent* ones: two Runs racing against the same Conversation are not
-merged: whichever finishes last silently overwrites the other's turn. See
+merged into one coherent narrative, since each Run's own model calls only
+see the Conversation's history as of the moment of that call. Recording
+appends rather than replaces, so neither Run's turn is lost, but the order
+the two turns land in reflects whichever Run finished recording first, not
+necessarily which one happened "logically" first. See
 [Sharing State Across Runs](guides.md#sharing-state-across-runs) for the
 pattern this implies for concurrent work.
 

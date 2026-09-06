@@ -70,12 +70,14 @@ def list_runs(
     since: str | None = None,
     agent_name: str | None = None,
     parent_run_id: str | None = None,
+    conversation_id: str | None = None,
 ) -> str:
     """List Runs in the app's RunStore, optionally filtered by `status`,
     `since` (an ISO 8601 timestamp; only Runs created at or after it match),
-    `agent_name` (the Agent that produced the Run, see `Agent.name`), and/or
+    `agent_name` (the Agent that produced the Run, see `Agent.name`),
     `parent_run_id` (only Runs delegated from that Run, see `ParentRunAware`,
-    e.g. to list everything a given Run spawned).
+    e.g. to list everything a given Run spawned), and/or `conversation_id`
+    (only Runs that belong to that Conversation, see `Run.conversation_id`).
     """
     parsed_status = RunStatus(status) if status is not None else None
     parsed_since = datetime.fromisoformat(since) if since is not None else None
@@ -85,6 +87,7 @@ def list_runs(
             since=parsed_since,
             agent_name=agent_name,
             parent_run_id=parent_run_id,
+            conversation_id=conversation_id,
         )
     return format_run_list(runs)
 

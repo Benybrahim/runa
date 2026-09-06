@@ -241,6 +241,29 @@ def test_list_filters_by_parent_run_id():
     assert [run.id for run in matches] == [child.id]
 
 
+def test_round_trips_conversation_id():
+    store = SQLiteRunStore(":memory:")
+    run = Run(input="hi", conversation_id="conv-1")
+
+    store.save(run)
+    loaded = store.get(run.id)
+    assert loaded is not None
+
+    assert loaded.conversation_id == "conv-1"
+
+
+def test_list_filters_by_conversation_id():
+    store = SQLiteRunStore(":memory:")
+    first = Run(input="one", conversation_id="conv-1")
+    second = Run(input="two", conversation_id="conv-2")
+    store.save(first)
+    store.save(second)
+
+    matches = store.list(conversation_id="conv-1")
+
+    assert [run.id for run in matches] == [first.id]
+
+
 def test_list_filters_by_status():
     store = SQLiteRunStore(":memory:")
     completed = Run(input="one")

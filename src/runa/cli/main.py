@@ -84,7 +84,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     runs_list_parser = runs_subparsers.add_parser(
         "list",
-        help="List Runs, optionally filtered by status/since/agent-name/parent-run-id",
+        help=(
+            "List Runs, optionally filtered by "
+            "status/since/agent-name/parent-run-id/conversation-id"
+        ),
     )
     runs_list_parser.add_argument(
         "--status", default=None, help="e.g. completed, failed, awaiting_approval"
@@ -97,6 +100,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     runs_list_parser.add_argument(
         "--parent-run-id", default=None, help="only Runs delegated from this Run"
+    )
+    runs_list_parser.add_argument(
+        "--conversation-id",
+        default=None,
+        help="only Runs that belong to this Conversation",
     )
 
     runs_subparsers.add_parser("pending", help="List Runs paused awaiting approval")
@@ -245,6 +253,7 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
                 since=args.since,
                 agent_name=args.agent_name,
                 parent_run_id=args.parent_run_id,
+                conversation_id=args.conversation_id,
             )
         )
         return 0

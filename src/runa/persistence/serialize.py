@@ -133,6 +133,7 @@ def run_to_dict(run: Run) -> dict[str, Any]:
         "agent_name": run.agent_name,
         "agent_version": run.agent_version,
         "parent_run_id": run.parent_run_id,
+        "conversation_id": run.conversation_id,
         "input": _json_safe(run.input),
         "state": _json_safe_dict(run.state),
         "messages": [
@@ -187,6 +188,7 @@ def run_from_dict(data: dict[str, Any]) -> Run:
         agent_name=data["agent_name"],
         agent_version=data["agent_version"],
         parent_run_id=data["parent_run_id"],
+        conversation_id=data["conversation_id"],
         input=data["input"],
         state=RunState(data["state"]),
         messages=messages,

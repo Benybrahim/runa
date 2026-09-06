@@ -92,6 +92,16 @@ def test_list_filters_by_parent_run_id():
     assert store.list(parent_run_id=parent.id) == [child]
 
 
+def test_list_filters_by_conversation_id():
+    store = InMemoryRunStore()
+    first = Run(input="one", conversation_id="conv-1")
+    second = Run(input="two", conversation_id="conv-2")
+    store.save(first)
+    store.save(second)
+
+    assert store.list(conversation_id="conv-1") == [first]
+
+
 def test_list_combines_status_and_since_filters():
     store = InMemoryRunStore()
     old_failed = Run(input="old", created_at=datetime.now(UTC) - timedelta(days=1))

@@ -204,12 +204,17 @@ class Agent:
         specific provider, strategy, or max_steps.
 
         Pass `conversation` to continue a prior exchange: its history is
-        seeded ahead of `input`, and this Run's messages are folded back
-        into it once the Run completes, so the next `await .run(...,
-        conversation=conversation)` call picks up where this one left off.
+        prepended ahead of `input` for each model call, and this Run's own
+        messages are folded back into it once the Run completes, so the
+        next `await .run(..., conversation=conversation)` call picks up
+        where this one left off. The Run itself only ever records
+        `conversation_id`; the live `Conversation` is a call-time
+        collaborator, not stored on the Run (see `Executor.run`).
         """
         executor = executor or Executor(provider=application.provider_for(cls.model))
-        return await executor.run(cls(), Run(input=input, conversation=conversation))
+        conversation_id = conversation.id if conversation else None
+        run = Run(input=input, conversation_id=conversation_id)
+        return await executor.run(cls(), run, conversation=conversation)
 
     @classmethod
     def run_sync(
@@ -263,7 +268,8 @@ class Agent:
         `Executor.run`'s `on_chunk` has.
         """
         executor = executor or Executor(provider=application.provider_for(cls.model))
-        run = Run(input=input, conversation=conversation)
+        conversation_id = conversation.id if conversation else None
+        run = Run(input=input, conversation_id=conversation_id)
         queue: asyncio.Queue[StreamChunk | None] = asyncio.Queue()
 
         async def on_chunk(chunk: StreamChunk) -> None:
@@ -271,7 +277,9 @@ class Agent:
 
         async def drive() -> Run:
             try:
-                return await executor.run(cls(), run, on_chunk=on_chunk)
+                return await executor.run(
+                    cls(), run, conversation=conversation, on_chunk=on_chunk
+                )
             finally:
                 await queue.put(None)
 
@@ -289,8 +297,9 @@ class Agent:
     ) -> Run:
         """Queue this agent's run for background execution. See `Agent.run`."""
         executor = executor or Executor(provider=application.provider_for(cls.model))
-        run = Run(input=input, conversation=conversation)
-        return _run_later(cls(), run, executor, queue=queue)
+        conversation_id = conversation.id if conversation else None
+        run = Run(input=input, conversation_id=conversation_id)
+        return _run_later(cls(), run, executor, queue=queue, conversation=conversation)
 
 
 class DelegateAgent(Tool):

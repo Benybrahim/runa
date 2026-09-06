@@ -20,7 +20,7 @@ from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from runa.application import application
-from runa.core import Run
+from runa.core import Conversation, Run
 from runa.persistence import RunStore
 from runa.runtime import Executor
 
@@ -65,7 +65,12 @@ class InlineQueue:
 
 
 def run_later(
-    agent: "Agent", run: Run, executor: Executor, *, queue: Queue | None = None
+    agent: "Agent",
+    run: Run,
+    executor: Executor,
+    *,
+    queue: Queue | None = None,
+    conversation: Conversation | None = None,
 ) -> Run:
     """Queue a Run for background execution and return it immediately.
 
@@ -77,7 +82,12 @@ def run_later(
     that to `Executor.run()`'s own seeding: a QUEUED Run is already durable
     state once a `DurableQueue` has journaled it, and architecture.md §14
     expects provenance to be attributable at that point, not only once
-    execution actually starts.
+    execution actually starts. `run.conversation_id` is already set by the
+    caller (`Agent.run_later()`) at Run construction time, for the same
+    reason. The live `conversation`, however, is a call-time collaborator
+    that can't survive a process boundary the way an id can (see
+    `recover_pending()`): it's threaded straight into the job's own
+    `executor.run()` call, not persisted.
 
     A `DurableQueue`'s journal only records *that* a run id is pending, not
     the Run itself (`background/sqlite.py`: an Agent/Executor hold live
@@ -104,7 +114,7 @@ def run_later(
     durable = isinstance(queue, DurableQueue)
 
     def job() -> None:
-        asyncio.run(executor.run(agent, run))
+        asyncio.run(executor.run(agent, run, conversation=conversation))
         if durable:
             application.run_store.save(run)
 
@@ -157,6 +167,14 @@ def recover_pending(
     resolved at the level of a whole recovered Run. Only give `agents` to
     `recover_pending()` whose tools are safe to run again in full:
     `Tool.idempotent` is the existing signal for exactly this.
+
+    A recovered Run's `conversation_id` survives (it's part of the Run
+    snapshot in `run_store`), but the live `Conversation` object does not:
+    it never crossed the process boundary in the first place, so this
+    resubmits without one. Resolving `conversation_id` back into a live
+    `Conversation` on recovery would need an application-level
+    `ConversationStore` lookup, which is outside what this function has
+    enough information to do on its own.
 
     A run id missing from `run_store` is skipped: it already finished and
     its journal row wasn't cleared for some unrelated reason. A Run whose

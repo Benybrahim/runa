@@ -55,7 +55,7 @@ application has actually persisted it (see
 [Inspecting Runs](guides.md#inspecting-runs)).
 
 * `runa runs show <run_id>`, print a Run's event timeline
-* `runa runs list [--status] [--since] [--agent-name] [--parent-run-id]`, list Runs, optionally filtered
+* `runa runs list [--status] [--since] [--agent-name] [--parent-run-id] [--conversation-id]`, list Runs, optionally filtered
 * `runa runs pending`, list Runs paused awaiting approval
 * `runa runs approve <run_id> <tool_call_id>`, approve a pending tool call and resume the Run
 * `runa runs deny <run_id> <tool_call_id> [--reason]`, deny a pending tool call and fail the Run

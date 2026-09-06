@@ -430,9 +430,12 @@ Two things worth knowing before you rely on this:
 
 * **Sequence, don't race.** Only run Agents against the same
   Conversation one after another. Two Runs launched concurrently against
-  one Conversation (say, both via `run_later()`) aren't merged, each
-  seeds its history from the Conversation as it stood when it started,
-  and whichever finishes last silently overwrites the other's turn.
+  one Conversation (say, both via `run_later()`) aren't merged into one
+  coherent narrative: each Run's own model calls only see the
+  Conversation's history as of the moment of that call, so neither is
+  aware of the other's turn. Neither turn is lost, but the order they
+  land in reflects whichever Run finished recording first, not
+  necessarily which one happened "logically" first.
 * **A Conversation doesn't survive a restart on its own.** It lives in
   memory, same as a Run, until you save it:
 
