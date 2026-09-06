@@ -1,5 +1,6 @@
 """Agent: a declarative object with behavior and capabilities."""
 
+import asyncio
 from collections.abc import Callable
 from typing import Any, ClassVar
 
@@ -7,12 +8,47 @@ from runa.application import application
 from runa.background import Queue
 from runa.background import run_later as _run_later
 from runa.core import Conversation, Run, RunStatus, ToolCall
-from runa.runtime import AsyncExecutor, Executor
+from runa.runtime import AsyncExecutor, Executor, StreamChunk
 from runa.tool import Tool
 
 ToolEntry = type[Tool] | Tool
 
 Policy = Callable[[Run, ToolCall], bool]
+
+
+class AgentStream:
+    """What `Agent.run_stream()` returns: an async iterator of `StreamChunk`s.
+
+    `run` is the exact `Run` object `AsyncExecutor` is advancing, available
+    immediately rather than only once exhausted (contrast `Stream.message`/
+    `AsyncStream.message` in `runtime/provider.py`/`runtime/async_provider.py`,
+    which can't be read until their stream is drained): Execution writes
+    messages, events, and state onto it as it goes, so it fills in as you
+    iterate and reaches its final status and result once the stream ends,
+    the same `Run` `Agent.run_async()` would have returned for the same
+    call. `run_stream()` is another way to observe that Execution, not a
+    second one.
+    """
+
+    def __init__(
+        self,
+        run: Run,
+        task: "asyncio.Task[Run]",
+        queue: "asyncio.Queue[StreamChunk | None]",
+    ) -> None:
+        self.run = run
+        self._task = task
+        self._queue = queue
+
+    def __aiter__(self) -> "AgentStream":
+        return self
+
+    async def __anext__(self) -> StreamChunk:
+        chunk = await self._queue.get()
+        if chunk is None:
+            await self._task  # re-raise if driving the Run itself failed
+            raise StopAsyncIteration
+        return chunk
 
 
 class DuplicateToolName(Exception):
@@ -190,6 +226,54 @@ class Agent:
         """
         executor = executor or AsyncExecutor(provider=application.async_provider)
         return await executor.run(cls(), Run(input=input, conversation=conversation))
+
+    @classmethod
+    def run_stream(
+        cls,
+        input: Any,
+        *,
+        executor: AsyncExecutor | None = None,
+        conversation: Conversation | None = None,
+    ) -> AgentStream:
+        """Run this agent against `input`, observing the model's output as it streams.
+
+        `run()`, `run_async()`, and `run_stream()` are different interfaces
+        to the same Execution: this one drives the exact same `AsyncExecutor`
+        loop as `run_async`, just with `AsyncExecutor.run(..., on_chunk=...)`
+        supplied internally to bridge each `StreamChunk` into an async
+        iterator as it arrives, instead of only returning the completed
+        `Run`. The `Run` this Execution produces is still there afterward,
+        as `.run` on the returned `AgentStream`, and it is identical to what
+        `run_async()` would have returned for the same call:
+
+            stream = ResearchAgent.run_stream("Research fusion energy.")
+            async for chunk in stream:
+                print(chunk.text, end="")
+            stream.run.result
+
+        This first version only streams the model's output, the same
+        `StreamChunk`s `on_chunk` already delivers; it does not yet stream
+        tool calls, state changes, or other Run events.
+
+        Async-only: requires the app-wide default AsyncProvider (or the
+        `executor` given explicitly) to satisfy `AsyncStreamingProvider`,
+        the same requirement `AsyncExecutor.run`'s `on_chunk` has.
+        """
+        executor = executor or AsyncExecutor(provider=application.async_provider)
+        run = Run(input=input, conversation=conversation)
+        queue: asyncio.Queue[StreamChunk | None] = asyncio.Queue()
+
+        async def on_chunk(chunk: StreamChunk) -> None:
+            await queue.put(chunk)
+
+        async def drive() -> Run:
+            try:
+                return await executor.run(cls(), run, on_chunk=on_chunk)
+            finally:
+                await queue.put(None)
+
+        task = asyncio.create_task(drive())
+        return AgentStream(run, task, queue)
 
     @classmethod
     def run_later(

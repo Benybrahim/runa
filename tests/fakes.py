@@ -67,7 +67,7 @@ class FakeStreamingProvider:
 
         def generate():
             for character in response.content:
-                yield StreamChunk(delta=character)
+                yield StreamChunk(text=character)
             stream.message = response
 
         stream = Stream(generate())
@@ -111,7 +111,7 @@ class FakeAsyncStreamingProvider:
 
         async def generate():
             for character in response.content:
-                yield StreamChunk(delta=character)
+                yield StreamChunk(text=character)
             stream.message = response
 
         stream = AsyncStream(generate())

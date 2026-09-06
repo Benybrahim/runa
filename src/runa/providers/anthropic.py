@@ -155,7 +155,7 @@ class AnthropicProvider:
                 else anthropic.omit,
             ) as vendor_stream:
                 for text in vendor_stream.text_stream:
-                    yield StreamChunk(delta=text)
+                    yield StreamChunk(text=text)
                 result.message = from_wire_message(vendor_stream.get_final_message())
 
         result = Stream(generate())
@@ -221,7 +221,7 @@ class AsyncAnthropicProvider:
                 else anthropic.omit,
             ) as vendor_stream:
                 async for text in vendor_stream.text_stream:
-                    yield StreamChunk(delta=text)
+                    yield StreamChunk(text=text)
                 result.message = from_wire_message(
                     await vendor_stream.get_final_message()
                 )

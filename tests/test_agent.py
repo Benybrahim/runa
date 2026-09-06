@@ -14,7 +14,7 @@ from runa.application import ProviderNotConfigured, application, configure
 from runa.core import Conversation, EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.runtime import AsyncExecutor, Executor
 from runa.tool import Tool
-from tests.fakes import FakeAsyncProvider, FakeProvider
+from tests.fakes import FakeAsyncProvider, FakeAsyncStreamingProvider, FakeProvider
 
 
 class Ledger(Tool):
@@ -196,6 +196,25 @@ def test_run_async_accepts_an_explicit_async_executor_as_an_escape_hatch():
     assert run.status == RunStatus.COMPLETED
     assert run.result == "hi"
     assert provider.calls  # the explicit executor's provider was used
+
+
+def test_run_stream_yields_the_streamed_output_and_the_same_final_run():
+    class SimpleAgent(Agent):
+        pass
+
+    provider = FakeAsyncStreamingProvider([Message(role=Role.ASSISTANT, content="hi")])
+    executor = AsyncExecutor(provider=provider)
+
+    async def collect():
+        stream = SimpleAgent.run_stream("hello", executor=executor)
+        chunks = [chunk.text async for chunk in stream]
+        return chunks, stream.run
+
+    chunks, run = asyncio.run(collect())
+
+    assert "".join(chunks) == "hi"
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "hi"
 
 
 def test_run_later_queues_and_runs_via_the_default_inline_queue():

@@ -93,7 +93,7 @@ class RetryingProvider:
 class StreamChunk:
     """One incremental piece of a streamed model response: a text delta."""
 
-    delta: str
+    text: str
 
 
 class Stream:

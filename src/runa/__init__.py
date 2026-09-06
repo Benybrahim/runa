@@ -2,6 +2,7 @@
 
 from runa.agent import (
     Agent,
+    AgentStream,
     AsyncDelegateAgent,
     DelegateAgent,
     DuplicateToolName,
@@ -105,6 +106,7 @@ __all__ = [
     "Action",
     "ActionArtifact",
     "Agent",
+    "AgentStream",
     "AnthropicProvider",
     "Application",
     "Artifact",

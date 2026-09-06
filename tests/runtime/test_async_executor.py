@@ -286,7 +286,7 @@ def test_async_on_chunk_receives_deltas_and_the_run_completes_normally():
         )
     )
 
-    assert "".join(c.delta for c in chunks) == "hi there"
+    assert "".join(c.text for c in chunks) == "hi there"
     assert run.status == RunStatus.COMPLETED
     assert run.result == "hi there"
 
@@ -305,7 +305,7 @@ def test_async_on_chunk_accepts_an_async_callback():
         AsyncExecutor(provider).run(WeatherAgent(), Run(input="hi"), on_chunk=on_chunk)
     )
 
-    assert "".join(c.delta for c in chunks) == "hi"
+    assert "".join(c.text for c in chunks) == "hi"
     assert run.result == "hi"
 
 

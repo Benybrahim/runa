@@ -226,7 +226,7 @@ def test_streaming_example():
     run = Executor(provider).run(
         streaming.WeatherAgent(),
         Run(input="What's the weather in Tokyo?"),
-        on_chunk=lambda chunk: seen.append(chunk.delta),
+        on_chunk=lambda chunk: seen.append(chunk.text),
     )
 
     assert run.status == RunStatus.COMPLETED

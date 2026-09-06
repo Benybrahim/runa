@@ -143,7 +143,7 @@ class OpenAIProvider:
             ) as vendor_stream:
                 for event in vendor_stream:
                     if event.type == "content.delta" and event.delta:
-                        yield StreamChunk(delta=event.delta)
+                        yield StreamChunk(text=event.delta)
                 result.message = from_wire_message(vendor_stream.get_final_completion())
 
         result = Stream(generate())
@@ -200,7 +200,7 @@ class AsyncOpenAIProvider:
             ) as vendor_stream:
                 async for event in vendor_stream:
                     if event.type == "content.delta" and event.delta:
-                        yield StreamChunk(delta=event.delta)
+                        yield StreamChunk(text=event.delta)
                 result.message = from_wire_message(
                     await vendor_stream.get_final_completion()
                 )

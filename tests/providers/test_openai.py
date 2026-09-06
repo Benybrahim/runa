@@ -241,7 +241,7 @@ def test_openai_provider_stream_yields_content_deltas_only():
     stream = provider.stream(
         messages=[Message(role=Role.USER, content="hi")], tools=[], model=None
     )
-    chunks = [chunk.delta for chunk in stream]
+    chunks = [chunk.text for chunk in stream]
 
     assert chunks == ["Let", " me check."]
     assert stream.message is not None
@@ -303,7 +303,7 @@ def test_async_openai_provider_stream_yields_content_deltas_only():
     )
 
     async def collect() -> list[str]:
-        return [chunk.delta async for chunk in stream]
+        return [chunk.text async for chunk in stream]
 
     chunks = asyncio.run(collect())
 

@@ -842,7 +842,7 @@ def test_on_chunk_receives_deltas_and_the_run_completes_normally():
         WeatherAgent(), Run(input="hello"), on_chunk=chunks.append
     )
 
-    assert "".join(c.delta for c in chunks) == "hi there"
+    assert "".join(c.text for c in chunks) == "hi there"
     assert result.status == RunStatus.COMPLETED
     assert result.result == "hi there"
 
@@ -863,7 +863,7 @@ def test_on_chunk_streams_every_model_call_in_a_tool_use_loop():
         WeatherAgent(), Run(input="weather in Tokyo?"), on_chunk=chunks.append
     )
 
-    assert "".join(c.delta for c in chunks) == "Tokyo is sunny."
+    assert "".join(c.text for c in chunks) == "Tokyo is sunny."
     assert result.result == "Tokyo is sunny."
 
 

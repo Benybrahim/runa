@@ -27,7 +27,7 @@ class WeatherAgent(Agent):
 
 
 def print_as_it_arrives(chunk: StreamChunk) -> None:
-    print(chunk.delta, end="", flush=True)
+    print(chunk.text, end="", flush=True)
 
 
 if __name__ == "__main__":
