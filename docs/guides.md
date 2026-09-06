@@ -281,7 +281,7 @@ run = ResearchAgent.run_later("Produce a detailed report.")
 
 The returned object represents the same conceptual unit of work as `run()`.
 
-For durable background execution, configure a persistent Run store and an appropriate Queue: `configure(async_provider=..., run_store=SQLiteRunStore(...))` (`run_later()` resolves its default `Executor` from `async_provider`, the same as `run()`/`run_sync()`/`run_stream()`). `run_later()` saves the Run there itself when queuing onto a `DurableQueue`, once before dispatch (so recovery has something to find after a crash) and again once the Run reaches its next pause point (completion, failure, or an approval gate), so `runa runs show <id>` reflects what actually happened instead of the Run's last-queued status. No extra wiring needed beyond `configure()`.
+For durable background execution, configure a persistent Run store and an appropriate Queue: `configure(provider=..., run_store=SQLiteRunStore(...))` (`run_later()` resolves its default `Executor` from `provider`, the same as `run()`/`run_sync()`/`run_stream()`). `run_later()` saves the Run there itself when queuing onto a `DurableQueue`, once before dispatch (so recovery has something to find after a crash) and again once the Run reaches its next pause point (completion, failure, or an approval gate), so `runa runs show <id>` reflects what actually happened instead of the Run's last-queued status. No extra wiring needed beyond `configure()`.
 
 Do not create a separate “job object” in application code just because execution happens later.
 
@@ -420,8 +420,8 @@ cases = [
     "Compare the leading approaches.",
 ]
 
-expect(run).to_be_factual()
-expect(run).to_meet_the_goal()
+await expect(run).to_be_factual()
+await expect(run).to_meet_the_goal()
 ```
 
 Keep evaluation on the same Agent and Run path used in production.
@@ -652,14 +652,14 @@ A retry should not accidentally duplicate a side effect.
 
 `RetryStrategy` covers tool calls, not the model call itself. A rate limit,
 timeout, or dropped connection from the model API fails the whole Run
-immediately unless the AsyncProvider `Executor` actually drives is wrapped
-in `AsyncRetryingProvider`:
+immediately unless the Provider `Executor` actually drives is wrapped in
+`RetryingProvider`:
 
 ```python
-from runa import configure, AsyncRetryingProvider
-from runa.providers import AsyncAnthropicProvider
+from runa import configure, RetryingProvider
+from runa.providers import AnthropicProvider
 
-configure(async_provider=AsyncRetryingProvider(AsyncAnthropicProvider(), max_retries=3))
+configure(provider=RetryingProvider(AnthropicProvider(), max_retries=3))
 ```
 
 This is safe by construction, not just by convention: `Executor._call_model`
@@ -675,8 +675,8 @@ rate-limit or connection-error types), pass `is_retryable`:
 import anthropic
 
 configure(
-    async_provider=AsyncRetryingProvider(
-        AsyncAnthropicProvider(),
+    provider=RetryingProvider(
+        AnthropicProvider(),
         is_retryable=lambda exc: isinstance(
             exc, anthropic.RateLimitError | anthropic.APIConnectionError
         ),
@@ -684,14 +684,12 @@ configure(
 )
 ```
 
-Only `complete()` is retried: an `AsyncRetryingProvider` wrapping a
-streaming Provider no longer satisfies `AsyncStreamingProvider`, since a
-partially delivered stream can't be safely restarted once some chunks have
-already reached `on_chunk`.
-
-`RetryingProvider` is the synchronous counterpart, for direct Provider use
-outside an Agent's own Execution, e.g. wrapping the Provider a `Judge`
-grades with.
+Only `complete()` is retried: a `RetryingProvider` wrapping a streaming
+Provider no longer satisfies `StreamingProvider`, since a partially
+delivered stream can't be safely restarted once some chunks have already
+reached `on_chunk`. `RetryingProvider` is also what a `Judge` should be
+wrapped in for the same reason, since it grades through this same
+`Provider` contract.
 
 ---
 

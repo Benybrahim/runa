@@ -18,18 +18,17 @@ is not threaded through every call.
 Construct `Application()` explicitly for tests, or any scenario that needs
 an isolated set of infrastructure: each instance owns its own `Config`, so
 configuring one instance never leaks into another (see
-tests/test_application.py). Its async_provider/provider/run_store can be
-passed straight into an `Executor`, the same escape hatch
-`Agent.run(executor=...)` already exposes, so an isolated Application
-doesn't need any Agent-level API of its own to be useful.
+tests/test_application.py). Its provider/run_store can be passed straight
+into an `Executor`, the same escape hatch `Agent.run(executor=...)` already
+exposes, so an isolated Application doesn't need any Agent-level API of its
+own to be useful.
 
 A model provider is an application-level dependency, not a per-agent one:
-most applications talk to exactly one. `async_provider` drives `Executor`
-(Runa's canonical execution model, see `runtime/executor.py`); `provider`
-is a separate, synchronous slot for direct use outside an Agent's own
-Executor, e.g. the default `Judge` in `eval/harness.py`. A sync client
-(`anthropic.Anthropic`) and an async one (`anthropic.AsyncAnthropic`) are
-different objects, so an app that wants both configures them explicitly.
+most applications talk to exactly one. `provider` drives both `Executor`
+(Runa's canonical execution model, see `runtime/executor.py`) and direct
+use outside an Agent's own Executor, e.g. the default `Judge` in
+`eval/harness.py`: one Provider, one async contract, no separate
+synchronous slot to keep in sync with it.
 
 `run_store` defaults to an in-memory store, so it's only useful across
 process boundaries once an app configures a durable one, e.g.
@@ -37,21 +36,16 @@ process boundaries once an app configures a durable one, e.g.
 """
 
 from dataclasses import dataclass, field, fields
+from typing import cast
 
 from runa.persistence.store import InMemoryRunStore, RunStore
-from runa.providers.registry import resolve_async_provider, resolve_provider
-from runa.runtime.async_provider import AsyncProvider
+from runa.providers.registry import resolve_provider
 from runa.runtime.provider import Provider
 
 
 class ProviderNotConfigured(Exception):
-    """Raised when the default synchronous Provider is needed but isn't set,
-    e.g. by `Judge`'s default in `eval/harness.py`."""
-
-
-class AsyncProviderNotConfigured(Exception):
-    """Raised when Agent.run()/.run_sync()/.run_stream()/.run_later() needs
-    an AsyncProvider that isn't set."""
+    """Raised when Agent.run()/.run_sync()/.run_stream()/.run_later() or a
+    direct use like `Judge`'s default needs a Provider that isn't set."""
 
 
 class InvalidConfiguration(Exception):
@@ -70,7 +64,6 @@ class Config:
     """
 
     provider: Provider | None = None
-    async_provider: AsyncProvider | None = None
     run_store: RunStore = field(default_factory=InMemoryRunStore)
 
 
@@ -107,10 +100,10 @@ class Application:
         isn't a known `Config` field, so a typo like `provder=...` fails
         loudly instead of being silently ignored.
 
-        `provider`/`async_provider` accept either a `Provider`/`AsyncProvider`
-        instance or its ergonomic string alias (`provider="openai"`); the
-        alias is resolved to an instance right here, so `self.config` and
-        everything downstream only ever sees a real Provider (see
+        `provider` accepts either a `Provider` instance or its ergonomic
+        string alias (`provider="openai"`); the alias is resolved to an
+        instance right here, so `self.config` and everything downstream
+        only ever sees a real Provider (see
         `runa.providers.registry.resolve_provider`). An unrecognized alias
         raises `UnknownProvider` immediately, at configure() time, rather
         than failing later inside the runtime.
@@ -122,34 +115,20 @@ class Application:
                 f"unknown configuration option(s): {', '.join(sorted(unknown))}; "
                 f"valid options are: {', '.join(sorted(valid_fields))}"
             )
-        resolvers = {
-            "provider": resolve_provider,
-            "async_provider": resolve_async_provider,
-        }
         for name, value in options.items():
-            resolve = resolvers.get(name)
-            if resolve is not None and value is not None:
-                value = resolve(value)
+            if name == "provider" and value is not None:
+                value = resolve_provider(cast(Provider | str, value))
             setattr(self.config, name, value)
 
     @property
     def provider(self) -> Provider:
         if self.config.provider is None:
             raise ProviderNotConfigured(
-                "call runa.configure(provider=...) first, or pass a Provider "
-                "explicitly, e.g. Judge(my_provider)"
+                "call runa.configure(provider=...) before Agent.run()/"
+                ".run_sync()/.run_stream()/.run_later(), or pass an "
+                "Executor explicitly, e.g. Judge(my_provider)"
             )
         return self.config.provider
-
-    @property
-    def async_provider(self) -> AsyncProvider:
-        if self.config.async_provider is None:
-            raise AsyncProviderNotConfigured(
-                "call runa.configure(async_provider=...) before Agent.run()/"
-                ".run_sync()/.run_stream()/.run_later(), or pass an "
-                "Executor explicitly"
-            )
-        return self.config.async_provider
 
     @property
     def run_store(self) -> RunStore:

@@ -99,9 +99,9 @@ class Judge:
         self.provider = provider
         self.model = model
 
-    def grade(self, run: Run, rubric: str) -> Verdict:
+    async def grade(self, run: Run, rubric: str) -> Verdict:
         prompt = _JUDGE_PROMPT.format(rubric=rubric, transcript=_format_transcript(run))
-        message = self.provider.complete(
+        message = await self.provider.complete(
             messages=[Message(role=Role.USER, content=prompt)],
             tools=[],
             model=self.model,

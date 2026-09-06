@@ -16,7 +16,6 @@ import asyncio
 
 from runa import (
     Agent,
-    AsyncOpenAIProvider,
     EvalCase,
     Executor,
     Judge,
@@ -60,7 +59,7 @@ cases = [
 
 
 if __name__ == "__main__":
-    executor = Executor(provider=AsyncOpenAIProvider())
+    executor = Executor(provider=provider)
     agent = WeatherAgent()
 
     for result in asyncio.run(run_evals(agent, executor, cases)):

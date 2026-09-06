@@ -34,7 +34,7 @@ def run_project_evals(root: Path) -> list[EvalResult]:
         )
 
     with loaded_app(root):
-        executor = Executor(provider=application.async_provider)
+        executor = Executor(provider=application.provider)
 
         modules = []
         for eval_file in sorted(evaluations_dir.glob("*.py")):

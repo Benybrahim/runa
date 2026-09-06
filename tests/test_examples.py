@@ -1,9 +1,9 @@
-"""Runs the example scripts' Agent/logic against a FakeAsyncProvider.
+"""Runs the example scripts' Agent/logic against a FakeProvider.
 
 Examples themselves call a live provider (see their docstrings), so these
 tests import each script as a module (its `if __name__ == "__main__":` block
 never executes on import) and drive the same Agent classes through
-Executor/FakeAsyncProvider, to catch example rot without spending API
+Executor/FakeProvider, to catch example rot without spending API
 credits.
 """
 
@@ -17,11 +17,7 @@ import pytest
 from runa import Executor, Judge, Run, RunStatus, approve, configure, run_evals
 from runa.application import application
 from runa.core import Message, Role, ToolCall
-from tests.fakes import (
-    FakeAsyncProvider,
-    FakeAsyncStreamingProvider,
-    FakeProvider,
-)
+from tests.fakes import FakeProvider, FakeStreamingProvider
 
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 
@@ -37,12 +33,11 @@ def _load(name: str) -> Any:
 @pytest.fixture(autouse=True)
 def _reset_default_provider(monkeypatch):
     monkeypatch.setattr(application.config, "provider", None)
-    monkeypatch.setattr(application.config, "async_provider", None)
 
 
 def test_hello_example():
     hello = _load("hello")
-    fake = FakeAsyncProvider(
+    fake = FakeProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -51,7 +46,7 @@ def test_hello_example():
             Message(role=Role.ASSISTANT, content="It's sunny in Tokyo."),
         ]
     )
-    configure(async_provider=fake)
+    configure(provider=fake)
 
     run = hello.WeatherAgent.run_sync("What's the weather in Tokyo?")
 
@@ -61,7 +56,7 @@ def test_hello_example():
 
 def test_hello_anthropic_example():
     hello_anthropic = _load("hello_anthropic")
-    fake = FakeAsyncProvider(
+    fake = FakeProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -70,7 +65,7 @@ def test_hello_anthropic_example():
             Message(role=Role.ASSISTANT, content="It's sunny in Tokyo."),
         ]
     )
-    configure(async_provider=fake)
+    configure(provider=fake)
 
     run = hello_anthropic.WeatherAgent.run_sync("What's the weather in Tokyo?")
 
@@ -80,13 +75,13 @@ def test_hello_anthropic_example():
 
 def test_conversation_example():
     conversation_example = _load("conversation")
-    fake = FakeAsyncProvider(
+    fake = FakeProvider(
         [
             Message(role=Role.ASSISTANT, content="I'm sorry to hear that."),
             Message(role=Role.ASSISTANT, content="It was A123."),
         ]
     )
-    configure(async_provider=fake)
+    configure(provider=fake)
 
     conversation = conversation_example.Conversation()
     first = conversation_example.SupportAgent.run_sync(
@@ -110,7 +105,7 @@ def test_conversation_example():
 
 def test_background_example():
     background = _load("background")
-    fake = FakeAsyncProvider(
+    fake = FakeProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -119,7 +114,7 @@ def test_background_example():
             Message(role=Role.ASSISTANT, content="It's sunny in Kyoto."),
         ]
     )
-    configure(async_provider=fake)
+    configure(provider=fake)
 
     run = background.WeatherAgent.run_later("What's the weather in Kyoto?")
 
@@ -129,7 +124,7 @@ def test_background_example():
 
 def test_approval_example():
     approval = _load("approval")
-    fake = FakeAsyncProvider(
+    fake = FakeProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -162,7 +157,7 @@ def test_eval_example(monkeypatch):
     # present at import time, even though it's swapped for a fake below.
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     eval_example = _load("eval")
-    fake = FakeAsyncProvider(
+    fake = FakeProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -190,7 +185,7 @@ def test_eval_example(monkeypatch):
 
 def test_streaming_example():
     streaming = _load("streaming")
-    provider = FakeAsyncStreamingProvider(
+    provider = FakeStreamingProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -216,7 +211,7 @@ def test_streaming_example():
 
 def test_delegate_example():
     delegate = _load("delegate")
-    fake = FakeAsyncProvider(
+    fake = FakeProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -231,7 +226,7 @@ def test_delegate_example():
             Message(role=Role.ASSISTANT, content="Fusion is making progress."),
         ]
     )
-    configure(async_provider=fake)
+    configure(provider=fake)
 
     run = delegate.LeadAgent.run_sync("What's promising about fusion energy?")
 
@@ -241,7 +236,7 @@ def test_delegate_example():
 
 def test_transfer_delegate_example():
     transfer_delegate = _load("transfer_delegate")
-    fake = FakeAsyncProvider(
+    fake = FakeProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -261,7 +256,7 @@ def test_transfer_delegate_example():
             ),
         ]
     )
-    configure(async_provider=fake)
+    configure(provider=fake)
 
     run = transfer_delegate.TriageAgent.run_sync(
         "I was charged twice for my subscription this month."
@@ -275,7 +270,7 @@ def test_transfer_delegate_example():
 
 def test_parallel_delegate_example():
     parallel_delegate = _load("parallel_delegate")
-    fake = FakeAsyncProvider(
+    fake = FakeProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -289,7 +284,7 @@ def test_parallel_delegate_example():
             Message(role=Role.ASSISTANT, content="Sunny and 22C; the local team won."),
         ]
     )
-    configure(async_provider=fake)
+    configure(provider=fake)
 
     run = asyncio.run(parallel_delegate.BriefingAgent.run("Tokyo"))
 

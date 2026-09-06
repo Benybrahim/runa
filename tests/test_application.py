@@ -4,7 +4,6 @@ import runa
 from runa.agent import Agent
 from runa.application import (
     Application,
-    AsyncProviderNotConfigured,
     Config,
     InvalidConfiguration,
     ProviderNotConfigured,
@@ -12,8 +11,8 @@ from runa.application import (
 )
 from runa.core import Message, Role, RunStatus
 from runa.persistence import InMemoryRunStore
-from runa.providers import AsyncOpenAIProvider, OpenAIProvider, UnknownProvider
-from tests.fakes import FakeAsyncProvider, FakeProvider
+from runa.providers import OpenAIProvider, UnknownProvider
+from tests.fakes import FakeProvider
 
 
 @pytest.fixture(autouse=True)
@@ -38,11 +37,6 @@ def test_runa_configure_sets_the_default_applications_provider():
 def test_application_provider_raises_before_configuration():
     with pytest.raises(ProviderNotConfigured):
         application.provider
-
-
-def test_application_async_provider_raises_before_configuration():
-    with pytest.raises(AsyncProviderNotConfigured):
-        application.async_provider
 
 
 def test_application_run_store_defaults_to_in_memory():
@@ -86,14 +80,6 @@ def test_configure_raises_a_clear_error_for_an_unknown_provider_alias():
         application.configure(provider="unrecognized-vendor")
 
 
-def test_configure_resolves_a_string_async_provider_alias(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-
-    application.configure(provider=FakeProvider(responses=[]), async_provider="openai")
-
-    assert isinstance(application.async_provider, AsyncOpenAIProvider)
-
-
 def test_explicit_application_can_be_constructed_and_configured():
     app = Application()
     provider = FakeProvider(responses=[])
@@ -125,13 +111,11 @@ def test_configuring_an_explicit_application_does_not_affect_the_default():
         application.provider
 
 
-def test_agent_run_sync_resolves_the_async_provider_from_the_default_application():
+def test_agent_run_sync_resolves_the_provider_from_the_default_application():
     class SimpleAgent(Agent):
         pass
 
-    runa.configure(
-        async_provider=FakeAsyncProvider([Message(role=Role.ASSISTANT, content="hi")])
-    )
+    runa.configure(provider=FakeProvider([Message(role=Role.ASSISTANT, content="hi")]))
 
     run = SimpleAgent.run_sync("hello")
 
@@ -139,14 +123,14 @@ def test_agent_run_sync_resolves_the_async_provider_from_the_default_application
     assert run.result == "hi"
 
 
-def test_agent_run_resolves_the_async_provider_from_the_default_application():
+def test_agent_run_resolves_the_provider_from_the_default_application():
     import asyncio
 
     class SimpleAgent(Agent):
         pass
 
     runa.configure(
-        async_provider=FakeAsyncProvider([Message(role=Role.ASSISTANT, content="hi")]),
+        provider=FakeProvider([Message(role=Role.ASSISTANT, content="hi")]),
     )
 
     run = asyncio.run(SimpleAgent.run("hello"))
@@ -155,11 +139,11 @@ def test_agent_run_resolves_the_async_provider_from_the_default_application():
     assert run.result == "hi"
 
 
-def test_agent_run_raises_a_clear_error_when_no_async_provider_is_configured():
+def test_agent_run_raises_a_clear_error_when_no_provider_is_configured():
     class SimpleAgent(Agent):
         pass
 
-    with pytest.raises(AsyncProviderNotConfigured):
+    with pytest.raises(ProviderNotConfigured):
         SimpleAgent.run_sync("hello")
 
 
@@ -169,7 +153,7 @@ def test_agent_run_still_accepts_an_explicit_executor_without_any_configuration(
     class SimpleAgent(Agent):
         pass
 
-    provider = FakeAsyncProvider([Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider([Message(role=Role.ASSISTANT, content="hi")])
 
     run = SimpleAgent.run_sync("hello", executor=Executor(provider=provider))
 

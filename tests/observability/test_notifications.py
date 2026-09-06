@@ -8,7 +8,7 @@ from runa.core import EventType, Message, Role, Run, RunStatus, ToolCall
 from runa.observability import instrument, timeline
 from runa.runtime import Executor
 from runa.tool import Tool
-from tests.fakes import FakeAsyncProvider
+from tests.fakes import FakeProvider
 
 
 class GreeterAgent(Agent):
@@ -38,7 +38,7 @@ class NamedModelAgent(Agent):
 
 
 def test_timeline_summarizes_a_direct_answer_with_the_model_and_content():
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     run = asyncio.run(Executor(provider).run(NamedModelAgent(), Run(input="hello")))
 
     called = next(e for e in timeline(run) if e.type == EventType.MODEL_CALLED)
@@ -49,7 +49,7 @@ def test_timeline_summarizes_a_direct_answer_with_the_model_and_content():
 
 
 def test_timeline_summarizes_a_response_with_usage_when_the_provider_reports_it():
-    provider = FakeAsyncProvider(
+    provider = FakeProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -66,7 +66,7 @@ def test_timeline_summarizes_a_response_with_usage_when_the_provider_reports_it(
 
 
 def test_timeline_summarizes_a_model_call_with_no_configured_model():
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     run = asyncio.run(Executor(provider).run(GreeterAgent(), Run(input="hello")))
 
     called = next(e for e in timeline(run) if e.type == EventType.MODEL_CALLED)
@@ -75,7 +75,7 @@ def test_timeline_summarizes_a_model_call_with_no_configured_model():
 
 
 def test_timeline_summarizes_a_tool_requesting_response_by_call_count():
-    provider = FakeAsyncProvider(
+    provider = FakeProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -95,7 +95,7 @@ def test_timeline_summarizes_a_tool_requesting_response_by_call_count():
 
 
 def test_timeline_summarizes_events_in_order():
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     run = asyncio.run(Executor(provider).run(GreeterAgent(), Run(input="hello")))
 
     entries = timeline(run)
@@ -112,7 +112,7 @@ def test_timeline_summarizes_events_in_order():
 
 
 def test_timeline_summarizes_a_tool_call_with_its_arguments():
-    provider = FakeAsyncProvider(
+    provider = FakeProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -133,7 +133,7 @@ def test_timeline_summarizes_a_tool_call_with_its_arguments():
 
 
 def test_timeline_summarizes_a_failed_tool_call_with_its_arguments():
-    provider = FakeAsyncProvider(
+    provider = FakeProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -157,7 +157,7 @@ def test_timeline_summarizes_an_agent_transfer():
     class TriageAgent(Agent):
         delegations = [SupportAgent]
 
-    provider = FakeAsyncProvider(
+    provider = FakeProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -180,7 +180,7 @@ def test_timeline_summarizes_an_agent_transfer():
 
 
 def test_timeline_reflects_run_events_not_a_separate_copy():
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     run = Run(input="hello")
 
     assert timeline(run) == []
@@ -192,7 +192,7 @@ def test_timeline_reflects_run_events_not_a_separate_copy():
 
 def test_instrument_notifies_subscriber_as_events_happen():
     seen = []
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     run = Run(input="hello")
 
     instrument(run, seen.append)
@@ -225,7 +225,7 @@ def test_a_raising_subscriber_does_not_fail_or_crash_the_run():
     # from run.start(), which fires outside the Executor's own try/except,
     # defeating the guarantee that Run execution converts failures into a
     # failed Run rather than crashing the caller.
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     run = Run(input="hello")
 
     def broken_subscriber(event):
@@ -257,7 +257,7 @@ def test_a_raising_subscriber_does_not_block_other_subscribers():
 
 
 def test_timeline_works_for_an_awaited_run_with_no_runstore():
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     run = asyncio.run(Executor(provider).run(GreeterAgent(), Run(input="hello")))
 
     assert [entry.type for entry in timeline(run)] == [
@@ -269,7 +269,7 @@ def test_timeline_works_for_an_awaited_run_with_no_runstore():
 
 
 def test_timeline_works_for_a_run_later_run_with_no_runstore():
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     run = run_later(GreeterAgent(), Run(input="hello"), Executor(provider))
 
     assert [entry.type for entry in timeline(run)] == [
@@ -282,7 +282,7 @@ def test_timeline_works_for_a_run_later_run_with_no_runstore():
 
 
 def test_separate_runs_have_isolated_event_histories():
-    provider = FakeAsyncProvider(
+    provider = FakeProvider(
         responses=[
             Message(role=Role.ASSISTANT, content="hi"),
             Message(role=Role.ASSISTANT, content="bye"),

@@ -14,8 +14,8 @@ import asyncio
 
 from runa import (
     Agent,
-    AsyncOpenAIProvider,
     Executor,
+    OpenAIProvider,
     Run,
     RunStatus,
     approve,
@@ -34,7 +34,7 @@ class SupportAgent(Agent):
 
 
 if __name__ == "__main__":
-    executor = Executor(provider=AsyncOpenAIProvider())
+    executor = Executor(provider=OpenAIProvider())
     agent = SupportAgent()
 
     run = asyncio.run(executor.run(agent, Run(input="Refund order A123 for $42.")))

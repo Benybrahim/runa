@@ -13,7 +13,6 @@ import asyncio
 
 from runa import (
     Agent,
-    AsyncOpenAIProvider,
     Executor,
     OpenAIProvider,
     Run,
@@ -34,12 +33,12 @@ class WeatherAgent(Agent):
 
 
 if __name__ == "__main__":
-    configure(provider=OpenAIProvider(), async_provider=AsyncOpenAIProvider())
+    configure(provider=OpenAIProvider())
 
     print("--- live, as events happen ---")
     run = Run(input="What's the weather in Tokyo?")
     instrument(run, lambda event: print(f"  {event.type.value}"))
-    asyncio.run(Executor(AsyncOpenAIProvider()).run(WeatherAgent(), run))
+    asyncio.run(Executor(OpenAIProvider()).run(WeatherAgent(), run))
 
     print("\n--- after the fact, from the recorded timeline ---")
     for entry in timeline(run):

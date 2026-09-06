@@ -1,13 +1,12 @@
 """AnthropicProvider: a thin adapter between core.Message and Anthropic's API."""
 
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 from typing import Any, cast
 
 import anthropic
 from anthropic.types import MessageParam, ToolUnionParam
 
 from runa.core import Message, Role, ToolCall
-from runa.runtime.async_provider import AsyncStream
 from runa.runtime.provider import Stream, StreamChunk
 
 DEFAULT_MODEL = "claude-sonnet-5"
@@ -99,75 +98,16 @@ def from_wire_usage(usage: Any) -> dict[str, int]:
 class AnthropicProvider:
     """Provider backed by the Anthropic Messages API.
 
-    Satisfies the `Provider` protocol structurally: `complete(messages=...,
-    tools=..., model=...) -> Message`. Wire-format translation is exposed as
-    plain functions (`to_wire_messages`, `to_wire_tools`, `from_wire_message`)
-    so it stays testable without a real API call.
-    """
+    Satisfies the `Provider` protocol structurally: `async complete(
+    messages=..., tools=..., model=...) -> Message`. Wire-format translation
+    is exposed as plain functions (`to_wire_messages`, `to_wire_tools`,
+    `from_wire_message`) so it stays testable without a real API call.
 
-    def __init__(
-        self,
-        client: anthropic.Anthropic | None = None,
-        *,
-        max_tokens: int = DEFAULT_MAX_TOKENS,
-    ) -> None:
-        self.client = client or anthropic.Anthropic()
-        self.max_tokens = max_tokens
-
-    def complete(
-        self,
-        *,
-        messages: list[Message],
-        tools: list[dict[str, Any]],
-        model: str | None,
-    ) -> Message:
-        system, wire_messages = to_wire_messages(messages)
-        response = self.client.messages.create(
-            model=model or DEFAULT_MODEL,
-            max_tokens=self.max_tokens,
-            system=system,
-            messages=cast(list[MessageParam], wire_messages),
-            tools=cast(list[ToolUnionParam], to_wire_tools(tools))
-            if tools
-            else anthropic.omit,
-        )
-        return from_wire_message(response)
-
-    def stream(
-        self,
-        *,
-        messages: list[Message],
-        tools: list[dict[str, Any]],
-        model: str | None,
-    ) -> Stream:
-        """Satisfies `StreamingProvider` structurally. Lazy: the request
-        only fires once the returned `Stream` is iterated."""
-        system, wire_messages = to_wire_messages(messages)
-
-        def generate() -> Iterator[StreamChunk]:
-            with self.client.messages.stream(
-                model=model or DEFAULT_MODEL,
-                max_tokens=self.max_tokens,
-                system=system,
-                messages=cast(list[MessageParam], wire_messages),
-                tools=cast(list[ToolUnionParam], to_wire_tools(tools))
-                if tools
-                else anthropic.omit,
-            ) as vendor_stream:
-                for text in vendor_stream.text_stream:
-                    yield StreamChunk(text=text)
-                result.message = from_wire_message(vendor_stream.get_final_message())
-
-        result = Stream(generate())
-        return result
-
-
-class AsyncAnthropicProvider:
-    """The async counterpart to `AnthropicProvider`.
-
-    Satisfies `AsyncProvider` structurally, backed by `anthropic.AsyncAnthropic`
-    instead of `anthropic.Anthropic`. Shares the exact same wire-format
-    functions as the sync provider; only the client and the `await` differ.
+    Backed by `anthropic.AsyncAnthropic`: async is Runa's canonical
+    execution path, so there is no separate synchronous counterpart to
+    maintain here. Code that needs a blocking call can await this from
+    `asyncio.run(...)`, the same thing `Agent.run_sync()` does for a whole
+    Executor run.
     """
 
     def __init__(
@@ -204,9 +144,9 @@ class AsyncAnthropicProvider:
         messages: list[Message],
         tools: list[dict[str, Any]],
         model: str | None,
-    ) -> AsyncStream:
-        """Satisfies `AsyncStreamingProvider` structurally. Not `async def`
-        itself: the request only fires once the returned `AsyncStream` is
+    ) -> Stream:
+        """Satisfies `StreamingProvider` structurally. Not `async def`
+        itself: the request only fires once the returned `Stream` is
         async-iterated."""
         system, wire_messages = to_wire_messages(messages)
 
@@ -226,5 +166,5 @@ class AsyncAnthropicProvider:
                     await vendor_stream.get_final_message()
                 )
 
-        result = AsyncStream(generate())
+        result = Stream(generate())
         return result

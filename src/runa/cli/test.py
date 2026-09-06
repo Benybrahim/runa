@@ -13,6 +13,7 @@ dependency just so a generated app can run its own tests, matching
 `run_evals()`'s choice not to depend on an external harness either.
 """
 
+import asyncio
 import importlib
 import inspect
 from dataclasses import dataclass
@@ -52,7 +53,9 @@ def run_project_tests(root: Path) -> list[TestResult]:
                     continue
                 name = f"{test_file.stem}.{attr_name}"
                 try:
-                    attr()
+                    outcome = attr()
+                    if inspect.isawaitable(outcome):
+                        asyncio.run(outcome)
                 except AssertionError as exc:
                     results.append(TestResult(name=name, passed=False, error=str(exc)))
                 else:

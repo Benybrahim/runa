@@ -1,14 +1,14 @@
 """Executor: drives a Strategy against a Run, emitting Events as it acts.
 
-Async is Runa's canonical execution model: one `Executor` class, not the
-separate `Executor`/`AsyncExecutor` pair Runa used to maintain in parallel.
-A model call goes through an `AsyncProvider`; independent pending tool
-calls from the same model turn run concurrently via `asyncio.gather`, the
-common case of a model turn requesting several independent tools at once.
-A tool call that's already mid-retry (has its own `error` set) is left for
-its own `Strategy.step()` vetting. Approval-gated calls are excluded from
-the batch; if any remain blocked once the runnable ones finish, the Run
-pauses into AWAITING_APPROVAL.
+Async is Runa's canonical execution model: one `Executor` class, not a
+separate `Executor`/`AsyncExecutor` pair. A model call goes through a
+`Provider`; independent pending tool calls from the same model turn run
+concurrently via `asyncio.gather`, the common case of a model turn
+requesting several independent tools at once. A tool call that's already
+mid-retry (has its own `error` set) is left for its own `Strategy.step()`
+vetting. Approval-gated calls are excluded from the batch; if any remain
+blocked once the runnable ones finish, the Run pauses into
+AWAITING_APPROVAL.
 
 A `Tool.call` may be a plain function or an `async def`: this Executor
 awaits async tools directly and runs sync ones via `asyncio.to_thread` so
@@ -34,8 +34,7 @@ from runa.core import (
     ToolCall,
 )
 from runa.runtime._shared import seed_run, tool_schemas, transfer_agent
-from runa.runtime.async_provider import AsyncProvider, AsyncStreamingProvider
-from runa.runtime.provider import StreamChunk
+from runa.runtime.provider import Provider, StreamChunk, StreamingProvider
 from runa.runtime.strategy import (
     Action,
     CallModel,
@@ -55,7 +54,7 @@ if TYPE_CHECKING:
 
 
 class Executor:
-    """Drives a Strategy against a Run using an `AsyncProvider`.
+    """Drives a Strategy against a Run using a `Provider`.
 
     Seeds the initial messages, calls the model, executes tools, and applies
     the Strategy's decisions until the Run leaves RUNNING, either because it
@@ -104,7 +103,7 @@ class Executor:
 
     def __init__(
         self,
-        provider: AsyncProvider,
+        provider: Provider,
         strategy: Strategy | None = None,
         *,
         max_steps: int = 50,
@@ -130,7 +129,7 @@ class Executor:
         identical either way; `on_chunk` only changes what's observed while
         a CallModel step is in flight. May itself be `async def`; a plain
         callable works too, and its return value (if any) is ignored.
-        Requires `self.provider` to satisfy `AsyncStreamingProvider`; raises
+        Requires `self.provider` to satisfy `StreamingProvider`; raises
         `TypeError` otherwise.
 
         A no-op if `run` is already terminal: there's nothing left to
@@ -233,10 +232,10 @@ class Executor:
                 messages=run.messages, tools=schemas, model=agent.model
             )
         else:
-            if not isinstance(self.provider, AsyncStreamingProvider):
+            if not isinstance(self.provider, StreamingProvider):
                 raise TypeError(
                     f"{type(self.provider).__name__} does not implement "
-                    "AsyncStreamingProvider.stream(): on_chunk requires a "
+                    "StreamingProvider.stream(): on_chunk requires a "
                     "streaming-capable Provider"
                 )
             stream = self.provider.stream(

@@ -256,13 +256,12 @@ and the model decides per call which outcome it wants:
   Run was originally given to). Use this for a handoff, e.g. a triage agent
   passing a conversation to a specialist.
 
-`DelegateAgent`/`AsyncDelegateAgent` are the two ways to override a
-delegation's `executor` (e.g. for tests, or a specific provider):
-`AsyncDelegateAgent` awaits the Return outcome's `Executor` directly instead
-of wrapping it with `asyncio.run()`, so several delegates called in one
-model turn run as genuine concurrent async I/O rather than one thread each.
-Neither matters for Transfer, which never spawns a nested Run in the first
-place.
+Pass `DelegateAgent(SomeAgent, executor=...)` to override a delegation's
+`executor` directly (e.g. for tests, or a specific provider); its `call()`
+awaits the Return outcome's `Executor` directly, so several delegates
+called in one model turn run as genuine concurrent async I/O rather than
+one thread each. Doesn't matter for Transfer, which never spawns a nested
+Run in the first place.
 
 ---
 

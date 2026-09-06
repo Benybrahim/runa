@@ -7,7 +7,7 @@ from runa.core import Message, Role, Run, RunStatus, ToolCall
 from runa.persistence import SQLiteRunStore
 from runa.runtime import Executor
 from runa.tool import Tool
-from tests.fakes import FakeAsyncProvider
+from tests.fakes import FakeProvider
 
 
 class GreeterAgent(Agent):
@@ -33,7 +33,7 @@ def test_run_later_journals_and_clears_the_run_id(tmp_path):
     started = threading.Event()
     queue = SQLiteQueue(str(tmp_path / "queue.db"), max_workers=1)
 
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     executor = Executor(provider)
     agent = GreeterAgent()
     run = Run(input="hello")
@@ -106,7 +106,7 @@ def test_pending_survives_reopening_the_same_database(tmp_path):
 
 
 def test_run_later_with_sqlite_queue_completes_once_the_queue_drains(tmp_path):
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     executor = Executor(provider)
     agent = GreeterAgent()
     run = Run(input="hello")
@@ -130,7 +130,7 @@ def test_run_later_saves_the_terminal_status_once_a_durable_job_completes(
     run_store = SQLiteRunStore(str(tmp_path / "runs.db"))
     monkeypatch.setattr(application.config, "run_store", run_store)
     queue = SQLiteQueue(str(tmp_path / "queue.db"), max_workers=1)
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     executor = Executor(provider)
     agent = GreeterAgent()
     run = Run(input="hello")
@@ -153,7 +153,7 @@ def test_run_later_saves_a_failed_status_once_a_durable_job_fails(
     run_store = SQLiteRunStore(str(tmp_path / "runs.db"))
     monkeypatch.setattr(application.config, "run_store", run_store)
     queue = SQLiteQueue(str(tmp_path / "queue.db"), max_workers=1)
-    provider = FakeAsyncProvider(responses=[])  # raises on the first call
+    provider = FakeProvider(responses=[])  # raises on the first call
     executor = Executor(provider)
     agent = GreeterAgent()
     run = Run(input="hello")
@@ -189,7 +189,7 @@ def test_recover_pending_resumes_a_run_orphaned_by_a_crashed_process(tmp_path):
     # A new process reopens both and recovers.
     run_store = SQLiteRunStore(run_store_path)
     queue = SQLiteQueue(queue_path, max_workers=1)
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     executor = Executor(provider)
 
     recovered = recover_pending(queue, run_store, executor, agents=[GreeterAgent])
@@ -254,7 +254,7 @@ def test_recover_pending_reruns_a_non_idempotent_tool_call_that_already_fired(
     # A new process recovers.
     run_store = SQLiteRunStore(run_store_path)
     queue = SQLiteQueue(queue_path, max_workers=1)
-    provider = FakeAsyncProvider(
+    provider = FakeProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,

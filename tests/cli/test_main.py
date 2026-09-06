@@ -39,9 +39,9 @@ def test_eval_reports_pass_fail_and_exit_code(tmp_path, capsys):
     main(["new", "acme"], cwd=tmp_path)
     (project_dir / "main.py").write_text(
         "from runa import configure\n"
-        "from tests.fakes import FakeAsyncProvider\n"
+        "from tests.fakes import FakeProvider\n"
         "from runa.core import Message, Role\n\n"
-        "configure(async_provider=FakeAsyncProvider(responses=["
+        "configure(provider=FakeProvider(responses=["
         'Message(role=Role.ASSISTANT, content="hi")]))\n'
     )
     (project_dir / "app" / "evaluations" / "echo_eval.py").write_text(
@@ -68,10 +68,10 @@ def test_run_invokes_an_agent_and_prints_its_result(tmp_path, capsys):
     (project_dir / "main.py").write_text(
         "from runa import configure\n"
         "from runa.persistence import SQLiteRunStore\n"
-        "from tests.fakes import FakeAsyncProvider\n"
+        "from tests.fakes import FakeProvider\n"
         "from runa.core import Message, Role\n\n"
         "configure(\n"
-        "    async_provider=FakeAsyncProvider(responses=["
+        "    provider=FakeProvider(responses=["
         'Message(role=Role.ASSISTANT, content="hi there")]),\n'
         f"    run_store=SQLiteRunStore({db_path!r}),\n"
         ")\n"
@@ -95,9 +95,9 @@ def test_test_reports_pass_fail_and_exit_code(tmp_path, capsys):
     main(["new", "acme"], cwd=tmp_path)
     (project_dir / "main.py").write_text(
         "from runa import configure\n"
-        "from tests.fakes import FakeAsyncProvider\n"
+        "from tests.fakes import FakeProvider\n"
         "from runa.core import Message, Role\n\n"
-        "configure(async_provider=FakeAsyncProvider(responses=["
+        "configure(provider=FakeProvider(responses=["
         'Message(role=Role.ASSISTANT, content="hi")]))\n'
     )
     (project_dir / "app" / "tests" / "echo_test.py").write_text(

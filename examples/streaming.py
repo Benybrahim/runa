@@ -15,7 +15,7 @@ Run with: uv run python examples/streaming.py
 
 import asyncio
 
-from runa import Agent, AsyncOpenAIProvider, Executor, Run, StreamChunk, tool
+from runa import Agent, Executor, OpenAIProvider, Run, StreamChunk, tool
 
 
 @tool
@@ -33,7 +33,7 @@ def print_as_it_arrives(chunk: StreamChunk) -> None:
 
 
 if __name__ == "__main__":
-    executor = Executor(AsyncOpenAIProvider())
+    executor = Executor(OpenAIProvider())
 
     run = asyncio.run(
         executor.run(

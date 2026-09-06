@@ -8,7 +8,7 @@ from runa.background import ThreadQueue
 from runa.core import EventType, Message, Role, Run
 from runa.observability import instrument, webhook
 from runa.runtime import Executor
-from tests.fakes import FakeAsyncProvider
+from tests.fakes import FakeProvider
 
 
 class GreeterAgent(Agent):
@@ -53,9 +53,7 @@ class _RecordingServer:
 def test_webhook_posts_each_event_as_json():
     server = _RecordingServer()
     try:
-        provider = FakeAsyncProvider(
-            responses=[Message(role=Role.ASSISTANT, content="hi")]
-        )
+        provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
         run = Run(input="hello")
 
         instrument(run, webhook(server.url, run_id=run.id))
@@ -77,9 +75,7 @@ def test_webhook_with_a_queue_does_not_block_the_run():
     server = _RecordingServer()
     queue = ThreadQueue(max_workers=2)
     try:
-        provider = FakeAsyncProvider(
-            responses=[Message(role=Role.ASSISTANT, content="hi")]
-        )
+        provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
         run = Run(input="hello")
 
         instrument(run, webhook(server.url, run_id=run.id, queue=queue))

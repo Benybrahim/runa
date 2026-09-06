@@ -1,12 +1,8 @@
 import pytest
 
-from runa.providers import AnthropicProvider, AsyncOpenAIProvider, OpenAIProvider
-from runa.providers.registry import (
-    UnknownProvider,
-    resolve_async_provider,
-    resolve_provider,
-)
-from tests.fakes import FakeAsyncProvider, FakeProvider
+from runa.providers import AnthropicProvider, OpenAIProvider
+from runa.providers.registry import UnknownProvider, resolve_provider
+from tests.fakes import FakeProvider
 
 
 @pytest.fixture(autouse=True)
@@ -38,20 +34,3 @@ def test_resolve_provider_resolves_the_anthropic_alias():
 def test_resolve_provider_raises_a_clear_error_for_an_unknown_alias():
     with pytest.raises(UnknownProvider, match="unrecognized-vendor"):
         resolve_provider("unrecognized-vendor")
-
-
-def test_resolve_async_provider_passes_an_existing_instance_through_unchanged():
-    provider = FakeAsyncProvider(responses=[])
-
-    assert resolve_async_provider(provider) is provider
-
-
-def test_resolve_async_provider_resolves_the_openai_alias():
-    provider = resolve_async_provider("openai")
-
-    assert isinstance(provider, AsyncOpenAIProvider)
-
-
-def test_resolve_async_provider_raises_a_clear_error_for_an_unknown_alias():
-    with pytest.raises(UnknownProvider, match="unrecognized-vendor"):
-        resolve_async_provider("unrecognized-vendor")

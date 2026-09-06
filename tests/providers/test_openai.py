@@ -6,7 +6,6 @@ import openai
 
 from runa.core import Message, Role, ToolCall
 from runa.providers.openai import (
-    AsyncOpenAIProvider,
     OpenAIProvider,
     from_wire_message,
     to_wire_messages,
@@ -144,7 +143,7 @@ def test_from_wire_message_with_no_usage_attribute_leaves_usage_none():
     assert message.usage is None
 
 
-def test_async_openai_provider_awaits_the_async_client():
+def test_openai_provider_awaits_the_async_client():
     class FakeCompletions:
         async def create(self, **kwargs):
             self.kwargs = kwargs
@@ -165,7 +164,7 @@ def test_async_openai_provider_awaits_the_async_client():
             self.chat = FakeChat()
 
     client = FakeAsyncClient()
-    provider = AsyncOpenAIProvider(client=cast(openai.AsyncOpenAI, client))
+    provider = OpenAIProvider(client=cast(openai.AsyncOpenAI, client))
 
     message = asyncio.run(
         provider.complete(
@@ -183,70 +182,6 @@ def _completion_event(
     delta: str | None, type: str = "content.delta"
 ) -> SimpleNamespace:
     return SimpleNamespace(type=type, delta=delta)
-
-
-class _FakeVendorStream:
-    def __init__(self, events: list[SimpleNamespace], final: SimpleNamespace) -> None:
-        self._events = events
-        self._final = final
-
-    def __iter__(self):
-        return iter(self._events)
-
-    def get_final_completion(self) -> SimpleNamespace:
-        return self._final
-
-
-class _FakeVendorStreamManager:
-    def __init__(self, events: list[SimpleNamespace], final: SimpleNamespace) -> None:
-        self._stream = _FakeVendorStream(events, final)
-
-    def __enter__(self) -> _FakeVendorStream:
-        return self._stream
-
-    def __exit__(self, *exc: object) -> bool:
-        return False
-
-
-def test_openai_provider_stream_yields_content_deltas_only():
-    events = [
-        _completion_event("Let"),
-        _completion_event(" me check."),
-        _completion_event(None, type="content.done"),
-    ]
-    final = SimpleNamespace(
-        choices=[
-            SimpleNamespace(
-                message=SimpleNamespace(content="Let me check.", tool_calls=None)
-            )
-        ]
-    )
-
-    class FakeCompletions:
-        def stream(self, **kwargs):
-            self.kwargs = kwargs
-            return _FakeVendorStreamManager(events, final)
-
-    class FakeChat:
-        def __init__(self):
-            self.completions = FakeCompletions()
-
-    class FakeClient:
-        def __init__(self):
-            self.chat = FakeChat()
-
-    client = FakeClient()
-    provider = OpenAIProvider(client=cast(openai.OpenAI, client))
-
-    stream = provider.stream(
-        messages=[Message(role=Role.USER, content="hi")], tools=[], model=None
-    )
-    chunks = [chunk.text for chunk in stream]
-
-    assert chunks == ["Let", " me check."]
-    assert stream.message is not None
-    assert stream.message.content == "Let me check."
-    assert client.chat.completions.kwargs["model"] == "gpt-5-nano"
 
 
 class _FakeAsyncVendorStream:
@@ -273,7 +208,7 @@ class _FakeAsyncVendorStreamManager:
         return False
 
 
-def test_async_openai_provider_stream_yields_content_deltas_only():
+def test_openai_provider_stream_yields_content_deltas_only():
     events = [_completion_event("hi"), _completion_event(" there")]
     final = SimpleNamespace(
         choices=[
@@ -297,7 +232,7 @@ def test_async_openai_provider_stream_yields_content_deltas_only():
             self.chat = FakeChat()
 
     client = FakeAsyncClient()
-    provider = AsyncOpenAIProvider(client=cast(openai.AsyncOpenAI, client))
+    provider = OpenAIProvider(client=cast(openai.AsyncOpenAI, client))
     stream = provider.stream(
         messages=[Message(role=Role.USER, content="hi")], tools=[], model=None
     )

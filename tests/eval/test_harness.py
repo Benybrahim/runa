@@ -15,7 +15,7 @@ from runa.eval import (
 )
 from runa.runtime import Executor
 from runa.tool import Tool
-from tests.fakes import FakeAsyncProvider, FakeProvider
+from tests.fakes import FakeProvider
 
 
 class GetWeather(Tool):
@@ -29,7 +29,7 @@ class WeatherAgent(Agent):
 
 
 def test_expect_to_be_completed_passes_on_a_completed_run():
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     run = asyncio.run(Executor(provider).run(WeatherAgent(), Run(input="hello")))
 
     expect(run).to_be_completed().to_have_result("hi").to_contain("hi")
@@ -43,7 +43,7 @@ def test_expect_to_be_completed_fails_on_a_failed_run():
     class BrokenAgent(Agent):
         tools = [BrokenTool]
 
-    provider = FakeAsyncProvider(
+    provider = FakeProvider(
         responses=[
             Message(role=Role.ASSISTANT, tool_calls=[ToolCall(name="BrokenTool")])
         ]
@@ -86,7 +86,7 @@ def test_expect_to_have_error_fails_when_the_run_never_failed():
 
 
 def test_expect_to_have_called_checks_tool_calls():
-    provider = FakeAsyncProvider(
+    provider = FakeProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -115,7 +115,7 @@ def test_run_evals_reports_pass_and_fail_for_each_case():
             check=lambda run: expect(run).to_contain("goodbye"),
         ),
     ]
-    provider = FakeAsyncProvider(
+    provider = FakeProvider(
         responses=[
             Message(role=Role.ASSISTANT, content="hi"),
             Message(role=Role.ASSISTANT, content="hi"),
@@ -138,7 +138,7 @@ def test_to_satisfy_passes_when_judge_returns_pass():
     provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="PASS")])
     judge = Judge(provider)
 
-    expect(run).to_satisfy("answers the question", judge=judge)
+    asyncio.run(expect(run).to_satisfy("answers the question", judge=judge))
 
 
 def test_to_satisfy_raises_when_judge_returns_fail():
@@ -151,7 +151,7 @@ def test_to_satisfy_raises_when_judge_returns_fail():
     )
 
     with pytest.raises(ExpectationFailed, match="never answers"):
-        expect(run).to_satisfy("answers the question", judge=judge)
+        asyncio.run(expect(run).to_satisfy("answers the question", judge=judge))
 
 
 def test_to_be_helpful_grades_against_the_helpful_rubric():
@@ -159,7 +159,7 @@ def test_to_be_helpful_grades_against_the_helpful_rubric():
     run.add_message(Message(role=Role.ASSISTANT, content="Paris."))
     provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="PASS")])
 
-    expect(run).to_be_helpful(judge=Judge(provider))
+    asyncio.run(expect(run).to_be_helpful(judge=Judge(provider)))
 
     assert RUBRIC_HELPFUL in provider.calls[0]["messages"][0].content
 
@@ -169,7 +169,7 @@ def test_to_meet_the_goal_grades_against_the_goal_rubric():
     run.add_message(Message(role=Role.ASSISTANT, content="Paris."))
     provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="PASS")])
 
-    expect(run).to_meet_the_goal(judge=Judge(provider))
+    asyncio.run(expect(run).to_meet_the_goal(judge=Judge(provider)))
 
     assert RUBRIC_GOAL in provider.calls[0]["messages"][0].content
 
@@ -186,7 +186,7 @@ def test_to_meet_the_goal_fails_when_the_judge_returns_fail():
     )
 
     with pytest.raises(ExpectationFailed, match="no flight was booked"):
-        expect(run).to_meet_the_goal(judge=judge)
+        asyncio.run(expect(run).to_meet_the_goal(judge=judge))
 
 
 def test_run_evals_runs_every_case_even_after_a_failure():
@@ -194,7 +194,7 @@ def test_run_evals_runs_every_case_even_after_a_failure():
         EvalCase(name="a", input="x", check=lambda run: expect(run).to_contain("z")),
         EvalCase(name="b", input="y", check=lambda run: expect(run).to_be_completed()),
     ]
-    provider = FakeAsyncProvider(
+    provider = FakeProvider(
         responses=[
             Message(role=Role.ASSISTANT, content="hi"),
             Message(role=Role.ASSISTANT, content="hi"),
@@ -205,3 +205,24 @@ def test_run_evals_runs_every_case_even_after_a_failure():
     results = asyncio.run(run_evals(WeatherAgent(), executor, cases))
 
     assert [result.passed for result in results] == [False, True]
+
+
+def test_run_evals_awaits_a_check_that_calls_to_satisfy():
+    """A `check` may return an awaitable (e.g. one that calls
+    `to_satisfy`/`to_be_helpful`); `run_evals()` awaits it before moving on,
+    same as it would a plain sync check."""
+    response = Message(role=Role.ASSISTANT, content="PASS")
+    judge = Judge(FakeProvider(responses=[response]))
+    cases = [
+        EvalCase(
+            name="is a helpful reply",
+            input="hi",
+            check=lambda run: expect(run).to_be_completed().to_be_helpful(judge=judge),
+        ),
+    ]
+    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    executor = Executor(provider)
+
+    results = asyncio.run(run_evals(WeatherAgent(), executor, cases))
+
+    assert results[0].passed is True

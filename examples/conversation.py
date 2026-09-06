@@ -9,7 +9,7 @@ Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/conversation.py
 """
 
-from runa import Agent, AsyncOpenAIProvider, Conversation, OpenAIProvider, configure
+from runa import Agent, Conversation, OpenAIProvider, configure
 
 
 class SupportAgent(Agent):
@@ -17,7 +17,7 @@ class SupportAgent(Agent):
 
 
 if __name__ == "__main__":
-    configure(provider=OpenAIProvider(), async_provider=AsyncOpenAIProvider())
+    configure(provider=OpenAIProvider())
 
     conversation = Conversation()
 

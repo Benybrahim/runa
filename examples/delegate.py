@@ -11,7 +11,7 @@ Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/delegate.py
 """
 
-from runa import Agent, AsyncOpenAIProvider, OpenAIProvider, configure
+from runa import Agent, OpenAIProvider, configure
 
 
 class ResearchAgent(Agent):
@@ -24,7 +24,7 @@ class LeadAgent(Agent):
 
 
 if __name__ == "__main__":
-    configure(provider=OpenAIProvider(), async_provider=AsyncOpenAIProvider())
+    configure(provider=OpenAIProvider())
 
     run = LeadAgent.run_sync("What's promising about fusion energy right now?")
     print(run.result)

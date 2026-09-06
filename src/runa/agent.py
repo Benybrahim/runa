@@ -20,14 +20,13 @@ class AgentStream:
     """What `Agent.run_stream()` returns: an async iterator of `StreamChunk`s.
 
     `run` is the exact `Run` object `Executor` is advancing, available
-    immediately rather than only once exhausted (contrast `Stream.message`/
-    `AsyncStream.message` in `runtime/provider.py`/`runtime/async_provider.py`,
-    which can't be read until their stream is drained): Execution writes
-    messages, events, and state onto it as it goes, so it fills in as you
-    iterate and reaches its final status and result once the stream ends,
-    the same `Run` `Agent.run()` would have returned for the same call.
-    `run_stream()` is another way to observe that Execution, not a second
-    one.
+    immediately rather than only once exhausted (contrast `Stream.message`
+    in `runtime/provider.py`, which can't be read until its stream is
+    drained): Execution writes messages, events, and state onto it as it
+    goes, so it fills in as you iterate and reaches its final status and
+    result once the stream ends, the same `Run` `Agent.run()` would have
+    returned for the same call. `run_stream()` is another way to observe
+    that Execution, not a second one.
     """
 
     def __init__(
@@ -200,16 +199,16 @@ class Agent:
         The native execution path: async all the way through `Executor`,
         so independent tool calls a model turn asks for run concurrently
         (see `Executor` for the exact rule). Uses the app-wide default
-        AsyncProvider (`runa.configure(async_provider=...)`) unless an
-        `Executor` is given explicitly: the escape hatch for an agent that
-        needs a specific provider, strategy, or max_steps.
+        Provider (`runa.configure(provider=...)`) unless an `Executor` is
+        given explicitly: the escape hatch for an agent that needs a
+        specific provider, strategy, or max_steps.
 
         Pass `conversation` to continue a prior exchange: its history is
         seeded ahead of `input`, and this Run's messages are folded back
         into it once the Run completes, so the next `await .run(...,
         conversation=conversation)` call picks up where this one left off.
         """
-        executor = executor or Executor(provider=application.async_provider)
+        executor = executor or Executor(provider=application.provider)
         return await executor.run(cls(), Run(input=input, conversation=conversation))
 
     @classmethod
@@ -259,11 +258,11 @@ class Agent:
         `StreamChunk`s `on_chunk` already delivers; it does not yet stream
         tool calls, state changes, or other Run events.
 
-        Requires the app-wide default AsyncProvider (or the `executor`
-        given explicitly) to satisfy `AsyncStreamingProvider`, the same
-        requirement `Executor.run`'s `on_chunk` has.
+        Requires the app-wide default Provider (or the `executor` given
+        explicitly) to satisfy `StreamingProvider`, the same requirement
+        `Executor.run`'s `on_chunk` has.
         """
-        executor = executor or Executor(provider=application.async_provider)
+        executor = executor or Executor(provider=application.provider)
         run = Run(input=input, conversation=conversation)
         queue: asyncio.Queue[StreamChunk | None] = asyncio.Queue()
 
@@ -289,20 +288,36 @@ class Agent:
         conversation: Conversation | None = None,
     ) -> Run:
         """Queue this agent's run for background execution. See `Agent.run`."""
-        executor = executor or Executor(provider=application.async_provider)
+        executor = executor or Executor(provider=application.provider)
         run = Run(input=input, conversation=conversation)
         return _run_later(cls(), run, executor, queue=queue)
 
 
-class _BaseDelegateAgent(Tool):
-    """Shared machinery for `DelegateAgent`/`AsyncDelegateAgent` (`Agent.delegations`).
+class DelegateAgent(Tool):
+    """Runs an Agent as a delegation: the Return outcome for `Agent.delegations`.
 
     Every delegation exposes the same schema regardless of outcome: `input`
     (what to hand the sub-agent) plus an optional `transfer` flag the model
     can set to hand off control of the whole Run to the sub-agent instead of
-    getting an answer back (see `runtime._shared.transfer_agent`). Both
-    subclasses drive the same `Executor`; only `call()` differs (sync,
-    wrapping it with `asyncio.run()`, vs `async def`, awaiting it directly).
+    getting an answer back (see `runtime._shared.transfer_agent`).
+
+    `call()` is `async def` and awaits its `Executor` directly, using the
+    app-wide default Provider (`runa.configure(provider=...)`) unless an
+    `executor` is given, and returns its `Run.result`, the same value the
+    sub-agent's own `await .run()` would return. A run that doesn't
+    complete raises, which the parent's `Executor` turns into an ordinary
+    `TOOL_FAILED` event, so a delegate's failure is visible the same way any
+    other tool's is. When a model turn requests several sub-agents at once,
+    `Executor`'s own `asyncio.gather` batching (see its docstring) runs
+    them as genuine concurrent async I/O, not one thread per delegate.
+
+    The sub-agent's own `Run` isn't threaded into the parent Run's event log
+    (the two are separate executions), but it stays reachable on
+    `self.last_run` after each call, as the escape hatch for inspecting a
+    delegated run directly (manifesto §15), e.g. `timeline(tool.last_run)`.
+    Its `parent_run_id` also records the parent Run's id (architecture.md
+    §15), so the lineage survives being persisted and read back later, not
+    just while `self` stays in memory. See `ParentRunAware`.
     """
 
     _agent_cls: type[Agent]
@@ -355,58 +370,13 @@ class _BaseDelegateAgent(Tool):
             "required": ["input"],
         }
 
-
-class DelegateAgent(_BaseDelegateAgent):
-    """Runs an Agent as a delegation: the Return outcome for `Agent.delegations`.
-
-    `call()` is a plain function: it drives the wrapped Agent's `Executor`
-    to completion via `asyncio.run()`, using the app-wide default
-    AsyncProvider (`runa.configure(async_provider=...)`) unless an
-    `executor` is given, and returns its `Run.result`, the same value the
-    sub-agent's own `await .run()` would return. A run that doesn't
-    complete raises, which the parent's `Executor` turns into an ordinary
-    `TOOL_FAILED` event, so a delegate's failure is visible the same way any
-    other tool's is. Under `Executor`, a sync `call()` like this one runs
-    via `asyncio.to_thread` (one thread per delegate, not true concurrency);
-    see `AsyncDelegateAgent` for genuine concurrent delegation.
-
-    The sub-agent's own `Run` isn't threaded into the parent Run's event log
-    (the two are separate executions), but it stays reachable on
-    `self.last_run` after each call, as the escape hatch for inspecting a
-    delegated run directly (manifesto §15), e.g. `timeline(tool.last_run)`.
-    Its `parent_run_id` also records the parent Run's id (architecture.md
-    §15), so the lineage survives being persisted and read back later, not
-    just while `self` stays in memory. See `ParentRunAware`.
-    """
-
-    def call(self, input: str, transfer: bool = False) -> Any:
+    async def call(self, input: str, transfer: bool = False) -> Any:
         # `transfer` is never True here: Executor._call_tool intercepts a
         # transfer=true call before call() would run (see DelegatesToAgent).
         # It's still an accepted parameter so tool_call.arguments (which may
         # explicitly carry transfer=false) can always be splatted straight
         # into call() without a KeyError.
-        executor = self._executor or Executor(provider=application.async_provider)
-        run = asyncio.run(
-            executor.run(
-                self._agent_cls(), Run(input=input, parent_run_id=self._parent_run_id)
-            )
-        )
-        return self._record(run)
-
-
-class AsyncDelegateAgent(_BaseDelegateAgent):
-    """The async counterpart to `DelegateAgent`. See its docstring.
-
-    This class's `call()` is `async def` and awaits its `Executor`
-    directly instead of wrapping it with `asyncio.run()`, so when a model
-    turn requests several sub-agents at once, `Executor`'s existing
-    `asyncio.gather` batching (see its docstring) runs them as genuine
-    concurrent async I/O rather than one thread per delegate.
-    """
-
-    async def call(self, input: str, transfer: bool = False) -> Any:
-        # See DelegateAgent.call() for why `transfer` is accepted but unused.
-        executor = self._executor or Executor(provider=application.async_provider)
+        executor = self._executor or Executor(provider=application.provider)
         run = await executor.run(
             self._agent_cls(), Run(input=input, parent_run_id=self._parent_run_id)
         )
@@ -414,14 +384,11 @@ class AsyncDelegateAgent(_BaseDelegateAgent):
 
 
 def _resolve_delegation(entry: "DelegationEntry") -> Tool:
-    if isinstance(entry, _BaseDelegateAgent):
+    if isinstance(entry, DelegateAgent):
         return entry
     if isinstance(entry, type) and issubclass(entry, Agent):
         return DelegateAgent(entry)
-    raise TypeError(
-        f"{entry!r} is not an Agent subclass or "
-        "DelegateAgent/AsyncDelegateAgent instance"
-    )
+    raise TypeError(f"{entry!r} is not an Agent subclass or DelegateAgent instance")
 
 
-DelegationEntry = type[Agent] | DelegateAgent | AsyncDelegateAgent
+DelegationEntry = type[Agent] | DelegateAgent

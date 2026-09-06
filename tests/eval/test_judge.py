@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from runa.core import Message, Role, Run, ToolCall
@@ -56,7 +58,7 @@ def test_judge_grade_sends_rubric_and_transcript_with_no_tools():
     provider = FakeProvider(responses=[response])
     judge = Judge(provider)
 
-    verdict = judge.grade(run, "be nice")
+    verdict = asyncio.run(judge.grade(run, "be nice"))
 
     assert verdict.passed is True
     call = provider.calls[0]
@@ -71,4 +73,4 @@ def test_judge_grade_raises_when_provider_replies_without_a_verdict():
     judge = Judge(provider)
 
     with pytest.raises(JudgeParseError):
-        judge.grade(run, "be nice")
+        asyncio.run(judge.grade(run, "be nice"))

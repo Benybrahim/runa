@@ -1,13 +1,13 @@
 """parallel_delegate.py: two sub-agents delegated to concurrently (manifesto §6).
 
-`AsyncDelegateAgent` is the concurrency-capable delegation for
-`Agent.delegations`: it awaits its Executor directly instead of wrapping it
-with `asyncio.run()` on a thread, so when a model turn requests both
-sub-agents at once, Executor's existing concurrent tool-call batching (see
-Executor's docstring) runs them as genuine concurrent async I/O rather than
-one network call at a time. A bare class in `delegations` (e.g.
-`delegations = [WeatherAgent]`) still works, just via `DelegateAgent`'s
-`asyncio.run()`-per-thread path instead.
+Every delegation's `DelegateAgent.call()` is `async def` and awaits its
+Executor directly, so when a model turn requests both sub-agents at once,
+Executor's existing concurrent tool-call batching (see Executor's
+docstring) runs them as genuine concurrent async I/O rather than one
+network call at a time. No special wiring needed: a bare class in
+`delegations` (e.g. `delegations = [WeatherAgent]`) already gets this,
+`DelegateAgent(WeatherAgent)` only exists as the escape hatch for
+overriding a delegation's `executor` explicitly.
 
 Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/parallel_delegate.py
@@ -15,13 +15,7 @@ Run with: uv run python examples/parallel_delegate.py
 
 import asyncio
 
-from runa import (
-    Agent,
-    AsyncDelegateAgent,
-    AsyncOpenAIProvider,
-    OpenAIProvider,
-    configure,
-)
+from runa import Agent, OpenAIProvider, configure
 
 
 class WeatherAgent(Agent):
@@ -37,13 +31,11 @@ class BriefingAgent(Agent):
         "Given a city, call both WeatherAgent and NewsAgent, then combine "
         "their answers into a short morning briefing."
     )
-    # No `executor=` override: both fall back to the app-wide default
-    # AsyncProvider set by `configure()` below.
-    delegations = [AsyncDelegateAgent(WeatherAgent), AsyncDelegateAgent(NewsAgent)]
+    delegations = [WeatherAgent, NewsAgent]
 
 
 if __name__ == "__main__":
-    configure(provider=OpenAIProvider(), async_provider=AsyncOpenAIProvider())
+    configure(provider=OpenAIProvider())
 
     run = asyncio.run(BriefingAgent.run("Tokyo"))
     print(run.result)

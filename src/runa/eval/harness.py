@@ -15,6 +15,7 @@ behavior: a real, non-deterministic model call grading what the agent
 actually did.
 """
 
+import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -77,35 +78,40 @@ class Expectation:
             raise ExpectationFailed(f"expected tool {tool_name!r} to have been called")
         return self
 
-    def to_satisfy(self, rubric: str, *, judge: Judge | None = None) -> "Expectation":
+    async def to_satisfy(
+        self, rubric: str, *, judge: Judge | None = None
+    ) -> "Expectation":
         """Grade this Run against `rubric` with an LLM judge (manifesto §12).
 
         Unlike the structural checks above, this makes a real model request
         and its result is not deterministic; reserve it for
-        `app/evaluations/` cases, not `test`-style invariants. Defaults to a
-        `Judge` backed by `runa.configure()`'s default Provider; pass `judge`
-        explicitly to grade with a different model, or a `FakeProvider` in
-        tests of your own eval cases.
+        `app/evaluations/` cases, not `test`-style invariants. `async def`,
+        since it goes through `Provider.complete()`: `await
+        expect(run).to_be_completed().to_satisfy(...)` (the sync checks
+        return `self` immediately, so they chain fine ahead of the one
+        `await`). Defaults to a `Judge` backed by `runa.configure()`'s
+        default Provider; pass `judge` explicitly to grade with a different
+        model, or a `FakeProvider` in tests of your own eval cases.
         """
         judge = judge or Judge(application.provider)
-        verdict = judge.grade(self.run, rubric)
+        verdict = await judge.grade(self.run, rubric)
         if not verdict.passed:
             raise ExpectationFailed(
                 f"failed to satisfy {rubric!r}: {verdict.reasoning}"
             )
         return self
 
-    def to_be_helpful(self, *, judge: Judge | None = None) -> "Expectation":
-        return self.to_satisfy(RUBRIC_HELPFUL, judge=judge)
+    async def to_be_helpful(self, *, judge: Judge | None = None) -> "Expectation":
+        return await self.to_satisfy(RUBRIC_HELPFUL, judge=judge)
 
-    def to_be_factual(self, *, judge: Judge | None = None) -> "Expectation":
-        return self.to_satisfy(RUBRIC_FACTUAL, judge=judge)
+    async def to_be_factual(self, *, judge: Judge | None = None) -> "Expectation":
+        return await self.to_satisfy(RUBRIC_FACTUAL, judge=judge)
 
-    def not_to_hallucinate(self, *, judge: Judge | None = None) -> "Expectation":
-        return self.to_satisfy(RUBRIC_NOT_HALLUCINATE, judge=judge)
+    async def not_to_hallucinate(self, *, judge: Judge | None = None) -> "Expectation":
+        return await self.to_satisfy(RUBRIC_NOT_HALLUCINATE, judge=judge)
 
-    def to_meet_the_goal(self, *, judge: Judge | None = None) -> "Expectation":
-        return self.to_satisfy(RUBRIC_GOAL, judge=judge)
+    async def to_meet_the_goal(self, *, judge: Judge | None = None) -> "Expectation":
+        return await self.to_satisfy(RUBRIC_GOAL, judge=judge)
 
 
 def expect(run: Run) -> Expectation:
@@ -116,6 +122,9 @@ def expect(run: Run) -> Expectation:
 class EvalCase:
     name: str
     input: Any
+    # Sync for structural checks; `async def` (or otherwise awaitable) for
+    # one that calls `to_satisfy` and its rubrics. `run_evals()` handles
+    # both.
     check: Callable[[Run], Any]
 
 
@@ -133,13 +142,17 @@ async def run_evals(
     """Run every case's input through `agent`/`executor` and check it.
 
     Every case runs to completion even if an earlier one fails, so a full
-    eval report comes back in one pass.
+    eval report comes back in one pass. `eval_case.check` may be a plain
+    function or return an awaitable (e.g. `async def` calling
+    `to_satisfy`); either way it's awaited before moving to the next case.
     """
     results = []
     for eval_case in cases:
         run = await executor.run(agent, Run(input=eval_case.input))
         try:
-            eval_case.check(run)
+            outcome = eval_case.check(run)
+            if inspect.isawaitable(outcome):
+                await outcome
         except ExpectationFailed as exc:
             results.append(
                 EvalResult(case=eval_case, run=run, passed=False, error=str(exc))

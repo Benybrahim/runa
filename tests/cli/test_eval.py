@@ -5,10 +5,10 @@ from runa.cli.new import scaffold_project
 
 _MAIN_PY = """
 from runa import configure
-from tests.fakes import FakeAsyncProvider
+from tests.fakes import FakeProvider
 from runa.core import Message, Role
 
-configure(async_provider=FakeAsyncProvider(responses=[
+configure(provider=FakeProvider(responses=[
     Message(role=Role.ASSISTANT, content="hi"),
     Message(role=Role.ASSISTANT, content="hi"),
 ]))
@@ -66,8 +66,8 @@ def test_run_project_evals_raises_outside_a_runa_project(tmp_path):
 def test_run_project_evals_raises_for_a_module_missing_agent_or_cases(tmp_path):
     project_dir = _scaffold_with_evals(tmp_path, _INVALID_EVAL_MODULE)
     (project_dir / "main.py").write_text(
-        "from runa import configure\nfrom tests.fakes import FakeAsyncProvider\n"
-        "configure(async_provider=FakeAsyncProvider(responses=[]))\n"
+        "from runa import configure\nfrom tests.fakes import FakeProvider\n"
+        "configure(provider=FakeProvider(responses=[]))\n"
     )
 
     with pytest.raises(InvalidEvalModule):

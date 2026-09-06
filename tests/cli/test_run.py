@@ -17,11 +17,11 @@ class EchoAgent(Agent):
 def _main_py(db_path: str) -> str:
     return (
         "from runa import configure\n"
-        "from tests.fakes import FakeAsyncProvider\n"
+        "from tests.fakes import FakeProvider\n"
         "from runa.core import Message, Role\n"
         "from runa.persistence import SQLiteRunStore\n\n"
         "configure(\n"
-        "    async_provider=FakeAsyncProvider(responses=["
+        "    provider=FakeProvider(responses=["
         'Message(role=Role.ASSISTANT, content="hi there")]),\n'
         f"    run_store=SQLiteRunStore({db_path!r}),\n"
         ")\n"

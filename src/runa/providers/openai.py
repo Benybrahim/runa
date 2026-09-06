@@ -1,14 +1,13 @@
 """OpenAIProvider: a thin adapter between core.Message and OpenAI's API."""
 
 import json
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 from typing import Any, cast
 
 import openai
 from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolUnionParam
 
 from runa.core import Message, Role, ToolCall
-from runa.runtime.async_provider import AsyncStream
 from runa.runtime.provider import Stream, StreamChunk
 
 DEFAULT_MODEL = "gpt-5-nano"
@@ -96,66 +95,17 @@ def from_wire_usage(usage: Any) -> dict[str, int]:
 class OpenAIProvider:
     """Provider backed by the OpenAI chat completions API.
 
-    Satisfies the `Provider` protocol structurally: `complete(messages=...,
-    tools=..., model=...) -> Message`. Wire-format translation lives in
-    plain functions (`to_wire_messages`, `to_wire_tools`, `from_wire_message`)
-    so it stays testable without a real API call.
-    """
+    Satisfies the `Provider` protocol structurally: `async complete(
+    messages=..., tools=..., model=...) -> Message`. Wire-format
+    translation lives in plain functions (`to_wire_messages`,
+    `to_wire_tools`, `from_wire_message`) so it stays testable without a
+    real API call.
 
-    def __init__(self, client: openai.OpenAI | None = None) -> None:
-        self.client = client or openai.OpenAI()
-
-    def complete(
-        self,
-        *,
-        messages: list[Message],
-        tools: list[dict[str, Any]],
-        model: str | None,
-    ) -> Message:
-        response = self.client.chat.completions.create(
-            model=model or DEFAULT_MODEL,
-            messages=cast(list[ChatCompletionMessageParam], to_wire_messages(messages)),
-            tools=cast(list[ChatCompletionToolUnionParam], to_wire_tools(tools))
-            if tools
-            else openai.omit,
-        )
-        return from_wire_message(response)
-
-    def stream(
-        self,
-        *,
-        messages: list[Message],
-        tools: list[dict[str, Any]],
-        model: str | None,
-    ) -> Stream:
-        """Satisfies `StreamingProvider` structurally. Lazy: the request
-        only fires once the returned `Stream` is iterated."""
-
-        def generate() -> Iterator[StreamChunk]:
-            with self.client.chat.completions.stream(
-                model=model or DEFAULT_MODEL,
-                messages=cast(
-                    list[ChatCompletionMessageParam], to_wire_messages(messages)
-                ),
-                tools=cast(list[ChatCompletionToolUnionParam], to_wire_tools(tools))
-                if tools
-                else openai.omit,
-            ) as vendor_stream:
-                for event in vendor_stream:
-                    if event.type == "content.delta" and event.delta:
-                        yield StreamChunk(text=event.delta)
-                result.message = from_wire_message(vendor_stream.get_final_completion())
-
-        result = Stream(generate())
-        return result
-
-
-class AsyncOpenAIProvider:
-    """The async counterpart to `OpenAIProvider`.
-
-    Satisfies `AsyncProvider` structurally, backed by `openai.AsyncOpenAI`
-    instead of `openai.OpenAI`. Shares the exact same wire-format functions
-    as the sync provider; only the client and the `await` differ.
+    Backed by `openai.AsyncOpenAI`: async is Runa's canonical execution
+    path, so there is no separate synchronous counterpart to maintain here.
+    Code that needs a blocking call can await this from
+    `asyncio.run(...)`, the same thing `Agent.run_sync()` does for a whole
+    Executor run.
     """
 
     def __init__(self, client: openai.AsyncOpenAI | None = None) -> None:
@@ -183,9 +133,9 @@ class AsyncOpenAIProvider:
         messages: list[Message],
         tools: list[dict[str, Any]],
         model: str | None,
-    ) -> AsyncStream:
-        """Satisfies `AsyncStreamingProvider` structurally. Not `async def`
-        itself: the request only fires once the returned `AsyncStream` is
+    ) -> Stream:
+        """Satisfies `StreamingProvider` structurally. Not `async def`
+        itself: the request only fires once the returned `Stream` is
         async-iterated."""
 
         async def generate() -> AsyncIterator[StreamChunk]:
@@ -205,5 +155,5 @@ class AsyncOpenAIProvider:
                     await vendor_stream.get_final_completion()
                 )
 
-        result = AsyncStream(generate())
+        result = Stream(generate())
         return result

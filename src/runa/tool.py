@@ -111,7 +111,7 @@ class ParentRunAware(Protocol):
     elsewhere in Runa, not a method every Tool must implement. `Executor`
     calls `bind_parent_run_id()` right before `call()` for any Tool that
     satisfies this, structurally, with no base class to opt into.
-    `DelegateAgent`/`AsyncDelegateAgent` (see agent.py) use it to stamp the
+    `DelegateAgent` (see agent.py) uses it to stamp the
     sub-agent's Run with `parent_run_id`, so delegation lineage
     (architecture.md §15) survives being written to a RunStore and read back
     later, not just while the parent tool instance stays in memory.
@@ -129,10 +129,10 @@ class ParentRunAware(Protocol):
 class DelegatesToAgent(Protocol):
     """A Tool that wraps an Agent as a delegation (see `Agent.delegations`).
 
-    Structural, like `ParentRunAware` above: `DelegateAgent`/
-    `AsyncDelegateAgent` (agent.py) satisfy it without `Executor` needing
-    to import agent.py directly (agent.py already imports `Executor`, so
-    that import would cycle). `Executor` uses it to detect a
+    Structural, like `ParentRunAware` above: `DelegateAgent` (agent.py)
+    satisfies it without `Executor` needing to import agent.py directly
+    (agent.py already imports `Executor`, so that import would cycle).
+    `Executor` uses it to detect a
     `transfer=true` call and hand off the active Agent instead of running
     `call()` normally, via `new_agent_instance()`; see
     `runtime._shared.transfer_agent`.

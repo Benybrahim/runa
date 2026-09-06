@@ -153,23 +153,21 @@ Open `main.py`. It already contains:
 ```python
 from runa import configure
 from runa.persistence import SQLiteRunStore
-from runa.providers import AsyncOpenAIProvider, OpenAIProvider
+from runa.providers import OpenAIProvider
 
 configure(
     provider=OpenAIProvider(),
-    async_provider=AsyncOpenAIProvider(),
     run_store=SQLiteRunStore("runa.db"),
 )
 ```
 
 `configure()` sets up the default `Application` (`runa.application`)
-that every Agent resolves its provider from. `async_provider` is what
+that every Agent resolves its provider from. `provider` is what
 `Agent.run()`/`.run_sync()`/`.run_stream()`/`.run_later()` actually
 drive, Runa's execution model is async under the hood even when you
 call it synchronously (see [§11](#11-running-in-the-background)).
-`OpenAIProvider()`/`AsyncOpenAIProvider()` read `OPENAI_API_KEY` from
-the environment; swap them for `AnthropicProvider()`/
-`AsyncAnthropicProvider()` from `runa.providers` if you're using Claude
+`OpenAIProvider()` reads `OPENAI_API_KEY` from the environment; swap it
+for `AnthropicProvider()` from `runa.providers` if you're using Claude
 instead, nothing else in this guide changes.
 
 `SQLiteRunStore("runa.db")` is what lets `runa runs show` find a Run

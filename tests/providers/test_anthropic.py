@@ -7,7 +7,6 @@ import anthropic
 from runa.core import Message, Role, ToolCall
 from runa.providers.anthropic import (
     AnthropicProvider,
-    AsyncAnthropicProvider,
     from_wire_message,
     to_wire_messages,
     to_wire_tools,
@@ -148,7 +147,7 @@ def test_from_wire_message_with_no_usage_attribute_leaves_usage_none():
     assert message.usage is None
 
 
-def test_async_anthropic_provider_awaits_the_async_client():
+def test_anthropic_provider_awaits_the_async_client():
     class FakeMessages:
         async def create(self, **kwargs):
             self.kwargs = kwargs
@@ -159,7 +158,7 @@ def test_async_anthropic_provider_awaits_the_async_client():
             self.messages = FakeMessages()
 
     client = FakeAsyncClient()
-    provider = AsyncAnthropicProvider(client=cast(anthropic.AsyncAnthropic, client))
+    provider = AnthropicProvider(client=cast(anthropic.AsyncAnthropic, client))
 
     message = asyncio.run(
         provider.complete(
@@ -170,54 +169,6 @@ def test_async_anthropic_provider_awaits_the_async_client():
     )
 
     assert message.content == "hi"
-    assert client.messages.kwargs["model"] == "claude-sonnet-5"
-
-
-class _FakeVendorMessageStream:
-    def __init__(self, text_chunks: list[str], final_message: SimpleNamespace) -> None:
-        self.text_stream = iter(text_chunks)
-        self._final_message = final_message
-
-    def get_final_message(self) -> SimpleNamespace:
-        return self._final_message
-
-
-class _FakeVendorStreamManager:
-    def __init__(self, text_chunks: list[str], final_message: SimpleNamespace) -> None:
-        self._stream = _FakeVendorMessageStream(text_chunks, final_message)
-
-    def __enter__(self) -> _FakeVendorMessageStream:
-        return self._stream
-
-    def __exit__(self, *exc: object) -> bool:
-        return False
-
-
-def test_anthropic_provider_stream_yields_chunks_and_sets_the_final_message():
-    final = SimpleNamespace(
-        content=[SimpleNamespace(type="text", text="Let me check.")]
-    )
-
-    class FakeMessages:
-        def stream(self, **kwargs):
-            self.kwargs = kwargs
-            return _FakeVendorStreamManager(["Let", " me", " check."], final)
-
-    class FakeClient:
-        def __init__(self):
-            self.messages = FakeMessages()
-
-    client = FakeClient()
-    provider = AnthropicProvider(client=cast(anthropic.Anthropic, client))
-
-    stream = provider.stream(
-        messages=[Message(role=Role.USER, content="hi")], tools=[], model=None
-    )
-    chunks = [chunk.text for chunk in stream]
-
-    assert chunks == ["Let", " me", " check."]
-    assert stream.message is not None
-    assert stream.message.content == "Let me check."
     assert client.messages.kwargs["model"] == "claude-sonnet-5"
 
 
@@ -246,7 +197,7 @@ class _FakeAsyncVendorStreamManager:
         return False
 
 
-def test_async_anthropic_provider_stream_yields_chunks_and_sets_the_final_message():
+def test_anthropic_provider_stream_yields_chunks_and_sets_the_final_message():
     final = SimpleNamespace(content=[SimpleNamespace(type="text", text="hi there")])
 
     class FakeMessages:
@@ -259,7 +210,7 @@ def test_async_anthropic_provider_stream_yields_chunks_and_sets_the_final_messag
             self.messages = FakeMessages()
 
     client = FakeAsyncClient()
-    provider = AsyncAnthropicProvider(client=cast(anthropic.AsyncAnthropic, client))
+    provider = AnthropicProvider(client=cast(anthropic.AsyncAnthropic, client))
     stream = provider.stream(
         messages=[Message(role=Role.USER, content="hi")], tools=[], model=None
     )
