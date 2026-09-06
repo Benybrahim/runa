@@ -21,7 +21,6 @@ from runa.core import (
     ActionArtifact,
     Artifact,
     CitationSetArtifact,
-    Context,
     Conversation,
     DataArtifact,
     EffectStatus,
@@ -98,10 +97,10 @@ def _json_safe(value: Any) -> Any:
 
 
 def _json_safe_dict(mapping: dict[str, Any]) -> dict[str, Any]:
-    """`_json_safe` applied per value, for State/Context, the other places
-    the docs invite application code to put an arbitrary object (e.g.
-    `run.state.findings`, `run.context.resources`). One bad value falls back
-    to its `str()`; the rest of the mapping still round-trips normally.
+    """`_json_safe` applied per value, for State, the other place the docs
+    invite application code to put an arbitrary object (e.g.
+    `run.state.findings`). One bad value falls back to its `str()`; the
+    rest of the mapping still round-trips normally.
     """
     return {key: _json_safe(value) for key, value in mapping.items()}
 
@@ -134,7 +133,6 @@ def run_to_dict(run: Run) -> dict[str, Any]:
         "agent_version": run.agent_version,
         "parent_run_id": run.parent_run_id,
         "input": _json_safe(run.input),
-        "context": _json_safe_dict(run.context),
         "state": _json_safe_dict(run.state),
         "messages": [
             {
@@ -189,7 +187,6 @@ def run_from_dict(data: dict[str, Any]) -> Run:
         agent_version=data["agent_version"],
         parent_run_id=data["parent_run_id"],
         input=data["input"],
-        context=Context(data["context"]),
         state=RunState(data["state"]),
         messages=messages,
         events=[

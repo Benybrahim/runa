@@ -10,7 +10,6 @@ The core concepts are:
 Agent
 Execution
 Run
-Context
 State
 Capability
 ```
@@ -115,8 +114,8 @@ Conceptually:
 Run
 ├── Input
 ├── Goal
-├── Context
 ├── State
+├── Messages
 ├── Events
 ├── Actions
 ├── Artifacts
@@ -160,51 +159,57 @@ Durable Runs should retain enough identity and provenance to explain which Agent
 
 ---
 
-# Context
+# Model Context
 
-Context is the information made available to an Agent while it makes decisions.
-
-State is what the application or runtime owns.
-
-Context is what the Agent is given.
-
-Conceptually:
+What a model call sees is not a persisted object. It is a projection
+Execution builds from `Agent.instructions`, the Run's accumulated
+`Messages`, and whatever `State` the application chooses to surface, at
+the moment a model call happens.
 
 ```text
-Input
-Conversation
-Application resources
-Policies
-Run state
-Environment
+Instructions
+Messages
+Selected State
         ↓
-     Context
+   Model input
         ↓
-       Agent
+      Agent
 ```
 
-Context may be assembled differently for different Runs.
+> **Model context is a projection of the Run for a particular model call. RunState is the persistent execution state it is drawn from.**
 
-Context should remain inspectable.
+Runa does not keep a separate `Context` type alongside `State`. The two
+would share the same free-form, attribute-accessible shape (see below);
+the only thing a distinct type bought was auto-rendering a whole container
+into a system message before every Run, which does not scale as a
+default. State can hold working data the model should not see
+(accumulated findings, internal bookkeeping); surfacing all of it
+automatically means the framework would need an allowlist/denylist
+convention to claw that back. Runa leaves the selection explicit instead.
 
-The goal is to understand what information was available when a decision was made.
+In Runa's implementation, `Agent.before_run(run)` and `Agent.plan(run)`
+are where an application does this: read whatever `run.state` (or
+`run.conversation.state`) is relevant, and call `run.add_message(...)` to
+put it in front of the model, in whatever shape the prompt needs:
 
 ```python
-run.context.resources = [kb_article]
-run.context.policies = ["no refunds over $500 without approval"]
+class SupportAgent(Agent):
+    def before_run(self, run):
+        if run.state.resources:
+            run.add_message(
+                Message(
+                    role=Role.SYSTEM,
+                    content=f"Resources: {run.state.resources}",
+                )
+            )
 ```
 
-In Runa's implementation, `Run.context` is a `Context`, the same
-attribute-accessible container `RunState`/`ConversationState` use for
-State (see below), populated explicitly by application code. Runa does not
-auto-assemble it from Conversation/Resources/Policies/Run state; that
-remains an application-level pattern, not framework machinery.
-
-A non-empty `Context` does reach the Agent, though: it's rendered as a
-second system message, right after `Agent.instructions`, before every Run:
-a generic listing of whatever keys the application set, since Context is
-free-form and no key name is treated specially. An empty `Context` (the
-default) adds nothing to what the Agent sees.
+`before_run`/`plan` are the same hooks Execution already calls once,
+right after seeding a Run's instructions and input message and before the
+step loop starts, so this needs no new framework machinery. What the
+model actually saw stays inspectable the same way everything else does:
+the messages these hooks add are ordinary Run messages, in `run.messages`
+alongside every other turn.
 
 ---
 
@@ -698,9 +703,9 @@ Application
           ▼
       Execution
           │
-     ┌────┼────┐
-     │    │    │
- Context State Capabilities
+       ┌──┴──┐
+       │     │
+     State Capabilities
           │
           ▼
          Run

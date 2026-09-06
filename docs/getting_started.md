@@ -682,7 +682,7 @@ and evaluations apart.
 
 From here:
 
-* [docs/concepts.md](concepts.md), the full vocabulary (Context, State,
+* [docs/concepts.md](concepts.md), the full vocabulary (State,
   Capability, Event, Artifact) this guide only used pieces of.
 * [docs/guides.md](guides.md), independent recipes for the same
   patterns above, plus a few this guide didn't cover: delegating to
@@ -695,5 +695,5 @@ From here:
 > **TIP:** When you're unsure whether something needs a new abstraction,
 > RUNA.md's own checklist is the fastest way to decide: does it simplify
 > the common case, does it belong to an existing Agent/Execution/Run/
-> Context/State/Capability, and does it preserve an escape hatch? If not,
+> State/Capability, and does it preserve an escape hatch? If not,
 > it probably doesn't belong in the core.

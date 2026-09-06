@@ -7,7 +7,6 @@ from runa.agent import Agent
 from runa.approval import approve
 from runa.config import configure
 from runa.core import (
-    Context,
     DataArtifact,
     EventType,
     Message,
@@ -85,20 +84,6 @@ def test_async_model_responded_event_carries_the_messages_usage():
 
     responded = next(e for e in run.events if e.type == EventType.MODEL_RESPONDED)
     assert responded.data["usage"] == {"input_tokens": 10, "output_tokens": 3}
-
-
-def test_async_populated_context_is_seeded_as_a_system_message():
-    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
-    executor = AsyncExecutor(provider)
-    agent = WeatherAgent()
-    run = Run(input="hello")
-    run.context.resources = ["policy: refunds within 30 days"]
-
-    result = asyncio.run(executor.run(agent, run))
-
-    system_messages = [m.content for m in result.messages if m.role == Role.SYSTEM]
-    assert system_messages[0] == "Answer weather questions."
-    assert "resources: ['policy: refunds within 30 days']" in system_messages[1]
 
 
 def test_async_executor_answers_directly_without_tools():
@@ -193,15 +178,15 @@ def test_a_bug_while_seeding_the_run_fails_it_instead_of_stranding_it():
     # ever observe it.
     class Unstringable:
         def __str__(self):
-            raise RuntimeError("bug while rendering context")
+            raise RuntimeError("bug while rendering input")
 
     provider = FakeAsyncProvider(responses=[])
-    run = Run(input="hi", context=Context(bad=Unstringable()))
+    run = Run(input=Unstringable())
 
     result = asyncio.run(AsyncExecutor(provider).run(WeatherAgent(), run))
 
     assert result.status == RunStatus.FAILED
-    assert "bug while rendering context" in (result.error or "")
+    assert "bug while rendering input" in (result.error or "")
     assert provider.calls == []
 
 

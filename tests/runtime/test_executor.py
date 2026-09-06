@@ -6,7 +6,6 @@ import pytest
 from runa.agent import Agent
 from runa.approval import approve
 from runa.core import (
-    Context,
     DataArtifact,
     EffectStatus,
     EventType,
@@ -146,36 +145,6 @@ def test_model_responded_event_usage_is_none_when_the_provider_reports_none():
 
     responded = next(e for e in result.events if e.type == EventType.MODEL_RESPONDED)
     assert responded.data["usage"] is None
-
-
-def test_populated_context_is_seeded_as_a_system_message():
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
-    executor = Executor(provider)
-    agent = WeatherAgent()
-    run = Run(input="hello")
-    run.context.resources = ["policy: refunds within 30 days"]
-
-    result = executor.run(agent, run)
-
-    # instructions, then context, as separate system messages; both reach
-    # the model (the fake provider just records whatever it was given)
-    system_messages = [m.content for m in result.messages if m.role == Role.SYSTEM]
-    assert system_messages[0] == "Answer weather questions."
-    assert "resources: ['policy: refunds within 30 days']" in system_messages[1]
-
-
-def test_empty_context_adds_no_extra_message():
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
-    executor = Executor(provider)
-    agent = WeatherAgent()
-    run = Run(input="hello")
-
-    result = executor.run(agent, run)
-
-    # exactly one SYSTEM message (instructions), no second one for context
-    system_messages = [m for m in result.messages if m.role == Role.SYSTEM]
-    assert len(system_messages) == 1
-    assert system_messages[0].content == "Answer weather questions."
 
 
 def test_executor_answers_directly_without_tools():
@@ -525,15 +494,15 @@ def test_a_bug_while_seeding_the_run_fails_it_instead_of_stranding_it():
     # thread, where nothing would ever observe the exception at all.
     class Unstringable:
         def __str__(self):
-            raise RuntimeError("bug while rendering context")
+            raise RuntimeError("bug while rendering input")
 
     provider = FakeProvider(responses=[])
-    run = Run(input="hi", context=Context(bad=Unstringable()))
+    run = Run(input=Unstringable())
 
     result = Executor(provider).run(WeatherAgent(), run)
 
     assert result.status == RunStatus.FAILED
-    assert "bug while rendering context" in (result.error or "")
+    assert "bug while rendering input" in (result.error or "")
     assert len(provider.calls) == 0  # never reached the step loop
 
 

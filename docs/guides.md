@@ -9,7 +9,7 @@ Agent → Run → Outcome
 ```
 
 Each guide covers one problem end to end. For the vocabulary they build on
-(Agent, Execution, Run, Context, State, Capability), see
+(Agent, Execution, Run, State, Capability), see
 [concepts.md](./concepts.md).
 
 ## Start Here
@@ -17,7 +17,7 @@ Each guide covers one problem end to end. For the vocabulary they build on
 * [Defining an Agent](#defining-an-agent)
 * [Building a Tool](#building-a-tool)
 * [Structuring Application State](#structuring-application-state)
-* [Giving the Agent Context](#giving-the-agent-context)
+* [Surfacing State to the Model](#surfacing-state-to-the-model)
 
 ## State & Conversations
 
@@ -77,7 +77,7 @@ run = ResearchAgent.run("What's the capital of France?")
 ```
 
 That's a complete Agent. Everything else in this document extends it: tools,
-state, context, background execution, approval. See
+state, background execution, approval. See
 [concepts.md](./concepts.md) for what an Agent is (a definition, not an
 execution) and how it relates to Run and Execution.
 
@@ -155,23 +155,32 @@ Do not turn durable application concepts into “agent memory” merely because 
 
 ---
 
-# Giving the Agent Context
+# Surfacing State to the Model
 
-Populate `run.context` before running the Agent when it needs information the application already has:
+What a model call sees is a projection Execution builds from
+`Agent.instructions`, the Run's messages, and whatever State the
+application explicitly puts in front of it, not something Runa assembles
+for you. Use `before_run`/`plan` to add it as an ordinary system message
+when the Agent needs information the application already has:
 
 ```python
-run = Run(input="What's the refund policy on order A123?")
-run.context.resources = [kb_article]
-run.context.policies = ["no refunds over $500 without approval"]
-
-ResearchAgent.run(run.input, executor=Executor(provider=..., ...))
+class SupportAgent(Agent):
+    def before_run(self, run):
+        run.state.resources = [kb_article]
+        run.state.policies = ["no refunds over $500 without approval"]
+        run.add_message(
+            Message(
+                role=Role.SYSTEM,
+                content=f"Resources: {run.state.resources}\nPolicies: {run.state.policies}",
+            )
+        )
 ```
 
-A non-empty Context reaches the Agent as a second system message, right after `Agent.instructions`: a plain listing of whatever keys are set. No key name is treated specially; Context stays free-form, the same way Run State and Conversation State do.
-
-An empty Context (the default) adds nothing; most simple agents never need one.
-
-If a different shape belongs in the prompt than the default listing gives, don't populate `run.context`; build the message directly in `before_run`/`plan` instead.
+There is no framework-level auto-rendering of State into the prompt: an
+Agent's `state` can hold working data the model was never meant to see
+(accumulated findings, internal bookkeeping), so surfacing it is always a
+deliberate choice, in whatever shape the prompt actually needs, rather
+than a generic dump of whatever keys happen to be set.
 
 ---
 

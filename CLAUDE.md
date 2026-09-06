@@ -34,7 +34,7 @@ Do not duplicate the philosophy from these documents here. This file is the oper
 * Do not introduce graphs, orchestration abstractions, or agent-specific machinery unless ordinary application code cannot express the problem clearly.
 * Prefer Agent behavior and lifecycle hooks before introducing a custom `Strategy`.
 * Keep state lifetimes explicit: Run state, Conversation state, and Application state are distinct.
-* Keep Context distinct from State: Context is what the Agent is given; State is what the application/runtime owns.
+* Model context is a projection of the Run built at model-call time (instructions, messages, and whatever State the Agent explicitly surfaces via `before_run`/`plan`), not a stored object. Do not reintroduce a persisted `Context` type alongside `State`.
 * Keep capabilities and authority explicit. Intelligence does not imply authority.
 * Prefer existing abstractions over creating new ones. Add a new abstraction only when the codebase reveals a recurring problem.
 * Preserve escape hatches. Convenience APIs must not prevent direct access to underlying Runa primitives or integrations.
@@ -57,7 +57,7 @@ Before introducing a new core abstraction, ask:
 
 1. Is this a recurring application problem?
 2. Does an existing Runa concept already express it?
-3. Does it belong naturally to an Agent, Execution, Run, Context, State, or Capability?
+3. Does it belong naturally to an Agent, Execution, Run, State, or Capability?
 4. Does it simplify the common case?
 5. Does it preserve the architectural boundaries?
 6. Does it preserve an escape hatch?

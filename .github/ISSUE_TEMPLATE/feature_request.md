@@ -18,6 +18,6 @@ labels: enhancement
 <!--
 Before proposing a new abstraction, see RUNA.md's "Runa Standard" and
 CLAUDE.md's "When Changing Architecture": does an existing concept
-(Agent, Run, Context, State, Capability) already express this? Does it
+(Agent, Run, State, Capability) already express this? Does it
 simplify the common case? Does it preserve an escape hatch?
 -->

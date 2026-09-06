@@ -2,7 +2,7 @@ import threading
 
 from runa.agent import Agent
 from runa.background import ThreadQueue, run_later
-from runa.core import Context, Message, Role, Run, RunStatus
+from runa.core import Message, Role, Run, RunStatus
 from runa.runtime import Executor
 from tests.fakes import FakeProvider
 
@@ -70,12 +70,12 @@ def test_a_bug_before_the_step_loop_fails_the_run_instead_of_vanishing_on_the_wo
     # for the background path specifically, not just the synchronous one.
     class Unstringable:
         def __str__(self):
-            raise RuntimeError("bug while rendering context")
+            raise RuntimeError("bug while rendering input")
 
     provider = FakeProvider(responses=[])
     executor = Executor(provider)
     agent = GreeterAgent()
-    run = Run(input="hello", context=Context(bad=Unstringable()))
+    run = Run(input=Unstringable())
     queue = ThreadQueue(max_workers=1)
 
     result = run_later(agent, run, executor, queue=queue)
@@ -83,4 +83,4 @@ def test_a_bug_before_the_step_loop_fails_the_run_instead_of_vanishing_on_the_wo
 
     assert result is run
     assert result.status == RunStatus.FAILED
-    assert "bug while rendering context" in (result.error or "")
+    assert "bug while rendering input" in (result.error or "")

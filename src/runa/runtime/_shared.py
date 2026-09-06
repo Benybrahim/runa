@@ -7,25 +7,11 @@ their own copy.
 
 from typing import TYPE_CHECKING, Any
 
-from runa.core import Context, EffectStatus, EventType, Message, Role, Run, ToolCall
+from runa.core import EffectStatus, EventType, Message, Role, Run, ToolCall
 from runa.tool import DelegatesToAgent
 
 if TYPE_CHECKING:
     from runa.agent import Agent
-
-
-def render_context(context: Context) -> str:
-    """A plain "key: value" rendering of `context`, one line per entry.
-
-    Context is deliberately free-form (architecture.md §2): any key an
-    application sets should reach the Agent the same generic way, with
-    nothing in the framework interpreting specific key names specially. An
-    application whose Context needs a different shape in the prompt keeps
-    the escape hatch: don't populate `run.context`, and build the message
-    directly in `before_run`/`plan` instead.
-    """
-    lines = "\n".join(f"{key}: {value}" for key, value in context.items())
-    return f"Context:\n{lines}"
 
 
 def seed_run(agent: "Agent", run: Run) -> None:
@@ -41,8 +27,6 @@ def seed_run(agent: "Agent", run: Run) -> None:
     run.agent_version = agent.version
     if agent.instructions:
         run.add_message(Message(role=Role.SYSTEM, content=agent.instructions))
-    if run.context:
-        run.add_message(Message(role=Role.SYSTEM, content=render_context(run.context)))
     if run.conversation is not None:
         run.messages.extend(run.conversation.messages)
     run.add_message(Message(role=Role.USER, content=str(run.input)))
