@@ -32,9 +32,7 @@ Do not duplicate the philosophy from these documents here. This file is the oper
 * Preserve Runa's core model, the Agent-Run-Execution (ARE) pattern: **Agents declare behavior; Execution progresses it; Runs persist it.**
 * Keep provider, persistence, background, observability, and evaluation infrastructure outside the core primitives.
 * Do not introduce graphs, orchestration abstractions, or agent-specific machinery unless ordinary application code cannot express the problem clearly.
-* Prefer Agent behavior and lifecycle hooks before introducing a custom `Strategy`.
 * Keep state lifetimes explicit: Run state, Conversation state, and Domain state are distinct.
-* Model context is a projection of the Run built at model-call time (instructions, messages, and whatever State the Agent explicitly surfaces via `before_run`/`plan`), not a stored object. Do not reintroduce a persisted `Context` type alongside `State`.
 * Keep capabilities and authority explicit. Intelligence does not imply authority.
 * Prefer existing abstractions over creating new ones. Add a new abstraction only when the codebase reveals a recurring problem.
 * Preserve escape hatches. Convenience APIs must not prevent direct access to underlying Runa primitives or integrations.

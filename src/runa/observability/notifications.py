@@ -48,8 +48,8 @@ _SUMMARIES: dict[EventType, Callable[[dict[str, Any]], str]] = {
     EventType.TOOL_CALLED: (
         lambda d: f"tool called: {d.get('tool', '')}({d.get('arguments', {})})"
     ),
-    EventType.TOOL_COMPLETED: (
-        lambda d: f"tool completed: {d.get('tool', '')} -> {d.get('result', '')!r}"
+    EventType.TOOL_SUCCEEDED: (
+        lambda d: f"tool succeeded: {d.get('tool', '')} -> {d.get('result', '')!r}"
     ),
     EventType.TOOL_FAILED: (
         lambda d: (

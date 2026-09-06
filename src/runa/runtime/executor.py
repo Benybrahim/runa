@@ -382,7 +382,7 @@ class Executor:
         its own nested Run rather than running inline; that Run's id isn't
         otherwise visible on `run`'s own event log (the two are separate
         executions, see `docs/concepts.md`'s delegation section), so once
-        the call returns, `TOOL_COMPLETED`/`TOOL_FAILED` carry the child's
+        the call returns, `TOOL_SUCCEEDED`/`TOOL_FAILED` carry the child's
         `run_id` alongside the ordinary tool-call data, whenever the tool
         exposes one via `last_run` (structural, like `DelegatesToAgent`
         itself: no need to import `DelegateAgent` here and cycle back
@@ -442,7 +442,7 @@ class Executor:
             Message(role=Role.TOOL, content=content, tool_call_id=tool_call.id)
         )
         run.emit(
-            EventType.TOOL_COMPLETED,
+            EventType.TOOL_SUCCEEDED,
             tool=tool_call.name,
             tool_call_id=tool_call.id,
             # `content`, not the raw `tool_call.result`: a Tool may return

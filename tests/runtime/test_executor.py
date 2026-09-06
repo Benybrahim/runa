@@ -72,7 +72,7 @@ def test_executor_runs_a_full_tool_use_loop():
         EventType.MODEL_CALLED,
         EventType.MODEL_RESPONDED,
         EventType.TOOL_CALLED,
-        EventType.TOOL_COMPLETED,
+        EventType.TOOL_SUCCEEDED,
         EventType.MODEL_CALLED,
         EventType.MODEL_RESPONDED,
         EventType.RUN_COMPLETED,

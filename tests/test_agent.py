@@ -343,8 +343,8 @@ def test_a_parent_agent_can_delegate_to_a_sub_agent():
     assert research_tool.last_run.parent_run_id == run.id
     # and the parent's own event log carries the child's id, so the two
     # can be correlated without needing research_tool.last_run in memory
-    completed = next(e for e in run.events if e.type == EventType.TOOL_COMPLETED)
-    assert completed.data["run_id"] == research_tool.last_run.id
+    succeeded = next(e for e in run.events if e.type == EventType.TOOL_SUCCEEDED)
+    assert succeeded.data["run_id"] == research_tool.last_run.id
 
 
 def test_a_delegated_run_that_fails_surfaces_as_a_failed_tool_call():

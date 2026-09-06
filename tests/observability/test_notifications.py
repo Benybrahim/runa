@@ -126,10 +126,10 @@ def test_timeline_summarizes_a_tool_call_with_its_arguments():
     )
 
     called = next(e for e in timeline(run) if e.type == EventType.TOOL_CALLED)
-    completed = next(e for e in timeline(run) if e.type == EventType.TOOL_COMPLETED)
+    succeeded = next(e for e in timeline(run) if e.type == EventType.TOOL_SUCCEEDED)
 
     assert called.summary == "tool called: GetWeather({'city': 'Tokyo'})"
-    assert completed.summary == "tool completed: GetWeather -> 'Tokyo: sunny'"
+    assert succeeded.summary == "tool succeeded: GetWeather -> 'Tokyo: sunny'"
 
 
 def test_timeline_summarizes_a_failed_tool_call_with_its_arguments():

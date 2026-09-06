@@ -410,7 +410,7 @@ RunCancelled
 ModelCalled
 ModelResponded
 ToolCalled
-ToolCompleted
+ToolSucceeded
 ToolFailed
 ApprovalRequired
 PolicyDenied
