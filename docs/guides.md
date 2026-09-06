@@ -348,6 +348,22 @@ recover_pending(queue, run_store, executor, agents=[ResearchAgent])
 
 This restarts a recovered Run from the beginning, not from wherever the crashed process reached: nothing checkpoints progress once a Run starts executing, only before dispatch and at its next pause point. Any tool call the crashed process already completed runs again. Only pass `agents` whose tools are all `idempotent = True`, or a real side effect (a charge, an email, a ticket) can happen twice.
 
+If any of the Runs being recovered were run with a `conversation=`, pass a `ConversationStore` too, so their history can be resolved back into a live `Conversation` the same way `agent_name` is resolved back into a live Agent class:
+
+```python
+from runa.persistence import SQLiteConversationStore
+
+recover_pending(
+    queue,
+    run_store,
+    executor,
+    agents=[ResearchAgent],
+    conversation_store=SQLiteConversationStore("conversations.db"),
+)
+```
+
+Only the Run itself (via `Run.conversation_id`) survives a crash; the live `Conversation` object does not, so it must be resolvable from durable storage to recover correctly. A Run whose `conversation_id` can't be resolved this way (no `conversation_store` given, or the Conversation isn't in it) is not silently resubmitted with different context: it's failed explicitly, with `run.error` naming the unresolved id, so `runa runs show <id>` reports why rather than the Run quietly running with no history. A Run with no `conversation_id` recovers exactly as before, `conversation_store` or not.
+
 ## Shutting Down a Background Queue
 
 `ThreadQueue`/`SQLiteQueue` run jobs on a `ThreadPoolExecutor`. A normal

@@ -81,6 +81,20 @@ class SQLiteQueue:
             ).fetchall()
         return [row[0] for row in rows]
 
+    def forget(self, run_id: str) -> None:
+        """Clear `run_id`'s journal row without running a job for it.
+
+        For `recover_pending()` deciding a pending run id should not be
+        resubmitted at all (see its docstring): the same row `wrapped()`
+        would otherwise have cleared once a job actually ran, removed here
+        instead since no job runs in that case.
+        """
+        with self._lock:
+            self._connection.execute(
+                "DELETE FROM pending_jobs WHERE run_id = ?", (run_id,)
+            )
+            self._connection.commit()
+
     def close(self, *, wait: bool = True) -> None:
         """Stop accepting new jobs; `wait=True` blocks until running jobs
         finish.

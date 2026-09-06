@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from runa.application import application
 from runa.core import Conversation, Run
-from runa.persistence import RunStore
+from runa.persistence import ConversationStore, RunStore
 from runa.runtime import Executor
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ class DurableQueue(Protocol):
     A separate, optional protocol, not a second method tacked onto `Queue`:
     a Queue that only implements `enqueue()` still satisfies `Queue` on
     its own (`InlineQueue` and `ThreadQueue` included); one that also
-    implements `enqueue_run()`/`pending()` additionally satisfies
+    implements `enqueue_run()`/`pending()`/`forget()` additionally satisfies
     `DurableQueue`, structurally, with no base class to opt into.
     `run_later()` prefers `enqueue_run()` when a queue offers it, so the
     run being queued is recorded, not just the closure that runs it.
@@ -50,6 +50,19 @@ class DurableQueue(Protocol):
 
     def enqueue_run(self, run_id: str, job: Callable[[], None]) -> None: ...
     def pending(self) -> list[str]: ...
+
+    def forget(self, run_id: str) -> None:
+        """Clear `run_id` from the pending journal without running a job for it.
+
+        `enqueue_run()`'s job clears its own row once it runs; this is for
+        the other case, `recover_pending()` deciding a pending run id should
+        *not* be resubmitted at all (see its own docstring). Without this,
+        that run id would keep showing up in `pending()` on every future
+        startup, and (once `recover_pending()` marks the Run FAILED for the
+        same reason each time) `run.fail()` would raise `IllegalTransition`
+        on the second attempt, since a FAILED Run can't fail again.
+        """
+        ...
 
 
 class InlineQueue:
@@ -131,6 +144,8 @@ def recover_pending(
     run_store: RunStore,
     executor: Executor,
     agents: Sequence[type["Agent"]],
+    *,
+    conversation_store: ConversationStore | None = None,
 ) -> list[Run]:
     """Resubmit every Run a previous process left mid-flight.
 
@@ -170,18 +185,32 @@ def recover_pending(
 
     A recovered Run's `conversation_id` survives (it's part of the Run
     snapshot in `run_store`), but the live `Conversation` object does not:
-    it never crossed the process boundary in the first place, so this
-    resubmits without one. Resolving `conversation_id` back into a live
-    `Conversation` on recovery would need an application-level
-    `ConversationStore` lookup, which is outside what this function has
-    enough information to do on its own.
+    it never crossed the process boundary in the first place. Pass
+    `conversation_store` (the same explicit-dependency pattern `run_store`/
+    `executor`/`agents` already use here) to resolve it back: a Run with a
+    `conversation_id` is only resubmitted once `conversation_store.get(...)`
+    returns the matching `Conversation`, resolved synchronously in this loop
+    before the job is ever queued, exactly like `agent_name` is matched to
+    an `Agent` class above. A Run with a `conversation_id` that can't be
+    resolved this way (no `conversation_store` given, or the Conversation
+    isn't in it) is never queued and never executed with a silently
+    different context: it's instead failed explicitly, with `run.error`
+    naming the unresolved id, and forgotten from `queue`'s journal so it
+    isn't rediscovered as pending and re-failed (which would raise
+    `IllegalTransition`, a FAILED Run can't fail twice) on the next startup.
+    A Run with no `conversation_id` is unaffected and recovers exactly as
+    before, `conversation_store` or not.
 
     A run id missing from `run_store` is skipped: it already finished and
     its journal row wasn't cleared for some unrelated reason. A Run whose
     `agent_name` isn't among `agents` is also skipped, since this call site
-    has no Agent class to resume it with.
+    has no Agent class to resume it with. An already-terminal Run loaded
+    from `run_store` (e.g. from a crash timed exactly between a previous
+    recovery attempt saving it and forgetting its journal row) is skipped
+    the same way, rather than re-processed.
 
-    Returns the Runs that were resubmitted.
+    Returns the Runs this call took action on: resubmitted for execution,
+    or (for an unresolved Conversation) already failed and persisted.
     """
     by_name = {agent_cls.agent_name(): agent_cls for agent_cls in agents}
     recovered: list[Run] = []
@@ -189,14 +218,52 @@ def recover_pending(
         run = run_store.get(run_id)
         if run is None:
             continue
+        if run.is_terminal:
+            continue
         if run.agent_name is None:
             continue
         agent_cls = by_name.get(run.agent_name)
         if agent_cls is None:
             continue
 
-        def job(run: Run = run, agent_cls: type["Agent"] = agent_cls) -> None:
-            asyncio.run(executor.run(agent_cls(), run))
+        conversation: Conversation | None = None
+        if run.conversation_id is not None:
+            conversation = (
+                conversation_store.get(run.conversation_id)
+                if conversation_store is not None
+                else None
+            )
+            if conversation is None:
+                # QUEUED can't transition straight to FAILED (only RUNNING
+                # can); start() first, the same way Executor.run() itself
+                # moves a Run to RUNNING before a seeding bug can fail it,
+                # so recovery failing here looks like any other failure a
+                # Run can have, not a special case in the status machine.
+                run.start()
+                run.fail(
+                    error=(
+                        f"cannot recover: Conversation {run.conversation_id!r} "
+                        "could not be resolved (no conversation_store given "
+                        "to recover_pending(), or it was not found in it)"
+                    )
+                )
+                # Save the failure first: run_store is the source of truth
+                # for what happened, so if a crash lands between these two
+                # calls, losing the journal-cleanup (a merely inert stale
+                # pending() entry, caught by the is_terminal check above on
+                # the next attempt) is preferable to losing the failure
+                # itself (which would silently read back as QUEUED forever).
+                run_store.save(run)
+                queue.forget(run.id)
+                recovered.append(run)
+                continue
+
+        def job(
+            run: Run = run,
+            agent_cls: type["Agent"] = agent_cls,
+            conversation: Conversation | None = conversation,
+        ) -> None:
+            asyncio.run(executor.run(agent_cls(), run, conversation=conversation))
             run_store.save(run)
 
         queue.enqueue_run(run.id, job)
