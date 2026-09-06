@@ -60,6 +60,11 @@ _SUMMARIES: dict[EventType, Callable[[dict[str, Any]], str]] = {
     EventType.ARTIFACT_CREATED: (
         lambda d: f"artifact created: {d.get('artifact_id', '')}"
     ),
+    EventType.AGENT_TRANSFERRED: (
+        lambda d: (
+            f"transferred from {d.get('from_agent', '')} to {d.get('to_agent', '')}"
+        )
+    ),
 }
 
 

@@ -615,6 +615,44 @@ def test_sync_executor_rejects_a_tool_with_an_async_call():
     assert "AsyncExecutor" in run.events[-1].data["error"]
 
 
+def test_transfer_alongside_sibling_tool_calls_fails_the_run():
+    """A transfer=true delegation can't compose with concurrent siblings from
+    the same turn (see `AsyncExecutor._call_tools`'s docstring): whichever
+    agent's tools the siblings belong to becomes ambiguous once control has
+    moved, so the run fails with a clear error instead of running anything.
+    """
+
+    class SupportAgent(Agent):
+        pass
+
+    class GetWeatherAsync(Tool):
+        async def call(self, city: str) -> str:
+            return f"{city}: sunny"
+
+    class TriageAgent(Agent):
+        tools = [GetWeatherAsync]
+        delegations = [SupportAgent]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(
+                        name="SupportAgent",
+                        arguments={"input": "x", "transfer": True},
+                    ),
+                    ToolCall(name="GetWeatherAsync", arguments={"city": "Kyoto"}),
+                ],
+            )
+        ]
+    )
+    run = asyncio.run(AsyncExecutor(provider).run(TriageAgent(), Run(input="x")))
+
+    assert run.status == RunStatus.FAILED
+    assert "transfer" in (run.error or "")
+
+
 def test_run_async_uses_the_app_default_async_provider():
     class SimpleAgent(Agent):
         pass

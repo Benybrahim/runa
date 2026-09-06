@@ -2,8 +2,8 @@
 
 from runa.agent import (
     Agent,
-    AsyncDelegateTool,
-    DelegateTool,
+    AsyncDelegateAgent,
+    DelegateAgent,
     DuplicateToolName,
     Policy,
     UnknownApprovalTool,
@@ -109,7 +109,7 @@ __all__ = [
     "Application",
     "Artifact",
     "AsyncAnthropicProvider",
-    "AsyncDelegateTool",
+    "AsyncDelegateAgent",
     "AsyncExecutor",
     "AsyncOpenAIProvider",
     "AsyncProvider",
@@ -127,7 +127,7 @@ __all__ = [
     "ConversationStore",
     "DataArtifact",
     "DefaultStrategy",
-    "DelegateTool",
+    "DelegateAgent",
     "DuplicateToolName",
     "DurableQueue",
     "EvalCase",

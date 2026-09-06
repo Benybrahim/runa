@@ -16,7 +16,7 @@ from runa.core import (
     RunStatus,
     ToolCall,
 )
-from runa.runtime._shared import seed_run, tool_schemas
+from runa.runtime._shared import seed_run, tool_schemas, transfer_agent
 from runa.runtime.provider import Provider, StreamChunk, StreamingProvider
 from runa.runtime.strategy import (
     Action,
@@ -27,7 +27,7 @@ from runa.runtime.strategy import (
     Fail,
     Strategy,
 )
-from runa.tool import ParentRunAware
+from runa.tool import DelegatesToAgent, ParentRunAware
 
 if TYPE_CHECKING:
     # Agent.run()/.run_later() construct an Executor, so a runtime import here
@@ -157,7 +157,7 @@ class Executor:
 
                 try:
                     action = self.strategy.step(run)
-                    self._apply(agent, run, action, on_chunk)
+                    agent = self._apply(agent, run, action, on_chunk)
                 except Exception as exc:  # convert into a failed Run, not a crash
                     run.fail(error=str(exc))
                     break
@@ -185,11 +185,16 @@ class Executor:
         run: Run,
         action: Action,
         on_chunk: Callable[[StreamChunk], None] | None,
-    ) -> None:
+    ) -> "Agent":
+        """Apply one Strategy decision, returning the Agent driving `run` next.
+
+        Always `agent` unchanged, except a `CallTool` that turns out to be a
+        `transfer=true` delegation: see `_call_tool`/`transfer_agent`.
+        """
         if isinstance(action, CallModel):
             self._call_model(agent, run, on_chunk)
         elif isinstance(action, CallTool):
-            self._call_tool(agent, run, action.tool_call)
+            return self._call_tool(agent, run, action.tool_call)
         elif isinstance(action, Complete):
             revised = agent.review(run)
             run.complete(result=action.result if revised is None else revised)
@@ -197,6 +202,7 @@ class Executor:
             run.fail(error=action.error)
         else:
             raise TypeError(f"unknown action: {action!r}")
+        return agent
 
     def _call_model(
         self,
@@ -231,8 +237,8 @@ class Executor:
             usage=message.usage,
         )
 
-    def _call_tool(self, agent: "Agent", run: Run, tool_call: ToolCall) -> None:
-        """Run one tool call.
+    def _call_tool(self, agent: "Agent", run: Run, tool_call: ToolCall) -> "Agent":
+        """Run one tool call, returning the Agent driving `run` next.
 
         If `tool.call()` returns an `Artifact`, it's recorded on the Run via
         `run.add_artifact()` and its `summary()` becomes the tool result the
@@ -247,14 +253,14 @@ class Executor:
                 tool_call_id=tool_call.id,
             )
             run.fail(error=f"tool call {tool_call.name!r} denied by policy")
-            return
+            return agent
 
         if (
             tool_call.name in agent.approval_tool_names()
             and tool_call.approved is not True
         ):
             run.require_approval(tool_call.id)
-            return
+            return agent
 
         tools = agent.resolved_tools()
         tool = tools.get(tool_call.name)
@@ -263,6 +269,8 @@ class Executor:
                 f"model called unknown tool {tool_call.name!r}, declared "
                 f"tools are: {sorted(tools) or '(none)'}"
             )
+        if isinstance(tool, DelegatesToAgent) and tool_call.arguments.get("transfer"):
+            return transfer_agent(agent, run, tool, tool_call)
         if inspect.iscoroutinefunction(tool.call):
             raise TypeError(
                 f"{tool.tool_name()!r} defines an async call(): run this Agent with "
@@ -295,7 +303,7 @@ class Executor:
                 error=str(exc),
                 effect=EffectStatus.UNKNOWN.value,
             )
-            return
+            return agent
 
         tool_call.error = None
         tool_call.effect = EffectStatus.OBSERVED
@@ -319,3 +327,4 @@ class Executor:
             result=content,
             effect=EffectStatus.OBSERVED.value,
         )
+        return agent

@@ -1,8 +1,11 @@
 """delegate.py: one agent delegating to another (manifesto §6).
 
-`Agent.as_tool()` wraps an Agent as an ordinary Tool: the parent agent
-declares it in `tools` like any other capability, and delegation reuses
-DefaultStrategy's existing tool-use loop, no new Strategy needed.
+`Agent.delegations` declares a sub-agent as a capability the model can call,
+separately from `tools`: delegation reuses DefaultStrategy's existing
+tool-use loop, no new Strategy needed. This is the Return outcome (the
+default): the sub-agent runs to completion and its answer comes back as a
+tool result. See `transfer_delegate.py` for the Transfer outcome, where the
+sub-agent takes over the conversation instead.
 
 Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/delegate.py
@@ -17,7 +20,7 @@ class ResearchAgent(Agent):
 
 class LeadAgent(Agent):
     instructions = "Delegate research questions to the ResearchAgent tool."
-    tools = [ResearchAgent.as_tool()]
+    delegations = [ResearchAgent]
 
 
 if __name__ == "__main__":

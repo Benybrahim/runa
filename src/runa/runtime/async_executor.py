@@ -23,7 +23,7 @@ from runa.core import (
     RunStatus,
     ToolCall,
 )
-from runa.runtime._shared import seed_run, tool_schemas
+from runa.runtime._shared import seed_run, tool_schemas, transfer_agent
 from runa.runtime.async_provider import AsyncProvider, AsyncStreamingProvider
 from runa.runtime.provider import StreamChunk
 from runa.runtime.strategy import (
@@ -36,7 +36,7 @@ from runa.runtime.strategy import (
     Strategy,
     last_assistant_message,
 )
-from runa.tool import ParentRunAware
+from runa.tool import DelegatesToAgent, ParentRunAware
 
 if TYPE_CHECKING:
     # Agent.run_async() constructs an AsyncExecutor, so a runtime import here
@@ -140,7 +140,7 @@ class AsyncExecutor:
 
                 try:
                     action = self.strategy.step(run)
-                    await self._apply(agent, run, action, on_chunk)
+                    agent = await self._apply(agent, run, action, on_chunk)
                 except Exception as exc:  # convert into a failed Run, not a crash
                     run.fail(error=str(exc))
                     break
@@ -168,11 +168,16 @@ class AsyncExecutor:
         run: Run,
         action: Action,
         on_chunk: Callable[[StreamChunk], Any] | None,
-    ) -> None:
+    ) -> "Agent":
+        """Apply one Strategy decision, returning the Agent driving `run` next.
+
+        Always `agent` unchanged, except a `CallTool` batch that resolves to
+        a `transfer=true` delegation: see `_call_tools`/`transfer_agent`.
+        """
         if isinstance(action, CallModel):
             await self._call_model(agent, run, on_chunk)
         elif isinstance(action, CallTool):
-            await self._call_tools(agent, run, action.tool_call)
+            return await self._call_tools(agent, run, action.tool_call)
         elif isinstance(action, Complete):
             revised = agent.review(run)
             run.complete(result=action.result if revised is None else revised)
@@ -180,6 +185,7 @@ class AsyncExecutor:
             run.fail(error=action.error)
         else:
             raise TypeError(f"unknown action: {action!r}")
+        return agent
 
     async def _call_model(
         self,
@@ -218,8 +224,11 @@ class AsyncExecutor:
 
     async def _call_tools(
         self, agent: "Agent", run: Run, named_tool_call: ToolCall
-    ) -> None:
+    ) -> "Agent":
         """Run `named_tool_call` plus any fresh sibling pending calls, concurrently.
+
+        Returns the Agent driving `run` next: `agent` unchanged, unless the
+        turn's sole candidate is a `transfer=true` delegation.
 
         `named_tool_call` is whatever the Strategy explicitly vetted this
         step (honoring e.g. RetryStrategy's per-call attempt gating). A
@@ -233,12 +242,37 @@ class AsyncExecutor:
         `run.messages[-1]` is that sibling's TOOL-role result message, not
         the assistant message the still-pending calls actually live on. See
         `last_assistant_message`'s docstring.
+
+        A `transfer=true` call can't compose with concurrent siblings (which
+        agent's declared tools would they even belong to once control has
+        moved?), so it's only honored when it's the turn's only candidate;
+        otherwise the run fails with a clear error rather than running
+        anything concurrently. `Executor` (the sync one) doesn't need this
+        guard explicitly: it processes one call per step, so a sibling
+        surviving a transfer simply fails naturally on its own step, against
+        the new agent's `resolved_tools()`.
         """
         # named_tool_call came from this same lookup, so it's never None here.
         last_assistant = last_assistant_message(run)
         assert last_assistant is not None
         pending = [tc for tc in last_assistant.tool_calls if not tc.completed]
         candidates = [tc for tc in pending if tc is named_tool_call or tc.error is None]
+
+        tools = agent.resolved_tools()
+        transferring = [
+            tc
+            for tc in candidates
+            if isinstance(tools.get(tc.name), DelegatesToAgent)
+            and tc.arguments.get("transfer")
+        ]
+        if transferring and len(candidates) > 1:
+            run.fail(
+                error=(
+                    "cannot transfer control while other tool calls are "
+                    "pending in the same turn"
+                )
+            )
+            return agent
 
         approval_names = agent.approval_tool_names()
         runnable: list[ToolCall] = []
@@ -251,17 +285,27 @@ class AsyncExecutor:
                     tool_call_id=tool_call.id,
                 )
                 run.fail(error=f"tool call {tool_call.name!r} denied by policy")
-                return
+                return agent
             if tool_call.name in approval_names and tool_call.approved is not True:
                 blocked.append(tool_call)
             else:
                 runnable.append(tool_call)
+
+        if transferring:
+            tool_call = transferring[0]
+            if tool_call.name in approval_names and tool_call.approved is not True:
+                run.require_approval(tool_call.id)
+                return agent
+            delegation = tools[tool_call.name]
+            assert isinstance(delegation, DelegatesToAgent)
+            return transfer_agent(agent, run, delegation, tool_call)
 
         if runnable:
             await asyncio.gather(*(self._call_tool(agent, run, tc) for tc in runnable))
 
         if blocked and run.status == RunStatus.RUNNING:
             run.require_approval(blocked[0].id)
+        return agent
 
     async def _call_tool(self, agent: "Agent", run: Run, tool_call: ToolCall) -> None:
         """Run one tool call. See `Executor._call_tool` for the Artifact dispatch."""

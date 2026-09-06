@@ -76,7 +76,21 @@ Explicit configuration should be reserved for decisions that are genuinely appli
 
 ---
 
-## 5. Omakase Agent Infrastructure
+## 5. Don't Repeat Yourself (DRY)
+
+Recurring structure belongs in one place, not copied wherever it is needed.
+
+When the same capability, state shape, or behavior appears more than once, it should be defined once and reused, not reimplemented at each call site.
+
+This applies to application code built on RUNA as much as it applies to RUNA itself.
+
+Duplication is not a shortcut. It is a debt that Execution and Runs will have to carry.
+
+**Define it once.**
+
+---
+
+## 6. Omakase Agent Infrastructure
 
 Developers should not have to assemble an agent stack before they can build an application.
 
@@ -92,7 +106,7 @@ Omakase does not mean that every application must use every component. It means 
 
 ---
 
-## 6. State Has an Owner and a Lifetime
+## 7. State Has an Owner and a Lifetime
 
 Memory is not one thing.
 
@@ -110,7 +124,7 @@ State should be explicit rather than hidden behind one universal memory abstract
 
 ---
 
-## 7. Capabilities Do Not Imply Authority
+## 8. Capabilities Do Not Imply Authority
 
 Agents can reason about what should happen.
 
@@ -124,7 +138,7 @@ Important effects on the world should pass through explicit application boundari
 
 ---
 
-## 8. Standardize Execution, Not Intelligence
+## 9. Standardize Execution, Not Intelligence
 
 RUNA provides a consistent execution lifecycle without prescribing one theory of agent behavior.
 
@@ -140,7 +154,7 @@ The simplest agent should remain simple.
 
 ---
 
-## 9. Behavior Must Be Observable and Evaluatable
+## 10. Behavior Must Be Observable and Evaluatable
 
 Agent execution should answer two questions:
 
@@ -160,7 +174,7 @@ Observability and evaluation are part of development, not afterthoughts.
 
 ---
 
-## 10. Provide Sharp Knives
+## 11. Provide Sharp Knives
 
 Strong defaults should never become a prison.
 
@@ -180,6 +194,7 @@ Before adding a feature to the core framework, ask:
 
 * Does it make the common case simpler?
 * Does it follow an existing convention?
+* Does it avoid repeating structure that already exists elsewhere?
 * Does it make agent behavior easier to understand?
 * Does it belong naturally to an Agent, Execution, or Run?
 * Does it make state ownership or lifetime clearer?

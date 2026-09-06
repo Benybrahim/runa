@@ -64,6 +64,7 @@ class Run:
     input: Any
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     agent_name: str | None = None
+    active_agent_name: str | None = None
     agent_version: str | None = None
     parent_run_id: str | None = None
     context: Context = field(default_factory=Context)

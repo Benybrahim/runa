@@ -146,6 +146,35 @@ def test_timeline_summarizes_a_failed_tool_call_with_its_arguments():
     assert failed.summary == "tool failed: BrokenTool({'city': 'Tokyo'}): boom"
 
 
+def test_timeline_summarizes_an_agent_transfer():
+    class SupportAgent(Agent):
+        pass
+
+    class TriageAgent(Agent):
+        delegations = [SupportAgent]
+
+    provider = FakeProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(
+                        name="SupportAgent", arguments={"input": "x", "transfer": True}
+                    )
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="handled"),
+        ]
+    )
+    run = Executor(provider).run(TriageAgent(), Run(input="help"))
+
+    transferred = next(
+        e for e in timeline(run) if e.type == EventType.AGENT_TRANSFERRED
+    )
+
+    assert transferred.summary == "transferred from TriageAgent to SupportAgent"
+
+
 def test_timeline_reflects_run_events_not_a_separate_copy():
     provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     run = Run(input="hello")

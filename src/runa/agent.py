@@ -49,6 +49,7 @@ class Agent:
 
     instructions: ClassVar[str] = ""
     tools: ClassVar[list[ToolEntry]] = []
+    delegations: ClassVar[list["DelegationEntry"]] = []
     requires_approval: ClassVar[list[ToolEntry]] = []
     policies: ClassVar[list[Policy]] = []
     model: ClassVar[str | None] = None
@@ -79,6 +80,14 @@ class Agent:
         resolved: dict[str, Tool] = {}
         for entry in cls.tools:
             resolved_tool = _resolve_tool(entry)
+            name = resolved_tool.tool_name()
+            if name in resolved:
+                raise DuplicateToolName(
+                    f"{cls.__name__} declares more than one tool named {name!r}"
+                )
+            resolved[name] = resolved_tool
+        for entry in cls.delegations:
+            resolved_tool = _resolve_delegation(entry)
             name = resolved_tool.tool_name()
             if name in resolved:
                 raise DuplicateToolName(
@@ -196,51 +205,55 @@ class Agent:
         run = Run(input=input, conversation=conversation)
         return _run_later(cls(), run, executor, queue=queue)
 
-    @classmethod
-    def as_tool(
-        cls,
-        *,
-        name: str | None = None,
-        description: str | None = None,
-        executor: Executor | None = None,
-    ) -> "DelegateTool":
-        """Wrap this Agent as a Tool another Agent can call (manifesto §6).
 
-        A parent agent delegates by declaring the sub-agent as an ordinary
-        tool (`tools = [ResearchAgent.as_tool()]`), no new Strategy needed:
-        `DefaultStrategy`'s existing tool-use loop already covers it once an
-        Agent can be handed in as a Tool. For a parent driven by
-        `AsyncExecutor`/`run_async()`, see `as_async_tool()`.
+class _BaseDelegateAgent(Tool):
+    """Shared machinery for `DelegateAgent`/`AsyncDelegateAgent` (`Agent.delegations`).
+
+    Every delegation exposes the same schema regardless of outcome: `input`
+    (what to hand the sub-agent) plus an optional `transfer` flag the model
+    can set to hand off control of the whole Run to the sub-agent instead of
+    getting an answer back (see `Executor._transfer`). Only `__init__`/
+    `call()` differ between the sync and async subclasses (each types
+    `executor` as its own `Executor`/`AsyncExecutor`, not the union both
+    would need here, so `self._executor.run(...)` resolves to one concrete
+    return type rather than `Run | Coroutine[..., Run]`); everything else
+    about being a delegation is identical.
+    """
+
+    _agent_cls: type[Agent]
+    last_run: Run | None
+    _parent_run_id: str | None
+
+    def bind_parent_run_id(self, run_id: str) -> None:
+        self._parent_run_id = run_id
+
+    def new_agent_instance(self) -> Agent:
+        """A fresh instance of the delegated Agent (see `DelegatesToAgent`).
+
+        Used only for a `transfer=true` call: `Executor._transfer` swaps the
+        active Agent to this instance instead of running `call()`.
         """
-        return DelegateTool(cls, name=name, description=description, executor=executor)
+        return self._agent_cls()
 
-    @classmethod
-    def as_async_tool(
-        cls,
-        *,
-        name: str | None = None,
-        description: str | None = None,
-        executor: AsyncExecutor | None = None,
-    ) -> "AsyncDelegateTool":
-        """Wrap this Agent as a Tool for a parent run via AsyncExecutor/
-        `run_async()`, the async counterpart to `as_tool()`.
-
-        `DelegateTool.call()` is a plain function, so under AsyncExecutor it
-        runs via `asyncio.to_thread` (one thread per delegate, not true
-        concurrency). `AsyncDelegateTool.call()` is `async def` and delegates
-        through `AsyncExecutor` instead, so when a model turn requests
-        several sub-agents at once, AsyncExecutor's existing `asyncio.gather`
-        batching (see its docstring) runs them as genuine concurrent async
-        I/O. Only usable with `AsyncExecutor`; like any async-only tool,
-        `Executor` rejects it outright rather than mishandling it silently.
-        """
-        return AsyncDelegateTool(
-            cls, name=name, description=description, executor=executor
-        )
+    def schema(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "input": {"type": "string"},
+                "transfer": {
+                    "type": "boolean",
+                    "description": (
+                        "Set true to hand off the conversation to this agent "
+                        "instead of returning its answer."
+                    ),
+                },
+            },
+            "required": ["input"],
+        }
 
 
-class DelegateTool(Tool):
-    """Runs an Agent as a Tool call: the delegation strategy from manifesto §6.
+class DelegateAgent(_BaseDelegateAgent):
+    """Runs an Agent as a delegation: the Return outcome for `Agent.delegations`.
 
     `call()` runs the wrapped Agent synchronously against `input`, using the
     app-wide default Provider (`runa.configure()`) unless an `executor` is
@@ -259,24 +272,21 @@ class DelegateTool(Tool):
     """
 
     def __init__(
-        self,
-        agent_cls: type[Agent],
-        *,
-        name: str | None = None,
-        description: str | None = None,
-        executor: Executor | None = None,
+        self, agent_cls: type[Agent], *, executor: Executor | None = None
     ) -> None:
         self._agent_cls = agent_cls
-        self.name = name or agent_cls.__name__
-        self.description = description or agent_cls.instructions
+        self.name = agent_cls.agent_name()
+        self.description = agent_cls.instructions
         self._executor = executor
-        self.last_run: Run | None = None
-        self._parent_run_id: str | None = None
+        self.last_run = None
+        self._parent_run_id = None
 
-    def bind_parent_run_id(self, run_id: str) -> None:
-        self._parent_run_id = run_id
-
-    def call(self, input: str) -> Any:
+    def call(self, input: str, transfer: bool = False) -> Any:
+        # `transfer` is never True here: Executor._call_tool intercepts a
+        # transfer=true call before call() would run (see DelegatesToAgent).
+        # It's still an accepted parameter so tool_call.arguments (which may
+        # explicitly carry transfer=false) can always be splatted straight
+        # into call() without a KeyError.
         executor = self._executor or Executor(provider=application.provider)
         run = executor.run(
             self._agent_cls(), Run(input=input, parent_run_id=self._parent_run_id)
@@ -288,46 +298,32 @@ class DelegateTool(Tool):
             )
         return run.result
 
-    def schema(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {"input": {"type": "string"}},
-            "required": ["input"],
-        }
 
+class AsyncDelegateAgent(_BaseDelegateAgent):
+    """The async counterpart to `DelegateAgent`. See its docstring.
 
-class AsyncDelegateTool(Tool):
-    """The async counterpart to `DelegateTool`. See `Agent.as_async_tool()`.
-
-    `call()` is `async def` and runs the wrapped Agent through an
-    `AsyncExecutor`, using the app-wide default AsyncProvider
-    (`runa.configure(async_provider=...)`) unless an `executor` is given.
-    Otherwise identical to `DelegateTool`: `run.result` becomes the tool's
-    output, a non-completed sub-run raises (surfacing as an ordinary
-    `TOOL_FAILED` event on the parent), and the sub-agent's own `Run` stays
-    reachable on `self.last_run` for direct inspection (manifesto §15), with
-    `parent_run_id` recording the lineage (see `DelegateTool`).
+    `DelegateAgent.call()` is a plain function, so under `AsyncExecutor` it
+    still works via `asyncio.to_thread` (one thread per delegate, not true
+    concurrency). This class's `call()` is `async def` and delegates through
+    `AsyncExecutor` instead, so when a model turn requests several sub-agents
+    at once, `AsyncExecutor`'s existing `asyncio.gather` batching (see its
+    docstring) runs them as genuine concurrent async I/O. Only usable with
+    `AsyncExecutor`; like any async-only tool, `Executor` rejects it outright
+    rather than mishandling it silently.
     """
 
     def __init__(
-        self,
-        agent_cls: type[Agent],
-        *,
-        name: str | None = None,
-        description: str | None = None,
-        executor: AsyncExecutor | None = None,
+        self, agent_cls: type[Agent], *, executor: AsyncExecutor | None = None
     ) -> None:
         self._agent_cls = agent_cls
-        self.name = name or agent_cls.__name__
-        self.description = description or agent_cls.instructions
+        self.name = agent_cls.agent_name()
+        self.description = agent_cls.instructions
         self._executor = executor
-        self.last_run: Run | None = None
-        self._parent_run_id: str | None = None
+        self.last_run = None
+        self._parent_run_id = None
 
-    def bind_parent_run_id(self, run_id: str) -> None:
-        self._parent_run_id = run_id
-
-    async def call(self, input: str) -> Any:
+    async def call(self, input: str, transfer: bool = False) -> Any:
+        # See DelegateAgent.call() for why `transfer` is accepted but unused.
         executor = self._executor or AsyncExecutor(provider=application.async_provider)
         run = await executor.run(
             self._agent_cls(), Run(input=input, parent_run_id=self._parent_run_id)
@@ -339,9 +335,16 @@ class AsyncDelegateTool(Tool):
             )
         return run.result
 
-    def schema(self) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {"input": {"type": "string"}},
-            "required": ["input"],
-        }
+
+def _resolve_delegation(entry: "DelegationEntry") -> Tool:
+    if isinstance(entry, _BaseDelegateAgent):
+        return entry
+    if isinstance(entry, type) and issubclass(entry, Agent):
+        return DelegateAgent(entry)
+    raise TypeError(
+        f"{entry!r} is not an Agent subclass or "
+        "DelegateAgent/AsyncDelegateAgent instance"
+    )
+
+
+DelegationEntry = type[Agent] | DelegateAgent | AsyncDelegateAgent

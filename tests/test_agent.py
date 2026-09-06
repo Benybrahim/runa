@@ -5,8 +5,8 @@ import pytest
 
 from runa.agent import (
     Agent,
-    AsyncDelegateTool,
-    DelegateTool,
+    AsyncDelegateAgent,
+    DelegateAgent,
     DuplicateToolName,
     UnknownApprovalTool,
 )
@@ -243,36 +243,55 @@ def test_run_with_a_conversation_carries_history_into_the_next_run():
     assert conversation.messages[-1].content == "22 degrees."
 
 
-def test_as_tool_defaults_name_and_description_from_the_agent():
+def test_delegate_agent_defaults_name_and_description_from_the_agent():
     class ResearchAgent(Agent):
         instructions = "Research thoroughly."
 
-    tool = ResearchAgent.as_tool()
+    tool = DelegateAgent(ResearchAgent)
 
-    assert isinstance(tool, DelegateTool)
     assert tool.tool_name() == "ResearchAgent"
     assert tool.tool_description() == "Research thoroughly."
 
 
-def test_as_tool_accepts_name_and_description_overrides():
+def test_delegations_resolves_a_bare_agent_class_like_delegate_agent():
     class ResearchAgent(Agent):
         instructions = "Research thoroughly."
 
-    tool = ResearchAgent.as_tool(name="researcher", description="Looks things up.")
+    class LeadAgent(Agent):
+        delegations = [ResearchAgent]
 
-    assert tool.tool_name() == "researcher"
-    assert tool.tool_description() == "Looks things up."
+    tool = LeadAgent.resolved_tools()["ResearchAgent"]
+
+    assert isinstance(tool, DelegateAgent)
+    assert tool.tool_name() == "ResearchAgent"
+    assert tool.tool_description() == "Research thoroughly."
 
 
-def test_delegate_tool_schema_is_a_single_input_field():
+def test_delegate_agent_schema_has_input_and_transfer_fields():
     class ResearchAgent(Agent):
         pass
 
-    assert ResearchAgent.as_tool().schema() == {
-        "type": "object",
-        "properties": {"input": {"type": "string"}},
-        "required": ["input"],
-    }
+    schema = DelegateAgent(ResearchAgent).schema()
+
+    assert schema["required"] == ["input"]
+    assert set(schema["properties"]) == {"input", "transfer"}
+
+
+def test_duplicate_name_across_tools_and_delegations_raises():
+    class ResearchAgent(Agent):
+        pass
+
+    class Clashing(Tool):
+        name = "ResearchAgent"
+
+        def call(self) -> None:
+            pass
+
+    with pytest.raises(DuplicateToolName):
+
+        class LeadAgent(Agent):
+            tools = [Clashing]
+            delegations = [ResearchAgent]
 
 
 def test_a_parent_agent_can_delegate_to_a_sub_agent():
@@ -292,11 +311,11 @@ def test_a_parent_agent_can_delegate_to_a_sub_agent():
         ]
     )
     executor = Executor(provider=provider)
-    research_tool = ResearchAgent.as_tool(executor=executor)
+    research_tool = DelegateAgent(ResearchAgent, executor=executor)
 
     class LeadAgent(Agent):
         instructions = "Delegate research questions."
-        tools = [research_tool]
+        delegations = [research_tool]
 
     run = LeadAgent.run("What about fusion?", executor=executor)
 
@@ -327,10 +346,12 @@ def test_a_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
     )
     executor = Executor(provider=provider)
     # ResearchAgent's own model call has no scripted response, so its Run fails
-    research_tool = ResearchAgent.as_tool(executor=Executor(provider=FakeProvider([])))
+    research_tool = DelegateAgent(
+        ResearchAgent, executor=Executor(provider=FakeProvider([]))
+    )
 
     class LeadAgent(Agent):
-        tools = [research_tool]
+        delegations = [research_tool]
 
     run = LeadAgent.run("delegate this", executor=executor)
 
@@ -344,26 +365,124 @@ def test_a_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
     assert research_tool.last_run.status == RunStatus.FAILED
 
 
-def test_as_async_tool_defaults_name_and_description_from_the_agent():
+def test_transfer_false_argument_still_goes_through_the_return_path():
+    """`call()` accepts `transfer` (unused) so a scripted transfer=false
+    argument, or none at all, doesn't crash the ordinary Return path."""
+
+    class ResearchAgent(Agent):
+        pass
+
+    provider = FakeProvider(
+        [
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(
+                        name="ResearchAgent",
+                        arguments={"input": "x", "transfer": False},
+                    )
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="answer"),
+            Message(role=Role.ASSISTANT, content="answer, relayed"),
+        ]
+    )
+    executor = Executor(provider=provider)
+    research_tool = DelegateAgent(ResearchAgent, executor=executor)
+
+    class LeadAgent(Agent):
+        delegations = [research_tool]
+
+    run = LeadAgent.run("go", executor=executor)
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "answer, relayed"
+    assert research_tool.last_run is not None  # the nested Run actually ran
+
+
+def test_transfer_swaps_the_active_agent():
+    class SupportAgent(Agent):
+        instructions = "You are support. Help directly."
+
+    class TriageAgent(Agent):
+        instructions = "Route billing questions to support."
+        delegations = [SupportAgent]
+
+    provider = FakeProvider(
+        [
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(
+                        name="SupportAgent",
+                        arguments={"input": "billing issue", "transfer": True},
+                    )
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="Sure, let's sort out your billing."),
+        ]
+    )
+    executor = Executor(provider=provider)
+
+    run = TriageAgent.run("I have a billing issue.", executor=executor)
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "Sure, let's sort out your billing."
+    # provenance (who this Run was given to) survives the handoff...
+    assert run.agent_name == "TriageAgent"
+    # ...but who's currently driving it reflects the transfer
+    assert run.active_agent_name == "SupportAgent"
+    # the new agent's own instructions reach the model as a fresh system message
+    final_call_contents = [m.content for m in provider.calls[-1]["messages"]]
+    assert "You are support. Help directly." in final_call_contents
+
+
+def test_transfer_emits_agent_transferred_event():
+    class SupportAgent(Agent):
+        pass
+
+    class TriageAgent(Agent):
+        delegations = [SupportAgent]
+
+    provider = FakeProvider(
+        [
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(
+                        name="SupportAgent", arguments={"input": "x", "transfer": True}
+                    )
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="done"),
+        ]
+    )
+
+    run = TriageAgent.run("help", executor=Executor(provider=provider))
+
+    event = next(e for e in run.events if e.type == EventType.AGENT_TRANSFERRED)
+    assert event.data["from_agent"] == "TriageAgent"
+    assert event.data["to_agent"] == "SupportAgent"
+
+
+def test_async_delegate_agent_defaults_name_and_description_from_the_agent():
     class ResearchAgent(Agent):
         instructions = "Research thoroughly."
 
-    tool = ResearchAgent.as_async_tool()
+    tool = AsyncDelegateAgent(ResearchAgent)
 
-    assert isinstance(tool, AsyncDelegateTool)
     assert tool.tool_name() == "ResearchAgent"
     assert tool.tool_description() == "Research thoroughly."
 
 
-def test_async_delegate_tool_schema_is_a_single_input_field():
+def test_async_delegate_agent_schema_has_input_and_transfer_fields():
     class ResearchAgent(Agent):
         pass
 
-    assert ResearchAgent.as_async_tool().schema() == {
-        "type": "object",
-        "properties": {"input": {"type": "string"}},
-        "required": ["input"],
-    }
+    schema = AsyncDelegateAgent(ResearchAgent).schema()
+
+    assert schema["required"] == ["input"]
+    assert set(schema["properties"]) == {"input", "transfer"}
 
 
 def test_a_parent_agent_can_delegate_to_a_sub_agent_via_async_executor():
@@ -383,11 +502,11 @@ def test_a_parent_agent_can_delegate_to_a_sub_agent_via_async_executor():
         ]
     )
     executor = AsyncExecutor(provider=provider)
-    research_tool = ResearchAgent.as_async_tool(executor=executor)
+    research_tool = AsyncDelegateAgent(ResearchAgent, executor=executor)
 
     class LeadAgent(Agent):
         instructions = "Delegate research questions."
-        tools = [research_tool]
+        delegations = [research_tool]
 
     run = asyncio.run(LeadAgent.run_async("What about fusion?", executor=executor))
 
@@ -415,12 +534,12 @@ def test_an_async_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
     )
     executor = AsyncExecutor(provider=provider)
     # ResearchAgent's own model call has no scripted response, so its Run fails
-    research_tool = ResearchAgent.as_async_tool(
-        executor=AsyncExecutor(provider=FakeAsyncProvider([]))
+    research_tool = AsyncDelegateAgent(
+        ResearchAgent, executor=AsyncExecutor(provider=FakeAsyncProvider([]))
     )
 
     class LeadAgent(Agent):
-        tools = [research_tool]
+        delegations = [research_tool]
 
     run = asyncio.run(LeadAgent.run_async("delegate this", executor=executor))
 
@@ -431,8 +550,8 @@ def test_an_async_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
     assert research_tool.last_run.status == RunStatus.FAILED
 
 
-def test_async_delegate_tools_run_concurrently_under_async_executor():
-    """AsyncDelegateTool delegates through AsyncExecutor instead of a thread,
+def test_async_delegate_agents_run_concurrently_under_async_executor():
+    """AsyncDelegateAgent delegates through AsyncExecutor instead of a thread,
     so two independent delegate calls in one model turn run as genuine
     concurrent async I/O; see AsyncExecutor's docstring for the batching
     this rides on."""
@@ -451,19 +570,21 @@ def test_async_delegate_tools_run_concurrently_under_async_executor():
     class ResearchAgentB(Agent):
         pass
 
-    tool_a = ResearchAgentA.as_async_tool(
+    tool_a = AsyncDelegateAgent(
+        ResearchAgentA,
         executor=AsyncExecutor(
             provider=SlowAsyncProvider(Message(role=Role.ASSISTANT, content="a done"))
-        )
+        ),
     )
-    tool_b = ResearchAgentB.as_async_tool(
+    tool_b = AsyncDelegateAgent(
+        ResearchAgentB,
         executor=AsyncExecutor(
             provider=SlowAsyncProvider(Message(role=Role.ASSISTANT, content="b done"))
-        )
+        ),
     )
 
     class LeadAgent(Agent):
-        tools = [tool_a, tool_b]
+        delegations = [tool_a, tool_b]
 
     provider = FakeAsyncProvider(
         [

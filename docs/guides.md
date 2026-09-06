@@ -471,7 +471,7 @@ Or from application code, via `runa.approve()`/`runa.deny()`; see
 
 # Delegating to Another Agent
 
-Compose Agents through capabilities:
+Compose Agents through `delegations`, kept separate from `tools`:
 
 ```python
 class ResearchAgent(Agent):
@@ -479,10 +479,24 @@ class ResearchAgent(Agent):
 
 
 class ReportAgent(Agent):
-    tools = [ResearchAgent.as_tool()]
+    delegations = [ResearchAgent]
 ```
 
-The delegated Agent creates its own Run.
+By default the delegated Agent creates its own Run (the Return outcome): it
+runs to completion and its answer comes back to `ReportAgent` as a tool
+result.
+
+The model can instead set `transfer: true` on the call to hand the whole
+conversation off to `ResearchAgent`, which then becomes the Agent driving the
+Run for the rest of its lifetime, no nested Run involved. Reach for Transfer
+when one Agent's job is to route to the right specialist, not to consult it
+and keep going:
+
+```python
+class TriageAgent(Agent):
+    instructions = "Route to the right specialist; don't answer yourself."
+    delegations = [BillingAgent, TechSupportAgent]
+```
 
 This keeps agent composition explicit while avoiding a separate multi-agent programming model.
 

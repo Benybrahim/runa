@@ -259,6 +259,40 @@ def test_delegate_example():
     assert run.result == "Fusion is making progress."
 
 
+def test_transfer_delegate_example():
+    transfer_delegate = _load("transfer_delegate")
+    fake = FakeProvider(
+        [
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(
+                        name="BillingAgent",
+                        arguments={
+                            "input": "charged twice for subscription",
+                            "transfer": True,
+                        },
+                    )
+                ],
+            ),
+            Message(
+                role=Role.ASSISTANT,
+                content="I'll look into the duplicate charge and refund it.",
+            ),
+        ]
+    )
+    configure(provider=fake)
+
+    run = transfer_delegate.TriageAgent.run(
+        "I was charged twice for my subscription this month."
+    )
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "I'll look into the duplicate charge and refund it."
+    assert run.agent_name == "TriageAgent"
+    assert run.active_agent_name == "BillingAgent"
+
+
 def test_parallel_delegate_example():
     parallel_delegate = _load("parallel_delegate")
     fake = FakeAsyncProvider(

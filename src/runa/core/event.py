@@ -23,6 +23,7 @@ class EventType(StrEnum):
     TOOL_COMPLETED = "tool.completed"
     TOOL_FAILED = "tool.failed"
     ARTIFACT_CREATED = "artifact.created"
+    AGENT_TRANSFERRED = "agent.transferred"
 
 
 @dataclass

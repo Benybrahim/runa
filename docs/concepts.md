@@ -271,17 +271,40 @@ this diagram calls Capability. There is no separate `Capability` class
 between Agent and Tool; one would only rename `Tool` without adding
 behavior.
 
-An Agent can also delegate to another Agent through a capability:
+An Agent can also delegate to another Agent, declared separately from `tools`
+so a reader can tell "capabilities this agent uses" from "agents this agent
+delegates to" at a glance:
 
 ```python
-ResearchAgent.as_tool()  # for a parent driven by Executor/run()
-ResearchAgent.as_async_tool()  # for a parent driven by AsyncExecutor/run_async()
+class LeadAgent(Agent):
+    delegations = [ResearchAgent]
 ```
 
-This keeps composition within the same programming model.
+This keeps composition within the same programming model: a delegation still
+resolves to an ordinary Tool internally, so it reuses `DefaultStrategy`'s
+existing tool-use loop, no new Strategy needed.
 
-The delegated Agent's Run records the parent Run's id as `parent_run_id`,
-so delegation lineage survives being persisted and read back later.
+Every delegation's schema accepts `input` plus an optional `transfer` flag,
+and the model decides per call which outcome it wants:
+
+* **Return** (the default, `transfer` absent or `false`) — the delegated
+  Agent runs to completion in its own nested Run, and its result comes back
+  as a tool result. The nested Run's `parent_run_id` records the parent
+  Run's id, so delegation lineage survives being persisted and read back
+  later.
+* **Transfer** (`transfer: true`) — no nested Run is created. The delegated
+  Agent instead becomes the one driving the *same* Run for the rest of its
+  lifetime: its own instructions take over, and `Run.active_agent_name`
+  updates to reflect the handoff (`Run.agent_name` keeps recording who the
+  Run was originally given to). Use this for a handoff, e.g. a triage agent
+  passing a conversation to a specialist.
+
+`DelegateAgent`/`AsyncDelegateAgent` are the two ways to override a
+delegation's `executor` (e.g. for tests, or a specific provider):
+`AsyncDelegateAgent` additionally runs the Return outcome through
+`AsyncExecutor` directly, so several delegates called in one model turn run
+as genuine concurrent async I/O rather than one thread each. Neither matters
+for Transfer, which never spawns a nested Run in the first place.
 
 ---
 
