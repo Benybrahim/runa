@@ -102,7 +102,7 @@ def instrument(run: Run, subscriber: Subscriber) -> Callable[[], None]:
     must not be able to affect execution (architecture.md §10: "should not
     duplicate execution logic"). Without this, an exception here would
     propagate out of whatever emitted the event, including `run.start()`
-    and other lifecycle transitions the Executor's own step loop doesn't
+    and other lifecycle transitions Executor's own step loop doesn't
     wrap in a try/except, defeating `Executor.run()`'s guarantee to convert
     failures into a failed Run rather than crash. The exception is instead
     surfaced as a `RuntimeWarning`, so a broken subscriber stays visible

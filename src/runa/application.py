@@ -18,17 +18,18 @@ is not threaded through every call.
 Construct `Application()` explicitly for tests, or any scenario that needs
 an isolated set of infrastructure: each instance owns its own `Config`, so
 configuring one instance never leaks into another (see
-tests/test_application.py). Its provider/async_provider/run_store can be
-passed straight into an `Executor`/`AsyncExecutor`, the same escape hatch
+tests/test_application.py). Its async_provider/provider/run_store can be
+passed straight into an `Executor`, the same escape hatch
 `Agent.run(executor=...)` already exposes, so an isolated Application
 doesn't need any Agent-level API of its own to be useful.
 
 A model provider is an application-level dependency, not a per-agent one:
-most applications talk to exactly one. `async_provider` is a separate slot
-rather than something derived from `provider`: a sync client
+most applications talk to exactly one. `async_provider` drives `Executor`
+(Runa's canonical execution model, see `runtime/executor.py`); `provider`
+is a separate, synchronous slot for direct use outside an Agent's own
+Executor, e.g. the default `Judge` in `eval/harness.py`. A sync client
 (`anthropic.Anthropic`) and an async one (`anthropic.AsyncAnthropic`) are
-different objects, so an app that wants `Agent.run_async()` to work
-configures both explicitly.
+different objects, so an app that wants both configures them explicitly.
 
 `run_store` defaults to an in-memory store, so it's only useful across
 process boundaries once an app configures a durable one, e.g.
@@ -44,11 +45,13 @@ from runa.runtime.provider import Provider
 
 
 class ProviderNotConfigured(Exception):
-    """Raised when Agent.run()/.run_later() needs a Provider that isn't set."""
+    """Raised when the default synchronous Provider is needed but isn't set,
+    e.g. by `Judge`'s default in `eval/harness.py`."""
 
 
 class AsyncProviderNotConfigured(Exception):
-    """Raised when Agent.run_async() needs an AsyncProvider that isn't set."""
+    """Raised when Agent.run()/.run_sync()/.run_stream()/.run_later() needs
+    an AsyncProvider that isn't set."""
 
 
 class InvalidConfiguration(Exception):
@@ -133,8 +136,8 @@ class Application:
     def provider(self) -> Provider:
         if self.config.provider is None:
             raise ProviderNotConfigured(
-                "call runa.configure(provider=...) before Agent.run(), "
-                "or pass an Executor explicitly"
+                "call runa.configure(provider=...) first, or pass a Provider "
+                "explicitly, e.g. Judge(my_provider)"
             )
         return self.config.provider
 
@@ -142,8 +145,9 @@ class Application:
     def async_provider(self) -> AsyncProvider:
         if self.config.async_provider is None:
             raise AsyncProviderNotConfigured(
-                "call runa.configure(provider=..., async_provider=...) before "
-                "Agent.run_async(), or pass an AsyncExecutor explicitly"
+                "call runa.configure(async_provider=...) before Agent.run()/"
+                ".run_sync()/.run_stream()/.run_later(), or pass an "
+                "Executor explicitly"
             )
         return self.config.async_provider
 

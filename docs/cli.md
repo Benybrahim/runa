@@ -33,7 +33,7 @@ suffix left off, following `runa generate agent`'s own convention, so
 `Support` finds `SupportAgent`.
 
 Equivalent to importing the Agent into `main.py` and calling
-`SupportAgent.run(...)` directly; the CLI's version also saves the Run to
+`SupportAgent.run_sync(...)` directly; the CLI's version also saves the Run to
 `application.run_store` afterward, so `runa runs show <id>` can find it
 right away without any extra wiring.
 

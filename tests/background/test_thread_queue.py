@@ -4,7 +4,7 @@ from runa.agent import Agent
 from runa.background import ThreadQueue, run_later
 from runa.core import Message, Role, Run, RunStatus
 from runa.runtime import Executor
-from tests.fakes import FakeProvider
+from tests.fakes import FakeAsyncProvider
 
 
 class GreeterAgent(Agent):
@@ -46,7 +46,7 @@ def test_jobs_run_and_complete_on_a_background_thread():
 
 
 def test_run_later_with_thread_queue_completes_once_the_queue_drains():
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     executor = Executor(provider)
     agent = GreeterAgent()
     run = Run(input="hello")
@@ -72,7 +72,7 @@ def test_a_bug_before_the_step_loop_fails_the_run_instead_of_vanishing_on_the_wo
         def __str__(self):
             raise RuntimeError("bug while rendering input")
 
-    provider = FakeProvider(responses=[])
+    provider = FakeAsyncProvider(responses=[])
     executor = Executor(provider)
     agent = GreeterAgent()
     run = Run(input=Unstringable())

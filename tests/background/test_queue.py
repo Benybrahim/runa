@@ -4,7 +4,7 @@ from runa.background import InlineQueue, recover_pending, run_later
 from runa.core import Message, Role, Run, RunStatus
 from runa.persistence import InMemoryRunStore
 from runa.runtime import Executor
-from tests.fakes import FakeProvider
+from tests.fakes import FakeAsyncProvider
 
 
 class GreeterAgent(Agent):
@@ -39,7 +39,7 @@ class FakeDurableQueue:
 
 
 def test_run_later_with_inline_queue_runs_synchronously_to_completion():
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     executor = Executor(provider)
     agent = GreeterAgent()
     run = Run(input="hello")
@@ -59,7 +59,7 @@ def test_run_later_queues_before_a_custom_queue_dispatches():
             seen_status.append(run.status)
             job()
 
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     executor = Executor(provider)
     agent = GreeterAgent()
     run = Run(input="hello")
@@ -77,7 +77,7 @@ def test_deferred_queue_leaves_the_run_queued_until_dispatched():
         def enqueue(self, job):
             jobs.append(job)
 
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     executor = Executor(provider)
     agent = GreeterAgent()
     run = Run(input="hello")
@@ -97,7 +97,7 @@ def test_run_later_stamps_agent_provenance_before_the_job_runs():
         def enqueue(self, job):
             self.jobs.append(job)
 
-    provider = FakeProvider(responses=[])
+    provider = FakeAsyncProvider(responses=[])
     executor = Executor(provider)
     agent = GreeterAgent()
     run = Run(input="hello")
@@ -136,7 +136,7 @@ def test_run_later_saves_to_the_default_run_store_before_a_durable_queue_dispatc
 ):
     store = InMemoryRunStore()
     monkeypatch.setattr(application.config, "run_store", store)
-    provider = FakeProvider(responses=[])
+    provider = FakeAsyncProvider(responses=[])
     executor = Executor(provider)
     agent = GreeterAgent()
     run = Run(input="hello")
@@ -170,7 +170,7 @@ def test_recover_pending_resumes_a_run_left_mid_flight():
     orphaned = _queued_run(agent_name="GreeterAgent")
     run_store.save(orphaned)
     queue = FakeDurableQueue(pending_ids=[orphaned.id])
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
     executor = Executor(provider)
 
     recovered = recover_pending(queue, run_store, executor, agents=[GreeterAgent])
@@ -184,7 +184,7 @@ def test_recover_pending_resumes_a_run_left_mid_flight():
 def test_recover_pending_skips_a_run_id_missing_from_the_store():
     run_store = InMemoryRunStore()
     queue = FakeDurableQueue(pending_ids=["ghost-run"])
-    executor = Executor(FakeProvider(responses=[]))
+    executor = Executor(FakeAsyncProvider(responses=[]))
 
     recovered = recover_pending(queue, run_store, executor, agents=[GreeterAgent])
 
@@ -197,7 +197,7 @@ def test_recover_pending_skips_a_run_whose_agent_is_not_in_the_list():
     orphaned = _queued_run(agent_name="GreeterAgent")
     run_store.save(orphaned)
     queue = FakeDurableQueue(pending_ids=[orphaned.id])
-    executor = Executor(FakeProvider(responses=[]))
+    executor = Executor(FakeAsyncProvider(responses=[]))
 
     # only FarewellAgent is known here, not the GreeterAgent that produced it
     recovered = recover_pending(queue, run_store, executor, agents=[FarewellAgent])
@@ -214,7 +214,7 @@ def test_recover_pending_matches_each_run_to_its_own_agent_class():
     run_store.save(greeting)
     run_store.save(farewell)
     queue = FakeDurableQueue(pending_ids=[greeting.id, farewell.id])
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(role=Role.ASSISTANT, content="hi"),
             Message(role=Role.ASSISTANT, content="bye"),

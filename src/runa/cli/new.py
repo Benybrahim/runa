@@ -20,10 +20,13 @@ _MAIN_TEMPLATE = '''"""main.py: the application entry point.
 
 The one place to call `configure()`. A model Provider is an app-wide
 dependency (manifesto §2), not a per-agent one, so it's set once here
-rather than at each call site: swap OpenAIProvider for AnthropicProvider
-(or any other Provider) as this app's needs change. `load_dotenv()` reads
-the key(s) out of `.env` (see that file) so every `runa` command picks
-them up without exporting anything into the shell.
+rather than at each call site: swap OpenAIProvider/AsyncOpenAIProvider for
+AnthropicProvider/AsyncAnthropicProvider (or any other Provider) as this
+app's needs change. `async_provider` is what `Agent.run()`/`.run_sync()`/
+`.run_stream()`/`.run_later()` actually drive: Runa's canonical execution
+model is async (see docs/concepts.md). `load_dotenv()` reads the key(s) out
+of `.env` (see that file) so every `runa` command picks them up without
+exporting anything into the shell.
 
 `run_store=SQLiteRunStore("runa.db")` makes `runa runs show`/`list` work
 right away: `runa.configure()`'s own default RunStore is in-memory and
@@ -37,16 +40,20 @@ from dotenv import load_dotenv
 
 from runa import configure
 from runa.persistence import SQLiteRunStore
-from runa.providers import OpenAIProvider
+from runa.providers import AsyncOpenAIProvider, OpenAIProvider
 
 load_dotenv()
-configure(provider=OpenAIProvider(), run_store=SQLiteRunStore("runa.db"))
+configure(
+    provider=OpenAIProvider(),
+    async_provider=AsyncOpenAIProvider(),
+    run_store=SQLiteRunStore("runa.db"),
+)
 
 
 if __name__ == "__main__":
     # from app.agents.example_agent import ExampleAgent
     #
-    # run = ExampleAgent.run("...")
+    # run = ExampleAgent.run_sync("...")
     # print(run.result)
     pass
 '''

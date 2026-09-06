@@ -2,14 +2,14 @@
 
 A `Conversation` is separate from a `Run`: it survives across Runs while
 each Run stays a single execution. Pass the same `Conversation` into
-successive `Agent.run()` calls and each one sees the prior turns, without
-the caller re-assembling message history by hand.
+successive `Agent.run_sync()` calls and each one sees the prior turns,
+without the caller re-assembling message history by hand.
 
 Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/conversation.py
 """
 
-from runa import Agent, Conversation, OpenAIProvider, configure
+from runa import Agent, AsyncOpenAIProvider, Conversation, OpenAIProvider, configure
 
 
 class SupportAgent(Agent):
@@ -17,16 +17,16 @@ class SupportAgent(Agent):
 
 
 if __name__ == "__main__":
-    configure(provider=OpenAIProvider())
+    configure(provider=OpenAIProvider(), async_provider=AsyncOpenAIProvider())
 
     conversation = Conversation()
 
-    first = SupportAgent.run(
+    first = SupportAgent.run_sync(
         "My order #A123 hasn't arrived.", conversation=conversation
     )
     print(first.result)
 
-    second = SupportAgent.run(
+    second = SupportAgent.run_sync(
         "What was that order number again?", conversation=conversation
     )
     print(second.result)

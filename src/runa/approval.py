@@ -24,8 +24,8 @@ def _find_tool_call(run: Run, tool_call_id: str) -> ToolCall:
 def approve(run: Run, tool_call_id: str) -> None:
     """Approve a pending tool call and resume the Run.
 
-    The tool itself doesn't run here: call the Executor again to continue
-    driving the Run, which will now execute the approved call.
+    The tool itself doesn't run here: call `Executor.run()` again to
+    continue driving the Run, which will now execute the approved call.
     """
     _find_tool_call(run, tool_call_id).approved = True
     run.resume()

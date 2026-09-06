@@ -79,7 +79,6 @@ from runa.providers import (
 )
 from runa.runtime import (
     Action,
-    AsyncExecutor,
     AsyncProvider,
     AsyncRetryingProvider,
     AsyncStream,
@@ -110,7 +109,6 @@ __all__ = [
     "Artifact",
     "AsyncAnthropicProvider",
     "AsyncDelegateAgent",
-    "AsyncExecutor",
     "AsyncOpenAIProvider",
     "AsyncProvider",
     "AsyncProviderNotConfigured",

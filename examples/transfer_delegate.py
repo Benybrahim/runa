@@ -6,13 +6,13 @@ Every delegation's tool schema accepts an optional `transfer` flag alongside
 conversation to the sub-agent (Transfer). A transfer doesn't spawn a nested
 Run: the delegated Agent becomes the one driving this same Run, so its own
 instructions take over for the rest of the exchange (see
-`Executor._transfer`/`transfer_agent`).
+`runtime._shared.transfer_agent`).
 
 Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/transfer_delegate.py
 """
 
-from runa import Agent, OpenAIProvider, configure
+from runa import Agent, AsyncOpenAIProvider, OpenAIProvider, configure
 
 
 class BillingAgent(Agent):
@@ -33,8 +33,8 @@ class TriageAgent(Agent):
 
 
 if __name__ == "__main__":
-    configure(provider=OpenAIProvider())
+    configure(provider=OpenAIProvider(), async_provider=AsyncOpenAIProvider())
 
-    run = TriageAgent.run("I was charged twice for my subscription this month.")
+    run = TriageAgent.run_sync("I was charged twice for my subscription this month.")
     print(run.result)
     print(f"handled by: {run.active_agent_name}")

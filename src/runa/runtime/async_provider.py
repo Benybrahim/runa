@@ -29,7 +29,11 @@ class AsyncProvider(Protocol):
 
 @dataclass
 class AsyncRetryingProvider:
-    """The async counterpart to `RetryingProvider` (see `provider.py`), same
+    """Wraps an AsyncProvider, retrying `complete()` before giving up.
+
+    The retry wrapper for `Executor`, Runa's canonical execution path (see
+    `RetryingProvider` in `provider.py` for the synchronous counterpart,
+    used for direct Provider use outside an Agent's own Executor). Same
     retry policy, `await`ed instead of blocking: any exception retried by
     default, up to `max_retries` times, doubling `backoff` seconds each
     attempt, with `is_retryable` as the escape hatch for a specific

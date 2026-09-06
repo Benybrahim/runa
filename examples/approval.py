@@ -10,10 +10,12 @@ Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/approval.py
 """
 
+import asyncio
+
 from runa import (
     Agent,
+    AsyncOpenAIProvider,
     Executor,
-    OpenAIProvider,
     Run,
     RunStatus,
     approve,
@@ -32,16 +34,16 @@ class SupportAgent(Agent):
 
 
 if __name__ == "__main__":
-    executor = Executor(provider=OpenAIProvider())
+    executor = Executor(provider=AsyncOpenAIProvider())
     agent = SupportAgent()
 
-    run = executor.run(agent, Run(input="Refund order A123 for $42."))
+    run = asyncio.run(executor.run(agent, Run(input="Refund order A123 for $42.")))
 
     if run.status == RunStatus.AWAITING_APPROVAL:
         pending = next(tc for tc in run.tool_calls if not tc.completed)
         print(f"approval requested: {pending.name}({pending.arguments})")
 
         approve(run, pending.id)
-        run = executor.run(agent, run)
+        run = asyncio.run(executor.run(agent, run))
 
     print(run.status, run.result)

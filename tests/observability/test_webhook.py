@@ -1,3 +1,4 @@
+import asyncio
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -7,7 +8,7 @@ from runa.background import ThreadQueue
 from runa.core import EventType, Message, Role, Run
 from runa.observability import instrument, webhook
 from runa.runtime import Executor
-from tests.fakes import FakeProvider
+from tests.fakes import FakeAsyncProvider
 
 
 class GreeterAgent(Agent):
@@ -52,11 +53,13 @@ class _RecordingServer:
 def test_webhook_posts_each_event_as_json():
     server = _RecordingServer()
     try:
-        provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+        provider = FakeAsyncProvider(
+            responses=[Message(role=Role.ASSISTANT, content="hi")]
+        )
         run = Run(input="hello")
 
         instrument(run, webhook(server.url, run_id=run.id))
-        Executor(provider).run(GreeterAgent(), run)
+        asyncio.run(Executor(provider).run(GreeterAgent(), run))
 
         assert [body["type"] for body in server.received] == [
             EventType.RUN_STARTED.value,
@@ -74,11 +77,13 @@ def test_webhook_with_a_queue_does_not_block_the_run():
     server = _RecordingServer()
     queue = ThreadQueue(max_workers=2)
     try:
-        provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+        provider = FakeAsyncProvider(
+            responses=[Message(role=Role.ASSISTANT, content="hi")]
+        )
         run = Run(input="hello")
 
         instrument(run, webhook(server.url, run_id=run.id, queue=queue))
-        Executor(provider).run(GreeterAgent(), run)
+        asyncio.run(Executor(provider).run(GreeterAgent(), run))
         queue.close(wait=True)
 
         assert len(server.received) == len(run.events)

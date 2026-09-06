@@ -127,7 +127,7 @@ class EvalResult:
     error: str | None = None
 
 
-def run_evals(
+async def run_evals(
     agent: Agent, executor: Executor, cases: list[EvalCase]
 ) -> list[EvalResult]:
     """Run every case's input through `agent`/`executor` and check it.
@@ -137,7 +137,7 @@ def run_evals(
     """
     results = []
     for eval_case in cases:
-        run = executor.run(agent, Run(input=eval_case.input))
+        run = await executor.run(agent, Run(input=eval_case.input))
         try:
             eval_case.check(run)
         except ExpectationFailed as exc:

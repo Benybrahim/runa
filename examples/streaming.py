@@ -13,7 +13,9 @@ Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/streaming.py
 """
 
-from runa import Agent, Executor, OpenAIProvider, Run, StreamChunk, tool
+import asyncio
+
+from runa import Agent, AsyncOpenAIProvider, Executor, Run, StreamChunk, tool
 
 
 @tool
@@ -31,12 +33,14 @@ def print_as_it_arrives(chunk: StreamChunk) -> None:
 
 
 if __name__ == "__main__":
-    executor = Executor(OpenAIProvider())
+    executor = Executor(AsyncOpenAIProvider())
 
-    run = executor.run(
-        WeatherAgent(),
-        Run(input="What's the weather in Tokyo?"),
-        on_chunk=print_as_it_arrives,
+    run = asyncio.run(
+        executor.run(
+            WeatherAgent(),
+            Run(input="What's the weather in Tokyo?"),
+            on_chunk=print_as_it_arrives,
+        )
     )
     print()  # the streamed text has no trailing newline
     print("Final result:", run.result)

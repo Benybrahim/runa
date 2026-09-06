@@ -125,41 +125,42 @@ def test_configuring_an_explicit_application_does_not_affect_the_default():
         application.provider
 
 
-def test_agent_run_resolves_the_provider_from_the_default_application():
+def test_agent_run_sync_resolves_the_async_provider_from_the_default_application():
     class SimpleAgent(Agent):
         pass
 
-    runa.configure(provider=FakeProvider([Message(role=Role.ASSISTANT, content="hi")]))
+    runa.configure(
+        async_provider=FakeAsyncProvider([Message(role=Role.ASSISTANT, content="hi")])
+    )
 
-    run = SimpleAgent.run("hello")
+    run = SimpleAgent.run_sync("hello")
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "hi"
 
 
-def test_agent_run_async_resolves_the_async_provider_from_the_default_application():
+def test_agent_run_resolves_the_async_provider_from_the_default_application():
     import asyncio
 
     class SimpleAgent(Agent):
         pass
 
     runa.configure(
-        provider=FakeProvider([]),
         async_provider=FakeAsyncProvider([Message(role=Role.ASSISTANT, content="hi")]),
     )
 
-    run = asyncio.run(SimpleAgent.run_async("hello"))
+    run = asyncio.run(SimpleAgent.run("hello"))
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "hi"
 
 
-def test_agent_run_raises_a_clear_error_when_no_provider_is_configured():
+def test_agent_run_raises_a_clear_error_when_no_async_provider_is_configured():
     class SimpleAgent(Agent):
         pass
 
-    with pytest.raises(ProviderNotConfigured):
-        SimpleAgent.run("hello")
+    with pytest.raises(AsyncProviderNotConfigured):
+        SimpleAgent.run_sync("hello")
 
 
 def test_agent_run_still_accepts_an_explicit_executor_without_any_configuration():
@@ -168,9 +169,9 @@ def test_agent_run_still_accepts_an_explicit_executor_without_any_configuration(
     class SimpleAgent(Agent):
         pass
 
-    provider = FakeProvider([Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeAsyncProvider([Message(role=Role.ASSISTANT, content="hi")])
 
-    run = SimpleAgent.run("hello", executor=Executor(provider=provider))
+    run = SimpleAgent.run_sync("hello", executor=Executor(provider=provider))
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "hi"

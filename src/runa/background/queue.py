@@ -1,9 +1,12 @@
 """run_later() and the Queue protocol it dispatches through.
 
-`run_later()` produces the same Run as running an Agent synchronously would;
-only the executor differs (manifesto §13). Background execution is an
-alternate transition through the same Run state machine, not a second
-programming model.
+`run_later()` produces the same Run as running an Agent would; only the
+Executor differs (manifesto §13). Background execution is an alternate
+transition through the same Run state machine, not a second programming
+model. `Executor.run()` is a coroutine, but each job here is a plain
+synchronous callable (the `Queue` protocol's shape): `asyncio.run()` drives
+it to completion on whatever thread the Queue calls `job()` from, a fresh
+event loop each time, exactly like `Agent.run_sync()`.
 
 `Queue` only promises that a job runs eventually; `DurableQueue` below adds
 the ability to say *which run* is mid-flight, which is what lets a backend
@@ -12,6 +15,7 @@ automated version of the three-step manual recovery `SQLiteQueue` names in
 its own docstring.
 """
 
+import asyncio
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
@@ -100,7 +104,7 @@ def run_later(
     durable = isinstance(queue, DurableQueue)
 
     def job() -> None:
-        executor.run(agent, run)
+        asyncio.run(executor.run(agent, run))
         if durable:
             application.run_store.save(run)
 
@@ -174,7 +178,7 @@ def recover_pending(
             continue
 
         def job(run: Run = run, agent_cls: type["Agent"] = agent_cls) -> None:
-            executor.run(agent_cls(), run)
+            asyncio.run(executor.run(agent_cls(), run))
             run_store.save(run)
 
         queue.enqueue_run(run.id, job)

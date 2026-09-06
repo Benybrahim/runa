@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from runa.agent import Agent
@@ -13,7 +15,7 @@ from runa.eval import (
 )
 from runa.runtime import Executor
 from runa.tool import Tool
-from tests.fakes import FakeProvider
+from tests.fakes import FakeAsyncProvider, FakeProvider
 
 
 class GetWeather(Tool):
@@ -27,8 +29,8 @@ class WeatherAgent(Agent):
 
 
 def test_expect_to_be_completed_passes_on_a_completed_run():
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
-    run = Executor(provider).run(WeatherAgent(), Run(input="hello"))
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    run = asyncio.run(Executor(provider).run(WeatherAgent(), Run(input="hello")))
 
     expect(run).to_be_completed().to_have_result("hi").to_contain("hi")
 
@@ -41,12 +43,12 @@ def test_expect_to_be_completed_fails_on_a_failed_run():
     class BrokenAgent(Agent):
         tools = [BrokenTool]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(role=Role.ASSISTANT, tool_calls=[ToolCall(name="BrokenTool")])
         ]
     )
-    run = Executor(provider).run(BrokenAgent(), Run(input="do it"))
+    run = asyncio.run(Executor(provider).run(BrokenAgent(), Run(input="do it")))
 
     try:
         expect(run).to_be_completed()
@@ -84,7 +86,7 @@ def test_expect_to_have_error_fails_when_the_run_never_failed():
 
 
 def test_expect_to_have_called_checks_tool_calls():
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -93,7 +95,9 @@ def test_expect_to_have_called_checks_tool_calls():
             Message(role=Role.ASSISTANT, content="Tokyo is sunny."),
         ]
     )
-    run = Executor(provider).run(WeatherAgent(), Run(input="weather in Tokyo?"))
+    run = asyncio.run(
+        Executor(provider).run(WeatherAgent(), Run(input="weather in Tokyo?"))
+    )
 
     expect(run).to_have_called("GetWeather")
 
@@ -111,7 +115,7 @@ def test_run_evals_reports_pass_and_fail_for_each_case():
             check=lambda run: expect(run).to_contain("goodbye"),
         ),
     ]
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(role=Role.ASSISTANT, content="hi"),
             Message(role=Role.ASSISTANT, content="hi"),
@@ -119,7 +123,7 @@ def test_run_evals_reports_pass_and_fail_for_each_case():
     )
     executor = Executor(provider)
 
-    results = run_evals(WeatherAgent(), executor, cases)
+    results = asyncio.run(run_evals(WeatherAgent(), executor, cases))
 
     assert len(results) == 2
     assert results[0].passed is True
@@ -190,7 +194,7 @@ def test_run_evals_runs_every_case_even_after_a_failure():
         EvalCase(name="a", input="x", check=lambda run: expect(run).to_contain("z")),
         EvalCase(name="b", input="y", check=lambda run: expect(run).to_be_completed()),
     ]
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(role=Role.ASSISTANT, content="hi"),
             Message(role=Role.ASSISTANT, content="hi"),
@@ -198,6 +202,6 @@ def test_run_evals_runs_every_case_even_after_a_failure():
     )
     executor = Executor(provider)
 
-    results = run_evals(WeatherAgent(), executor, cases)
+    results = asyncio.run(run_evals(WeatherAgent(), executor, cases))
 
     assert [result.passed for result in results] == [False, True]

@@ -9,11 +9,13 @@ from runa.agent import (
     DelegateAgent,
     DuplicateToolName,
 )
-from runa.application import ProviderNotConfigured, application, configure
+from runa.application import AsyncProviderNotConfigured, application, configure
 from runa.core import Conversation, EventType, Message, Role, Run, RunStatus, ToolCall
-from runa.runtime import AsyncExecutor, Executor
+from runa.runtime import Executor
 from runa.tool import Tool
-from tests.fakes import FakeAsyncProvider, FakeAsyncStreamingProvider, FakeProvider
+from tests.fakes import FakeAsyncProvider, FakeAsyncStreamingProvider
+
+_HI = [Message(role=Role.ASSISTANT, content="hi")]
 
 
 class Ledger(Tool):
@@ -82,13 +84,25 @@ def test_subclasses_do_not_share_resolved_tool_cache():
     assert set(AgentB.resolved_tools()) == {"Reporting"}
 
 
-def test_run_uses_the_app_default_provider_when_no_executor_is_given():
+def test_run_uses_the_app_default_async_provider_when_no_executor_is_given():
     class SimpleAgent(Agent):
         pass
 
-    configure(provider=FakeProvider([Message(role=Role.ASSISTANT, content="hi")]))
+    configure(async_provider=FakeAsyncProvider(list(_HI)))
 
-    run = SimpleAgent.run("hello")
+    run = asyncio.run(SimpleAgent.run("hello"))
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "hi"
+
+
+def test_run_sync_uses_the_app_default_async_provider_when_no_executor_is_given():
+    class SimpleAgent(Agent):
+        pass
+
+    configure(async_provider=FakeAsyncProvider(list(_HI)))
+
+    run = SimpleAgent.run_sync("hello")
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "hi"
@@ -112,62 +126,58 @@ def test_run_is_stamped_with_agent_nameentity_and_version():
     class ResearchAgent(Agent):
         version = "1.2.0"
 
-    provider = FakeProvider([Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeAsyncProvider(list(_HI))
 
-    run = ResearchAgent.run("hello", executor=Executor(provider=provider))
+    run = ResearchAgent.run_sync("hello", executor=Executor(provider=provider))
 
     assert run.agent_name == "ResearchAgent"
     assert run.agent_version == "1.2.0"
 
 
-def test_run_async_and_run_later_also_stamp_agent_nameentity():
+def test_run_and_run_later_also_stamp_agent_nameentity():
     class ResearchAgent(Agent):
         pass
 
-    configure(provider=FakeProvider([Message(role=Role.ASSISTANT, content="hi")]))
+    configure(async_provider=FakeAsyncProvider(list(_HI)))
     later = ResearchAgent.run_later("hello")
     assert later.agent_name == "ResearchAgent"
 
-    async_provider = FakeAsyncProvider([Message(role=Role.ASSISTANT, content="hi")])
-    async_run = asyncio.run(
-        ResearchAgent.run_async(
-            "hello", executor=AsyncExecutor(provider=async_provider)
-        )
-    )
-    assert async_run.agent_name == "ResearchAgent"
+    provider = FakeAsyncProvider(list(_HI))
+    run = asyncio.run(ResearchAgent.run("hello", executor=Executor(provider=provider)))
+    assert run.agent_name == "ResearchAgent"
 
 
-def test_run_raises_if_no_default_provider_and_no_executor(monkeypatch):
-    monkeypatch.setattr(application.config, "provider", None)
+def test_run_raises_if_no_default_async_provider_and_no_executor(monkeypatch):
+    monkeypatch.setattr(application.config, "async_provider", None)
 
     class SimpleAgent(Agent):
         pass
 
-    with pytest.raises(ProviderNotConfigured):
-        SimpleAgent.run("hello")
+    with pytest.raises(AsyncProviderNotConfigured):
+        SimpleAgent.run_sync("hello")
 
 
 def test_run_accepts_an_explicit_executor_as_an_escape_hatch():
     class SimpleAgent(Agent):
         pass
 
-    provider = FakeProvider([Message(role=Role.ASSISTANT, content="hi")])
+    provider = FakeAsyncProvider(list(_HI))
     executor = Executor(provider=provider)
 
-    run = SimpleAgent.run("hello", executor=executor)
+    run = SimpleAgent.run_sync("hello", executor=executor)
 
     assert run.status == RunStatus.COMPLETED
     assert provider.calls  # the explicit executor's provider was used
 
 
-def test_run_async_accepts_an_explicit_async_executor_as_an_escape_hatch():
+def test_run_awaited_directly_accepts_an_explicit_executor_as_an_escape_hatch():
     class SimpleAgent(Agent):
         pass
 
-    provider = FakeAsyncProvider([Message(role=Role.ASSISTANT, content="hi")])
-    executor = AsyncExecutor(provider=provider)
+    provider = FakeAsyncProvider(list(_HI))
+    executor = Executor(provider=provider)
 
-    run = asyncio.run(SimpleAgent.run_async("hello", executor=executor))
+    run = asyncio.run(SimpleAgent.run("hello", executor=executor))
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "hi"
@@ -178,8 +188,8 @@ def test_run_stream_yields_the_streamed_output_and_the_same_final_run():
     class SimpleAgent(Agent):
         pass
 
-    provider = FakeAsyncStreamingProvider([Message(role=Role.ASSISTANT, content="hi")])
-    executor = AsyncExecutor(provider=provider)
+    provider = FakeAsyncStreamingProvider(list(_HI))
+    executor = Executor(provider=provider)
 
     async def collect():
         stream = SimpleAgent.run_stream("hello", executor=executor)
@@ -197,7 +207,7 @@ def test_run_later_queues_and_runs_via_the_default_inline_queue():
     class SimpleAgent(Agent):
         pass
 
-    configure(provider=FakeProvider([Message(role=Role.ASSISTANT, content="hi")]))
+    configure(async_provider=FakeAsyncProvider(list(_HI)))
 
     run = SimpleAgent.run_later("hello")
 
@@ -208,7 +218,7 @@ def test_run_with_a_conversation_carries_history_into_the_next_run():
     class SimpleAgent(Agent):
         instructions = "Be terse."
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         [
             Message(role=Role.ASSISTANT, content="Tokyo is sunny."),
             Message(role=Role.ASSISTANT, content="22 degrees."),
@@ -217,12 +227,12 @@ def test_run_with_a_conversation_carries_history_into_the_next_run():
     executor = Executor(provider=provider)
     conversation = Conversation()
 
-    first = SimpleAgent.run(
+    first = SimpleAgent.run_sync(
         "What's the weather in Tokyo?", executor=executor, conversation=conversation
     )
     assert first.status == RunStatus.COMPLETED
 
-    second = SimpleAgent.run(
+    second = SimpleAgent.run_sync(
         "And the temperature?", executor=executor, conversation=conversation
     )
 
@@ -293,7 +303,7 @@ def test_a_parent_agent_can_delegate_to_a_sub_agent():
     class ResearchAgent(Agent):
         instructions = "Research."
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -312,7 +322,7 @@ def test_a_parent_agent_can_delegate_to_a_sub_agent():
         instructions = "Delegate research questions."
         delegations = [research_tool]
 
-    run = LeadAgent.run("What about fusion?", executor=executor)
+    run = LeadAgent.run_sync("What about fusion?", executor=executor)
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "Fusion is promising, per research."
@@ -331,7 +341,7 @@ def test_a_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
     class ResearchAgent(Agent):
         pass
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -342,13 +352,13 @@ def test_a_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
     executor = Executor(provider=provider)
     # ResearchAgent's own model call has no scripted response, so its Run fails
     research_tool = DelegateAgent(
-        ResearchAgent, executor=Executor(provider=FakeProvider([]))
+        ResearchAgent, executor=Executor(provider=FakeAsyncProvider([]))
     )
 
     class LeadAgent(Agent):
         delegations = [research_tool]
 
-    run = LeadAgent.run("delegate this", executor=executor)
+    run = LeadAgent.run_sync("delegate this", executor=executor)
 
     # DefaultStrategy fails the parent run on the first tool error, same as
     # any other failing tool call would (see RetryStrategy for retries)
@@ -367,7 +377,7 @@ def test_transfer_false_argument_still_goes_through_the_return_path():
     class ResearchAgent(Agent):
         pass
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -388,7 +398,7 @@ def test_transfer_false_argument_still_goes_through_the_return_path():
     class LeadAgent(Agent):
         delegations = [research_tool]
 
-    run = LeadAgent.run("go", executor=executor)
+    run = LeadAgent.run_sync("go", executor=executor)
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "answer, relayed"
@@ -403,7 +413,7 @@ def test_transfer_swaps_the_active_agent():
         instructions = "Route billing questions to support."
         delegations = [SupportAgent]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -419,7 +429,7 @@ def test_transfer_swaps_the_active_agent():
     )
     executor = Executor(provider=provider)
 
-    run = TriageAgent.run("I have a billing issue.", executor=executor)
+    run = TriageAgent.run_sync("I have a billing issue.", executor=executor)
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "Sure, let's sort out your billing."
@@ -439,7 +449,7 @@ def test_transfer_emits_agent_transferred_event():
     class TriageAgent(Agent):
         delegations = [SupportAgent]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -453,7 +463,7 @@ def test_transfer_emits_agent_transferred_event():
         ]
     )
 
-    run = TriageAgent.run("help", executor=Executor(provider=provider))
+    run = TriageAgent.run_sync("help", executor=Executor(provider=provider))
 
     event = next(e for e in run.events if e.type == EventType.AGENT_TRANSFERRED)
     assert event.data["from_agent"] == "TriageAgent"
@@ -480,7 +490,7 @@ def test_async_delegate_agent_schema_has_input_and_transfer_fields():
     assert set(schema["properties"]) == {"input", "transfer"}
 
 
-def test_a_parent_agent_can_delegate_to_a_sub_agent_via_async_executor():
+def test_a_parent_agent_can_delegate_to_a_sub_agent_via_an_async_delegate_agent():
     class ResearchAgent(Agent):
         instructions = "Research."
 
@@ -496,14 +506,14 @@ def test_a_parent_agent_can_delegate_to_a_sub_agent_via_async_executor():
             Message(role=Role.ASSISTANT, content="Fusion is promising, per research."),
         ]
     )
-    executor = AsyncExecutor(provider=provider)
+    executor = Executor(provider=provider)
     research_tool = AsyncDelegateAgent(ResearchAgent, executor=executor)
 
     class LeadAgent(Agent):
         instructions = "Delegate research questions."
         delegations = [research_tool]
 
-    run = asyncio.run(LeadAgent.run_async("What about fusion?", executor=executor))
+    run = asyncio.run(LeadAgent.run("What about fusion?", executor=executor))
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "Fusion is promising, per research."
@@ -527,16 +537,16 @@ def test_an_async_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
             ),
         ]
     )
-    executor = AsyncExecutor(provider=provider)
+    executor = Executor(provider=provider)
     # ResearchAgent's own model call has no scripted response, so its Run fails
     research_tool = AsyncDelegateAgent(
-        ResearchAgent, executor=AsyncExecutor(provider=FakeAsyncProvider([]))
+        ResearchAgent, executor=Executor(provider=FakeAsyncProvider([]))
     )
 
     class LeadAgent(Agent):
         delegations = [research_tool]
 
-    run = asyncio.run(LeadAgent.run_async("delegate this", executor=executor))
+    run = asyncio.run(LeadAgent.run("delegate this", executor=executor))
 
     assert run.status == RunStatus.FAILED
     failed_call = next(tc for tc in run.tool_calls if tc.name == "ResearchAgent")
@@ -545,11 +555,11 @@ def test_an_async_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
     assert research_tool.last_run.status == RunStatus.FAILED
 
 
-def test_async_delegate_agents_run_concurrently_under_async_executor():
-    """AsyncDelegateAgent delegates through AsyncExecutor instead of a thread,
-    so two independent delegate calls in one model turn run as genuine
-    concurrent async I/O; see AsyncExecutor's docstring for the batching
-    this rides on."""
+def test_async_delegate_agents_run_concurrently_under_the_executor():
+    """AsyncDelegateAgent awaits its Executor directly instead of wrapping
+    it with asyncio.run(), so two independent delegate calls in one model
+    turn run as genuine concurrent async I/O; see Executor's docstring for
+    the batching this rides on."""
 
     class SlowAsyncProvider:
         def __init__(self, response: Message) -> None:
@@ -567,13 +577,13 @@ def test_async_delegate_agents_run_concurrently_under_async_executor():
 
     tool_a = AsyncDelegateAgent(
         ResearchAgentA,
-        executor=AsyncExecutor(
+        executor=Executor(
             provider=SlowAsyncProvider(Message(role=Role.ASSISTANT, content="a done"))
         ),
     )
     tool_b = AsyncDelegateAgent(
         ResearchAgentB,
-        executor=AsyncExecutor(
+        executor=Executor(
             provider=SlowAsyncProvider(Message(role=Role.ASSISTANT, content="b done"))
         ),
     )
@@ -593,10 +603,10 @@ def test_async_delegate_agents_run_concurrently_under_async_executor():
             Message(role=Role.ASSISTANT, content="both done"),
         ]
     )
-    executor = AsyncExecutor(provider=provider)
+    executor = Executor(provider=provider)
 
     start = time.monotonic()
-    run = asyncio.run(LeadAgent.run_async("do both", executor=executor))
+    run = asyncio.run(LeadAgent.run("do both", executor=executor))
     elapsed = time.monotonic() - start
 
     assert run.status == RunStatus.COMPLETED
@@ -618,11 +628,11 @@ def test_a_denying_policy_fails_the_run_without_calling_the_tool_or_a_human():
         tools = [TrackedTool]
         policies = [deny_everything]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         [Message(role=Role.ASSISTANT, tool_calls=[ToolCall(name="TrackedTool")])]
     )
 
-    run = FinanceAgent.run("do it", executor=Executor(provider=provider))
+    run = FinanceAgent.run_sync("do it", executor=Executor(provider=provider))
 
     assert run.status == RunStatus.FAILED
     assert not calls  # the tool itself never ran
@@ -643,7 +653,7 @@ def test_a_policy_runs_before_approval_so_a_denied_call_never_pauses_for_a_human
         tools = [TransferFunds]
         policies = [deny_large_transfers]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -654,7 +664,7 @@ def test_a_policy_runs_before_approval_so_a_denied_call_never_pauses_for_a_human
         ]
     )
 
-    run = FinanceAgent.run("transfer", executor=Executor(provider=provider))
+    run = FinanceAgent.run_sync("transfer", executor=Executor(provider=provider))
 
     assert run.status == RunStatus.FAILED  # denied outright, never AWAITING_APPROVAL
 
@@ -668,19 +678,19 @@ def test_a_passing_policy_lets_the_tool_call_proceed():
         tools = [TrackedTool]
         policies = [lambda run, tool_call: True]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         [
             Message(role=Role.ASSISTANT, tool_calls=[ToolCall(name="TrackedTool")]),
             Message(role=Role.ASSISTANT, content="done"),
         ]
     )
 
-    run = FinanceAgent.run("do it", executor=Executor(provider=provider))
+    run = FinanceAgent.run_sync("do it", executor=Executor(provider=provider))
 
     assert run.status == RunStatus.COMPLETED
 
 
-def test_a_denying_policy_fails_an_async_run_without_calling_the_tool():
+def test_a_denying_policy_fails_a_run_without_calling_the_tool():
     calls = []
 
     class TrackedTool(Tool):
@@ -698,9 +708,7 @@ def test_a_denying_policy_fails_an_async_run_without_calling_the_tool():
         [Message(role=Role.ASSISTANT, tool_calls=[ToolCall(name="TrackedTool")])]
     )
 
-    run = asyncio.run(
-        FinanceAgent.run_async("do it", executor=AsyncExecutor(provider=provider))
-    )
+    run = asyncio.run(FinanceAgent.run("do it", executor=Executor(provider=provider)))
 
     assert run.status == RunStatus.FAILED
     assert not calls

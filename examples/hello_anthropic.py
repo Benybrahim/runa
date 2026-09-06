@@ -9,7 +9,7 @@ Requires ANTHROPIC_API_KEY in the environment.
 Run with: uv run python examples/hello_anthropic.py
 """
 
-from runa import Agent, AnthropicProvider, configure, tool
+from runa import Agent, AnthropicProvider, AsyncAnthropicProvider, configure, tool
 
 
 @tool
@@ -23,7 +23,7 @@ class WeatherAgent(Agent):
 
 
 if __name__ == "__main__":
-    configure(provider=AnthropicProvider())
+    configure(provider=AnthropicProvider(), async_provider=AsyncAnthropicProvider())
 
-    run = WeatherAgent.run("What's the weather in Tokyo?")
+    run = WeatherAgent.run_sync("What's the weather in Tokyo?")
     print(run.result)

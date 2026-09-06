@@ -3,7 +3,7 @@
 Requires OPENAI_API_KEY in the environment. Run with `make hello`.
 """
 
-from runa import Agent, OpenAIProvider, configure, tool
+from runa import Agent, AsyncOpenAIProvider, OpenAIProvider, configure, tool
 
 
 @tool
@@ -17,7 +17,7 @@ class WeatherAgent(Agent):
 
 
 if __name__ == "__main__":
-    configure(provider=OpenAIProvider())
+    configure(provider=OpenAIProvider(), async_provider=AsyncOpenAIProvider())
 
-    run = WeatherAgent.run("What's the weather in Tokyo?")
+    run = WeatherAgent.run_sync("What's the weather in Tokyo?")
     print(run.result)

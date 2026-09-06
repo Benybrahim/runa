@@ -12,12 +12,12 @@ class EchoAgent(Agent):
 
 
 def test_completes_with_hi():
-    run = EchoAgent.run("hello")
+    run = EchoAgent.run_sync("hello")
     assert run.result == "hi"
 
 
 def test_wrong_expectation():
-    run = EchoAgent.run("hello")
+    run = EchoAgent.run_sync("hello")
     assert run.result == "goodbye"
 """
 
@@ -29,9 +29,9 @@ def _scaffold_with_tests(tmp_path, test_source: str, *, responses: int):
     scripted = ", ".join(['Message(role=Role.ASSISTANT, content="hi")'] * responses)
     (project_dir / "main.py").write_text(
         "from runa import configure\n"
-        "from tests.fakes import FakeProvider\n"
+        "from tests.fakes import FakeAsyncProvider\n"
         "from runa.core import Message, Role\n\n"
-        f"configure(provider=FakeProvider(responses=[{scripted}]))\n"
+        f"configure(async_provider=FakeAsyncProvider(responses=[{scripted}]))\n"
     )
     (project_dir / "app" / "tests" / "echo_test.py").write_text(test_source)
     return project_dir

@@ -8,9 +8,12 @@ on a specific vendor.
 tacked onto `Provider`: a Provider that only implements `complete()` still
 satisfies `Provider` on its own (every existing `FakeProvider` in tests
 included); one that also implements `stream()` additionally satisfies
-`StreamingProvider`, structurally, with no base class to opt into.
-`Executor.run(..., on_chunk=...)` is what actually calls `stream()`. See
-`runtime/executor.py`.
+`StreamingProvider`, structurally, with no base class to opt into. This
+synchronous `Provider`/`StreamingProvider` pair is a direct-use escape
+hatch (call `.complete()`/`.stream()` yourself, e.g. from a `Judge`); the
+canonical execution path is `AsyncProvider`/`AsyncStreamingProvider` (see
+`async_provider.py`), which `Executor.run(..., on_chunk=...)` actually
+calls. See `runtime/executor.py`.
 """
 
 import time
@@ -35,14 +38,17 @@ class Provider(Protocol):
 class RetryingProvider:
     """Wraps a Provider, retrying `complete()` on failure before giving up.
 
-    Without this, any transient failure from the model API itself (a rate
-    limit, a timeout, a dropped connection) fails the whole Run on the
+    This synchronous `Provider` isn't what `Executor` drives (see
+    `AsyncRetryingProvider` for that); it's the escape hatch for direct,
+    synchronous Provider use, e.g. wrapping the Provider a `Judge` grades
+    with. Without this, any transient failure from the model API itself (a
+    rate limit, a timeout, a dropped connection) fails the call on the
     first hit: `RetryStrategy` (`runtime/retry.py`) only retries *tool*
-    calls, since a tool call can have a real side effect a blind retry
-    might repeat. A model call has no such hazard here: `Executor.
-    _call_model` only calls `run.add_message()` with the result *after*
-    `complete()` returns, so a failed attempt has written nothing to the
-    Run; retrying just repeats the same read-only request.
+    calls under `Executor`, since a tool call can have a real side effect
+    a blind retry might repeat. A model call has no such hazard: nothing
+    is written anywhere until `complete()` returns, so a failed attempt
+    leaves nothing to undo; retrying just repeats the same read-only
+    request.
 
     Retries every exception by default, up to `max_retries` times, with
     delays that double each attempt starting at `backoff` seconds, the
@@ -56,9 +62,9 @@ class RetryingProvider:
     provider adapters").
 
     Satisfies `Provider` structurally, so it drops in anywhere a Provider
-    is expected: `Executor(provider=RetryingProvider(AnthropicProvider()))`.
-    Wraps `complete()` only: a Provider that also implements `stream()`
-    stops satisfying `StreamingProvider` once wrapped, since a partially
+    is expected: `Judge(RetryingProvider(AnthropicProvider()))`. Wraps
+    `complete()` only: a Provider that also implements `stream()` stops
+    satisfying `StreamingProvider` once wrapped, since a partially
     delivered stream can't be safely retried from the start once some
     chunks have already reached `on_chunk`.
     """

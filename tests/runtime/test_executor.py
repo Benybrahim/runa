@@ -1,3 +1,4 @@
+import asyncio
 import threading
 import time
 
@@ -16,12 +17,13 @@ from runa.core import (
     RunStatus,
     ToolCall,
 )
+from runa.runtime.async_provider import AsyncRetryingProvider
 from runa.runtime.executor import Executor
-from runa.runtime.provider import RetryingProvider, StreamChunk
+from runa.runtime.provider import StreamChunk
 from runa.runtime.retry import RetryStrategy
 from runa.runtime.strategy import CallModel, Complete, Strategy
 from runa.tool import Tool
-from tests.fakes import FakeProvider, FakeStreamingProvider
+from tests.fakes import FakeAsyncProvider, FakeAsyncStreamingProvider
 
 
 class GetWeather(Tool):
@@ -35,7 +37,7 @@ class WeatherAgent(Agent):
 
 
 def test_executor_runs_a_full_tool_use_loop():
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -48,7 +50,7 @@ def test_executor_runs_a_full_tool_use_loop():
     agent = WeatherAgent()
     run = Run(input="What's the weather in Tokyo?")
 
-    result = executor.run(agent, run)
+    result = asyncio.run(executor.run(agent, run))
 
     assert result.status == RunStatus.COMPLETED
     assert result.result == "Tokyo is sunny."
@@ -78,7 +80,7 @@ def test_executor_runs_a_full_tool_use_loop():
 
 
 def test_executor_runs_every_tool_call_requested_in_a_single_turn():
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -94,7 +96,7 @@ def test_executor_runs_every_tool_call_requested_in_a_single_turn():
     agent = WeatherAgent()
     run = Run(input="What's the weather in Tokyo and Osaka?")
 
-    result = executor.run(agent, run)
+    result = asyncio.run(executor.run(agent, run))
 
     assert result.status == RunStatus.COMPLETED
     assert result.result == "Both are sunny."
@@ -116,7 +118,7 @@ def test_executor_runs_every_tool_call_requested_in_a_single_turn():
 
 
 def test_model_responded_event_carries_the_messages_usage():
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -125,52 +127,72 @@ def test_model_responded_event_carries_the_messages_usage():
             )
         ]
     )
-    executor = Executor(provider)
-    agent = WeatherAgent()
-    run = Run(input="hello")
-
-    result = executor.run(agent, run)
+    result = asyncio.run(Executor(provider).run(WeatherAgent(), Run(input="hello")))
 
     responded = next(e for e in result.events if e.type == EventType.MODEL_RESPONDED)
     assert responded.data["usage"] == {"input_tokens": 10, "output_tokens": 3}
 
 
 def test_model_responded_event_usage_is_none_when_the_provider_reports_none():
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
-    executor = Executor(provider)
-    agent = WeatherAgent()
-    run = Run(input="hello")
-
-    result = executor.run(agent, run)
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="hi")])
+    result = asyncio.run(Executor(provider).run(WeatherAgent(), Run(input="hello")))
 
     responded = next(e for e in result.events if e.type == EventType.MODEL_RESPONDED)
     assert responded.data["usage"] is None
 
 
 def test_executor_answers_directly_without_tools():
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[Message(role=Role.ASSISTANT, content="No tools needed.")]
     )
-    executor = Executor(provider)
-    agent = WeatherAgent()
-    run = Run(input="hello")
-
-    result = executor.run(agent, run)
+    result = asyncio.run(Executor(provider).run(WeatherAgent(), Run(input="hello")))
 
     assert result.status == RunStatus.COMPLETED
     assert result.result == "No tools needed."
     assert len(provider.calls) == 1
 
 
+def test_executor_records_an_artifact_a_tool_returns():
+    class ExtractData(Tool):
+        async def call(self) -> DataArtifact:
+            return DataArtifact(data={"score": 0.9})
+
+    class ExtractAgent(Agent):
+        tools = [ExtractData]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="ExtractData", arguments={})],
+            ),
+            Message(role=Role.ASSISTANT, content="Extracted the score."),
+        ]
+    )
+    run = asyncio.run(
+        Executor(provider).run(ExtractAgent(), Run(input="extract the score"))
+    )
+
+    assert run.status == RunStatus.COMPLETED
+    assert len(run.artifacts) == 1
+    artifact = run.artifacts[0]
+    assert isinstance(artifact, DataArtifact)
+    assert artifact.data == {"score": 0.9}
+
+    tool_message = next(m for m in run.messages if m.role == Role.TOOL)
+    assert tool_message.content == artifact.summary()
+    assert EventType.ARTIFACT_CREATED in [e.type for e in run.events]
+
+
 def test_tool_exception_fails_the_run():
     class BrokenTool(Tool):
-        def call(self) -> None:
+        async def call(self) -> None:
             raise RuntimeError("boom")
 
     class BrokenAgent(Agent):
         tools = [BrokenTool]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -178,10 +200,7 @@ def test_tool_exception_fails_the_run():
             )
         ]
     )
-    executor = Executor(provider)
-    run = Run(input="do the thing")
-
-    result = executor.run(BrokenAgent(), run)
+    result = asyncio.run(Executor(provider).run(BrokenAgent(), Run(input="x")))
 
     assert result.status == RunStatus.FAILED
     assert "boom" in result.events[-1].data["error"]
@@ -200,7 +219,7 @@ def test_a_hallucinated_tool_call_fails_the_run_with_a_clear_message():
     it was even about a tool call. This should name the problem and list
     what *is* declared, so `run.error`/`runa runs show` are actually useful.
     """
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -208,10 +227,7 @@ def test_a_hallucinated_tool_call_fails_the_run_with_a_clear_message():
             )
         ]
     )
-    executor = Executor(provider)
-    run = Run(input="do the thing")
-
-    result = executor.run(WeatherAgent(), run)
+    result = asyncio.run(Executor(provider).run(WeatherAgent(), Run(input="x")))
 
     assert result.status == RunStatus.FAILED
     assert "unknown tool 'Ghost'" in (result.error or "")
@@ -223,19 +239,16 @@ def test_a_transient_model_error_fails_the_run_with_no_retrying_provider():
         def __init__(self):
             self.attempts = 0
 
-        def complete(self, *, messages, tools, model):
+        async def complete(self, *, messages, tools, model):
             self.attempts += 1
             raise ConnectionError("rate limited")
 
     provider = FlakyProvider()
-    executor = Executor(provider)
-    run = Run(input="hello")
-
-    result = executor.run(WeatherAgent(), run)
+    result = asyncio.run(Executor(provider).run(WeatherAgent(), Run(input="hello")))
 
     assert result.status == RunStatus.FAILED
     assert "rate limited" in (result.error or "")
-    assert provider.attempts == 1  # no retry at all without RetryingProvider
+    assert provider.attempts == 1  # no retry at all without AsyncRetryingProvider
 
 
 def test_retrying_provider_rescues_a_run_from_a_transient_model_error():
@@ -243,18 +256,17 @@ def test_retrying_provider_rescues_a_run_from_a_transient_model_error():
         def __init__(self):
             self.attempts = 0
 
-        def complete(self, *, messages, tools, model):
+        async def complete(self, *, messages, tools, model):
             self.attempts += 1
             if self.attempts < 3:
                 raise ConnectionError("rate limited")
             return Message(role=Role.ASSISTANT, content="hi")
 
     inner = FlakyProvider()
-    provider = RetryingProvider(inner, max_retries=3, sleep=lambda s: None)
-    executor = Executor(provider)
-    run = Run(input="hello")
-
-    result = executor.run(WeatherAgent(), run)
+    provider = AsyncRetryingProvider(
+        inner, max_retries=3, sleep=lambda s: asyncio.sleep(0)
+    )
+    result = asyncio.run(Executor(provider).run(WeatherAgent(), Run(input="hello")))
 
     assert result.status == RunStatus.COMPLETED
     assert result.result == "hi"
@@ -266,7 +278,7 @@ def test_retry_strategy_retries_a_flaky_tool_before_succeeding():
         idempotent = True
         calls = 0
 
-        def call(self) -> str:
+        async def call(self) -> str:
             FlakyTool.calls += 1
             if FlakyTool.calls < 3:
                 raise RuntimeError("still flaky")
@@ -275,7 +287,7 @@ def test_retry_strategy_retries_a_flaky_tool_before_succeeding():
     class FlakyAgent(Agent):
         tools = [FlakyTool]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -285,9 +297,7 @@ def test_retry_strategy_retries_a_flaky_tool_before_succeeding():
         ]
     )
     executor = Executor(provider, strategy=RetryStrategy(max_retries=3))
-    run = Run(input="do the flaky thing")
-
-    result = executor.run(FlakyAgent(), run)
+    result = asyncio.run(executor.run(FlakyAgent(), Run(input="do the flaky thing")))
 
     assert result.status == RunStatus.COMPLETED
     assert result.result == "done"
@@ -301,13 +311,13 @@ def test_retry_strategy_fails_after_exhausting_retries():
     class AlwaysBroken(Tool):
         idempotent = True
 
-        def call(self) -> None:
+        async def call(self) -> None:
             raise RuntimeError("nope")
 
     class BrokenAgent(Agent):
         tools = [AlwaysBroken]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -316,9 +326,7 @@ def test_retry_strategy_fails_after_exhausting_retries():
         ]
     )
     executor = Executor(provider, strategy=RetryStrategy(max_retries=2))
-    run = Run(input="do the thing")
-
-    result = executor.run(BrokenAgent(), run)
+    result = asyncio.run(executor.run(BrokenAgent(), Run(input="do the thing")))
 
     assert result.status == RunStatus.FAILED
     assert "nope" in result.events[-1].data["error"]
@@ -329,14 +337,14 @@ def test_retry_strategy_does_not_retry_a_non_idempotent_tool():
     class ChargeCard(Tool):
         calls = 0
 
-        def call(self) -> None:
+        async def call(self) -> None:
             ChargeCard.calls += 1
             raise RuntimeError("gateway timeout")
 
     class BillingAgent(Agent):
         tools = [ChargeCard]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -345,9 +353,7 @@ def test_retry_strategy_does_not_retry_a_non_idempotent_tool():
         ]
     )
     executor = Executor(provider, strategy=RetryStrategy(max_retries=3))
-    run = Run(input="charge the customer")
-
-    result = executor.run(BillingAgent(), run)
+    result = asyncio.run(executor.run(BillingAgent(), Run(input="charge the customer")))
 
     assert result.status == RunStatus.FAILED
     assert "gateway timeout" in result.events[-1].data["error"]
@@ -361,13 +367,11 @@ def test_max_steps_fails_the_run_instead_of_looping_forever():
         def step(self, run):
             return CallModel()
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[Message(role=Role.ASSISTANT, content="ignored")] * 100
     )
     executor = Executor(provider, strategy=NeverEndingStrategy(), max_steps=3)
-    run = Run(input="loop forever")
-
-    result = executor.run(WeatherAgent(), run)
+    result = asyncio.run(executor.run(WeatherAgent(), Run(input="loop forever")))
 
     assert result.status == RunStatus.FAILED
     assert "max_steps" in result.events[-1].data["error"]
@@ -378,23 +382,21 @@ def test_timeout_fails_the_run_instead_of_hanging_forever():
         def step(self, run):
             return CallModel()
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[Message(role=Role.ASSISTANT, content="ignored")] * 100
     )
     executor = Executor(provider, strategy=NeverEndingStrategy(), timeout=0.0)
-    run = Run(input="loop forever")
-
-    result = executor.run(WeatherAgent(), run)
+    result = asyncio.run(executor.run(WeatherAgent(), Run(input="loop forever")))
 
     assert result.status == RunStatus.FAILED
     assert "timeout" in result.events[-1].data["error"]
 
 
 def test_timeout_does_not_interfere_with_a_normal_run():
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
     executor = Executor(provider, timeout=60)
 
-    result = executor.run(WeatherAgent(), Run(input="hi"))
+    result = asyncio.run(executor.run(WeatherAgent(), Run(input="hi")))
 
     assert result.status == RunStatus.COMPLETED
     assert result.result == "ok"
@@ -405,11 +407,8 @@ def test_cancel_requested_before_the_loop_starts_stops_the_run_immediately():
         def before_run(self, run):
             run.request_cancel()
 
-    provider = FakeProvider(responses=[])
-    executor = Executor(provider)
-    run = Run(input="hi")
-
-    result = executor.run(CancellingAgent(), run)
+    provider = FakeAsyncProvider(responses=[])
+    result = asyncio.run(Executor(provider).run(CancellingAgent(), Run(input="hi")))
 
     assert result.status == RunStatus.CANCELLED
     assert result.events[-1].type == EventType.RUN_CANCELLED
@@ -427,14 +426,12 @@ def test_cancel_requested_mid_loop_stops_the_run_at_the_next_checkpoint():
                 run.request_cancel()
             return CallModel()
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[Message(role=Role.ASSISTANT, content="ignored")] * 5
     )
     strategy = CancelOnSecondStep()
     executor = Executor(provider, strategy=strategy)
-    run = Run(input="hi")
-
-    result = executor.run(WeatherAgent(), run)
+    result = asyncio.run(executor.run(WeatherAgent(), Run(input="hi")))
 
     assert result.status == RunStatus.CANCELLED
     assert result.events[-1].type == EventType.RUN_CANCELLED
@@ -455,8 +452,8 @@ def test_agent_hooks_are_called_around_execution():
         def after_run(self, run):
             calls.append("after_run")
 
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
-    Executor(provider).run(HookedAgent(), Run(input="hi"))
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
+    asyncio.run(Executor(provider).run(HookedAgent(), Run(input="hi")))
 
     assert calls == ["before_run", "after_run"]
 
@@ -470,10 +467,10 @@ def test_a_bug_in_before_run_fails_the_run_instead_of_crashing_and_stranding_it(
         def before_run(self, run):
             raise RuntimeError("bug in before_run")
 
-    provider = FakeProvider(responses=[])
+    provider = FakeAsyncProvider(responses=[])
     run = Run(input="hi")
 
-    result = Executor(provider).run(BuggyAgent(), run)
+    result = asyncio.run(Executor(provider).run(BuggyAgent(), run))
 
     assert result.status == RunStatus.FAILED
     assert result.error == "bug in before_run"
@@ -490,10 +487,10 @@ def test_a_bug_while_seeding_the_run_fails_it_instead_of_stranding_it():
         def __str__(self):
             raise RuntimeError("bug while rendering input")
 
-    provider = FakeProvider(responses=[])
+    provider = FakeAsyncProvider(responses=[])
     run = Run(input=Unstringable())
 
-    result = Executor(provider).run(WeatherAgent(), run)
+    result = asyncio.run(Executor(provider).run(WeatherAgent(), run))
 
     assert result.status == RunStatus.FAILED
     assert "bug while rendering input" in (result.error or "")
@@ -511,10 +508,10 @@ def test_a_bug_in_after_run_does_not_crash_or_falsify_an_already_completed_run(
         def after_run(self, run):
             raise RuntimeError("bug in after_run")
 
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
     run = Run(input="hi")
 
-    result = Executor(provider).run(BuggyAgent(), run)
+    result = asyncio.run(Executor(provider).run(BuggyAgent(), run))
 
     assert result.status == RunStatus.COMPLETED
     assert result.result == "ok"
@@ -528,16 +525,16 @@ def test_running_an_already_terminal_run_again_is_a_no_op():
         def after_run(self, run):
             calls.append("after_run")
 
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
+    provider = FakeAsyncProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
     executor = Executor(provider)
     agent = HookedAgent()
     run = Run(input="hi")
 
-    executor.run(agent, run)
+    asyncio.run(executor.run(agent, run))
     assert calls == ["after_run"]
     assert len(provider.calls) == 1
 
-    result = executor.run(agent, run)
+    result = asyncio.run(executor.run(agent, run))
 
     assert result is run
     assert calls == ["after_run"]  # not called again
@@ -545,13 +542,13 @@ def test_running_an_already_terminal_run_again_is_a_no_op():
 
 
 def test_run_raises_when_another_executor_is_already_driving_it():
-    provider = FakeProvider(responses=[])
+    provider = FakeAsyncProvider(responses=[])
     executor = Executor(provider)
     run = Run(input="hi")
     run.begin_driving()  # simulate another Executor already in flight
     try:
         with pytest.raises(RunAlreadyDriving):
-            executor.run(WeatherAgent(), run)
+            asyncio.run(executor.run(WeatherAgent(), run))
     finally:
         run.end_driving()
 
@@ -570,9 +567,9 @@ def test_two_threads_driving_the_same_run_do_not_silently_corrupt_it():
         def __init__(self):
             self.calls = 0
 
-        def complete(self, *, messages, tools, model):
+        async def complete(self, *, messages, tools, model):
             self.calls += 1
-            time.sleep(0.1)
+            await asyncio.sleep(0.1)
             return Message(role=Role.ASSISTANT, content="done")
 
     provider = SlowProvider()
@@ -584,7 +581,7 @@ def test_two_threads_driving_the_same_run_do_not_silently_corrupt_it():
 
     def drive():
         try:
-            results.append(executor.run(agent, run))
+            results.append(asyncio.run(executor.run(agent, run)))
         except RunAlreadyDriving as exc:
             errors.append(exc)
 
@@ -613,13 +610,13 @@ def test_before_run_is_not_re_run_when_resuming_a_paused_run():
     class SendEmail(Tool):
         requires_approval = True
 
-        def call(self, to: str) -> str:
+        async def call(self, to: str) -> str:
             return f"sent to {to}"
 
     class SupportAgent(HookedAgent):
         tools = [SendEmail]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -632,9 +629,9 @@ def test_before_run_is_not_re_run_when_resuming_a_paused_run():
     agent = SupportAgent()
     run = Run(input="email someone")
 
-    executor.run(agent, run)
+    asyncio.run(executor.run(agent, run))
     approve(run, run.tool_calls[0].id)
-    executor.run(agent, run)
+    asyncio.run(executor.run(agent, run))
 
     assert calls == ["before_run"]
 
@@ -643,13 +640,13 @@ def test_gated_tool_call_pauses_the_run_for_approval():
     class SendEmail(Tool):
         requires_approval = True
 
-        def call(self, to: str) -> str:
+        async def call(self, to: str) -> str:
             return f"sent to {to}"
 
     class SupportAgent(Agent):
         tools = [SendEmail]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -657,10 +654,7 @@ def test_gated_tool_call_pauses_the_run_for_approval():
             )
         ]
     )
-    executor = Executor(provider)
-    run = Run(input="email someone")
-
-    result = executor.run(SupportAgent(), run)
+    result = asyncio.run(Executor(provider).run(SupportAgent(), Run(input="x")))
 
     assert result.status == RunStatus.AWAITING_APPROVAL
     assert len(provider.calls) == 1  # never got past the gate to call again
@@ -669,17 +663,52 @@ def test_gated_tool_call_pauses_the_run_for_approval():
     assert not pending.completed
 
 
+def test_runnable_siblings_execute_while_a_gated_call_blocks_the_batch():
+    class SendEmail(Tool):
+        requires_approval = True
+
+        async def call(self, to: str) -> str:
+            return f"sent to {to}"
+
+    class GetWeatherAsync(Tool):
+        async def call(self, city: str) -> str:
+            return f"{city}: sunny"
+
+    class MixedAgent(Agent):
+        tools = [SendEmail, GetWeatherAsync]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(name="SendEmail", arguments={"to": "a@b.com"}),
+                    ToolCall(name="GetWeatherAsync", arguments={"city": "Kyoto"}),
+                ],
+            )
+        ]
+    )
+    run = asyncio.run(Executor(provider).run(MixedAgent(), Run(input="x")))
+
+    assert run.status == RunStatus.AWAITING_APPROVAL
+    send_email_call = next(tc for tc in run.tool_calls if tc.name == "SendEmail")
+    weather_call = next(tc for tc in run.tool_calls if tc.name == "GetWeatherAsync")
+    assert not send_email_call.completed
+    assert weather_call.completed
+    assert weather_call.result == "Kyoto: sunny"
+
+
 def test_approving_a_gated_tool_call_lets_the_run_finish():
     class SendEmail(Tool):
         requires_approval = True
 
-        def call(self, to: str) -> str:
+        async def call(self, to: str) -> str:
             return f"sent to {to}"
 
     class SupportAgent(Agent):
         tools = [SendEmail]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -690,17 +719,63 @@ def test_approving_a_gated_tool_call_lets_the_run_finish():
     )
     executor = Executor(provider)
     agent = SupportAgent()
-    run = Run(input="email someone")
-
-    executor.run(agent, run)
+    run = asyncio.run(executor.run(agent, Run(input="email someone")))
     assert run.status == RunStatus.AWAITING_APPROVAL
 
     approve(run, run.tool_calls[0].id)
-    result = executor.run(agent, run)
+    result = asyncio.run(executor.run(agent, run))
 
     assert result.status == RunStatus.COMPLETED
     assert result.result == "Email sent."
     assert result.tool_calls[0].result == "sent to a@b.com"
+
+
+def test_approving_gated_calls_one_at_a_time_eventually_runs_them_all():
+    class SendEmail(Tool):
+        requires_approval = True
+
+        async def call(self, to: str) -> str:
+            return f"emailed {to}"
+
+    class SendSms(Tool):
+        requires_approval = True
+
+        async def call(self, to: str) -> str:
+            return f"texted {to}"
+
+    class SupportAgent(Agent):
+        tools = [SendEmail, SendSms]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(name="SendEmail", arguments={"to": "a@b.com"}),
+                    ToolCall(name="SendSms", arguments={"to": "555"}),
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="done"),
+        ]
+    )
+    executor = Executor(provider)
+    agent = SupportAgent()
+    run = asyncio.run(executor.run(agent, Run(input="notify someone")))
+    assert run.status == RunStatus.AWAITING_APPROVAL
+
+    email_call = next(tc for tc in run.tool_calls if tc.name == "SendEmail")
+    approve(run, email_call.id)
+    run = asyncio.run(executor.run(agent, run))
+    assert run.status == RunStatus.AWAITING_APPROVAL  # SendSms still gated
+
+    sms_call = next(tc for tc in run.tool_calls if tc.name == "SendSms")
+    approve(run, sms_call.id)
+    run = asyncio.run(executor.run(agent, run))
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.result == "done"
+    assert email_call.completed and email_call.result == "emailed a@b.com"
+    assert sms_call.completed and sms_call.result == "texted 555"
 
 
 def test_tool_returning_an_artifact_records_it_on_the_run():
@@ -711,7 +786,7 @@ def test_tool_returning_an_artifact_records_it_on_the_run():
     class ExtractAgent(Agent):
         tools = [ExtractData]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -720,10 +795,9 @@ def test_tool_returning_an_artifact_records_it_on_the_run():
             Message(role=Role.ASSISTANT, content="Extracted the score."),
         ]
     )
-    executor = Executor(provider)
-    run = Run(input="extract the score")
-
-    result = executor.run(ExtractAgent(), run)
+    result = asyncio.run(
+        Executor(provider).run(ExtractAgent(), Run(input="extract the score"))
+    )
 
     assert result.status == RunStatus.COMPLETED
     assert len(result.artifacts) == 1
@@ -738,13 +812,15 @@ def test_tool_returning_an_artifact_records_it_on_the_run():
 
 
 def test_on_chunk_receives_deltas_and_the_run_completes_normally():
-    provider = FakeStreamingProvider(
+    provider = FakeAsyncStreamingProvider(
         responses=[Message(role=Role.ASSISTANT, content="hi there")]
     )
     chunks: list[StreamChunk] = []
 
-    result = Executor(provider).run(
-        WeatherAgent(), Run(input="hello"), on_chunk=chunks.append
+    result = asyncio.run(
+        Executor(provider).run(
+            WeatherAgent(), Run(input="hello"), on_chunk=chunks.append
+        )
     )
 
     assert "".join(c.text for c in chunks) == "hi there"
@@ -753,7 +829,7 @@ def test_on_chunk_receives_deltas_and_the_run_completes_normally():
 
 
 def test_on_chunk_streams_every_model_call_in_a_tool_use_loop():
-    provider = FakeStreamingProvider(
+    provider = FakeAsyncStreamingProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -764,25 +840,45 @@ def test_on_chunk_streams_every_model_call_in_a_tool_use_loop():
     )
     chunks: list[StreamChunk] = []
 
-    result = Executor(provider).run(
-        WeatherAgent(), Run(input="weather in Tokyo?"), on_chunk=chunks.append
+    result = asyncio.run(
+        Executor(provider).run(
+            WeatherAgent(), Run(input="weather in Tokyo?"), on_chunk=chunks.append
+        )
     )
 
     assert "".join(c.text for c in chunks) == "Tokyo is sunny."
     assert result.result == "Tokyo is sunny."
 
 
+def test_on_chunk_accepts_an_async_callback():
+    provider = FakeAsyncStreamingProvider(
+        responses=[Message(role=Role.ASSISTANT, content="hi")]
+    )
+    chunks: list[StreamChunk] = []
+
+    async def on_chunk(chunk: StreamChunk) -> None:
+        await asyncio.sleep(0)
+        chunks.append(chunk)
+
+    result = asyncio.run(
+        Executor(provider).run(WeatherAgent(), Run(input="hi"), on_chunk=on_chunk)
+    )
+
+    assert "".join(c.text for c in chunks) == "hi"
+    assert result.result == "hi"
+
+
 def test_on_chunk_requires_a_streaming_capable_provider():
     # like any other exception raised while applying an action, this is
     # caught and turned into a failed Run rather than propagating.
-    provider = FakeProvider(responses=[])
+    provider = FakeAsyncProvider(responses=[])
 
-    result = Executor(provider).run(
-        WeatherAgent(), Run(input="hi"), on_chunk=lambda c: None
+    result = asyncio.run(
+        Executor(provider).run(WeatherAgent(), Run(input="hi"), on_chunk=lambda c: None)
     )
 
     assert result.status == RunStatus.FAILED
-    assert "StreamingProvider" in result.events[-1].data["error"]
+    assert "AsyncStreamingProvider" in result.events[-1].data["error"]
 
 
 def test_strategy_protocol_is_satisfiable_without_inheritance():
@@ -791,8 +887,10 @@ def test_strategy_protocol_is_satisfiable_without_inheritance():
             return Complete(result="done")
 
     strategy: Strategy = AlwaysComplete()
-    provider = FakeProvider(responses=[])
-    result = Executor(provider, strategy=strategy).run(WeatherAgent(), Run(input="x"))
+    provider = FakeAsyncProvider(responses=[])
+    result = asyncio.run(
+        Executor(provider, strategy=strategy).run(WeatherAgent(), Run(input="x"))
+    )
 
     assert result.status == RunStatus.COMPLETED
     assert result.result == "done"
@@ -814,7 +912,7 @@ def test_parent_run_aware_tool_is_bound_before_it_is_called():
     class RecordingAgent(Agent):
         tools = [recorder]
 
-    provider = FakeProvider(
+    provider = FakeAsyncProvider(
         responses=[
             Message(
                 role=Role.ASSISTANT,
@@ -825,7 +923,98 @@ def test_parent_run_aware_tool_is_bound_before_it_is_called():
     )
     run = Run(input="x")
 
-    result = Executor(provider).run(RecordingAgent(), run)
+    result = asyncio.run(Executor(provider).run(RecordingAgent(), run))
 
     assert result.status == RunStatus.COMPLETED
     assert recorder.seen_parent_run_id == run.id
+
+
+def test_independent_tool_calls_run_concurrently():
+    class SlowToolA(Tool):
+        async def call(self) -> str:
+            await asyncio.sleep(0.2)
+            return "a done"
+
+    class SlowToolB(Tool):
+        async def call(self) -> str:
+            await asyncio.sleep(0.2)
+            return "b done"
+
+    class FanOutAgent(Agent):
+        tools = [SlowToolA, SlowToolB]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(name="SlowToolA", arguments={}),
+                    ToolCall(name="SlowToolB", arguments={}),
+                ],
+            ),
+            Message(role=Role.ASSISTANT, content="both done"),
+        ]
+    )
+    executor = Executor(provider)
+
+    start = time.monotonic()
+    run = asyncio.run(executor.run(FanOutAgent(), Run(input="do both")))
+    elapsed = time.monotonic() - start
+
+    assert run.status == RunStatus.COMPLETED
+    # sequential execution would take >= 0.4s; concurrent stays close to 0.2s
+    assert elapsed < 0.35, f"tool calls did not run concurrently (took {elapsed}s)"
+
+
+def test_sync_tool_runs_via_to_thread_under_executor():
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[ToolCall(name="GetWeather", arguments={"city": "Osaka"})],
+            ),
+            Message(role=Role.ASSISTANT, content="Osaka is sunny."),
+        ]
+    )
+    run = asyncio.run(Executor(provider).run(WeatherAgent(), Run(input="x")))
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.tool_calls[0].result == "Osaka: sunny"
+
+
+def test_transfer_alongside_sibling_tool_calls_fails_the_run():
+    """A transfer=true delegation can't compose with concurrent siblings from
+    the same turn (see `Executor._call_tools`'s docstring): whichever
+    agent's tools the siblings belong to becomes ambiguous once control has
+    moved, so the run fails with a clear error instead of running anything.
+    """
+
+    class SupportAgent(Agent):
+        pass
+
+    class GetWeatherAsync(Tool):
+        async def call(self, city: str) -> str:
+            return f"{city}: sunny"
+
+    class TriageAgent(Agent):
+        tools = [GetWeatherAsync]
+        delegations = [SupportAgent]
+
+    provider = FakeAsyncProvider(
+        responses=[
+            Message(
+                role=Role.ASSISTANT,
+                tool_calls=[
+                    ToolCall(
+                        name="SupportAgent",
+                        arguments={"input": "x", "transfer": True},
+                    ),
+                    ToolCall(name="GetWeatherAsync", arguments={"city": "Kyoto"}),
+                ],
+            )
+        ]
+    )
+    run = asyncio.run(Executor(provider).run(TriageAgent(), Run(input="x")))
+
+    assert run.status == RunStatus.FAILED
+    assert "transfer" in (run.error or "")

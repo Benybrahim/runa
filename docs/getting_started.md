@@ -153,15 +153,23 @@ Open `main.py`. It already contains:
 ```python
 from runa import configure
 from runa.persistence import SQLiteRunStore
-from runa.providers import OpenAIProvider
+from runa.providers import AsyncOpenAIProvider, OpenAIProvider
 
-configure(provider=OpenAIProvider(), run_store=SQLiteRunStore("runa.db"))
+configure(
+    provider=OpenAIProvider(),
+    async_provider=AsyncOpenAIProvider(),
+    run_store=SQLiteRunStore("runa.db"),
+)
 ```
 
 `configure()` sets up the default `Application` (`runa.application`)
-that every Agent resolves its provider from. `OpenAIProvider()` reads
-`OPENAI_API_KEY` from the environment; swap it for
-`AnthropicProvider()` from `runa.providers` if you're using Claude
+that every Agent resolves its provider from. `async_provider` is what
+`Agent.run()`/`.run_sync()`/`.run_stream()`/`.run_later()` actually
+drive, Runa's execution model is async under the hood even when you
+call it synchronously (see [§11](#11-running-in-the-background)).
+`OpenAIProvider()`/`AsyncOpenAIProvider()` read `OPENAI_API_KEY` from
+the environment; swap them for `AnthropicProvider()`/
+`AsyncAnthropicProvider()` from `runa.providers` if you're using Claude
 instead, nothing else in this guide changes.
 
 `SQLiteRunStore("runa.db")` is what lets `runa runs show` find a Run
@@ -202,7 +210,7 @@ class WeatherAgent(Agent):
 
 
 if __name__ == "__main__":
-    run = WeatherAgent.run("What's the weather in Tokyo?")
+    run = WeatherAgent.run_sync("What's the weather in Tokyo?")
     print(run.result)
 ```
 
@@ -214,7 +222,7 @@ Tokyo is sunny and 22°C.
 ```
 
 Four lines of application code, an instruction string, a tool, a class,
-a call to `.run()`, and you already have a working Agent that decides
+a call to `.run_sync()`, and you already have a working Agent that decides
 when to use a tool and reports back. Nothing about this required a
 graph, a orchestration DSL, or a custom execution loop.
 
@@ -226,8 +234,8 @@ properly, under `app/`, where it belongs.
 
 ## 6. Agent, Tool, Run: The Trio Behind "Hello"
 
-`WeatherAgent.run(...)` did three distinct things, and it's worth naming
-them before building something real:
+`WeatherAgent.run_sync(...)` did three distinct things, and it's worth
+naming them before building something real:
 
 ```text
 Agent   → declares behavior:      "answer weather questions, using this tool"
@@ -256,7 +264,7 @@ class WebSearch(Tool):
 
 Both forms are interchangeable in `tools = [...]`.
 
-**The Run** is what `.run(...)` returns. It's not just the model's final
+**The Run** is what `.run_sync(...)` returns. It's not just the model's final
 answer, it's the full record of that invocation: input, state, every
 event that happened along the way, and the result. You already used one
 field of it, `run.result`; [§9](#9-seeing-what-happened) uses the rest.
@@ -375,7 +383,7 @@ ticket #4471 so billing can correct the $12 difference on your account.
 `runa run <Agent> <input>` matches `Support` against `SupportAgent`
 (the `Agent` suffix is optional, following the same convention
 `runa generate agent` uses) and is equivalent to importing it into
-`main.py` and calling `SupportAgent.run(...)` directly, the CLI's
+`main.py` and calling `SupportAgent.run_sync(...)` directly, the CLI's
 version additionally saves the Run to the store configured in
 [§4](#4-configuring-the-application), which is what makes
 [§9](#9-seeing-what-happened) work without any extra code.
@@ -384,7 +392,7 @@ version additionally saves the Run to the store configured in
 
 ## 8. Giving the Agent a Memory
 
-Right now, every call to `SupportAgent.run(...)` starts from nothing. A
+Right now, every call to `SupportAgent.run_sync(...)` starts from nothing. A
 real support interaction is rarely one message, the customer follows up,
 and the Agent needs to remember what was already said.
 
@@ -395,12 +403,12 @@ from runa import Conversation
 
 conversation = Conversation()
 
-run1 = SupportAgent.run(
+run1 = SupportAgent.run_sync(
     "My invoice is wrong.",
     conversation=conversation,
 )
 
-run2 = SupportAgent.run(
+run2 = SupportAgent.run_sync(
     "What should I do next?",
     conversation=conversation,
 )
@@ -449,7 +457,7 @@ In-process, this is always available, with no setup:
 ```python
 from runa.observability import timeline
 
-run = SupportAgent.run("My invoice is wrong.")
+run = SupportAgent.run_sync("My invoice is wrong.")
 for entry in timeline(run):
     print(entry.timestamp, entry.summary)
 ```
@@ -482,14 +490,14 @@ $ runa runs list --status failed --agent-name SupportAgent
 no runs found
 ```
 
-If you call `SupportAgent.run(...)` directly instead of going through
+If you call `SupportAgent.run_sync(...)` directly instead of going through
 `runa run` (as in a script, or a web handler), save it yourself when you
 want this available later:
 
 ```python
 from runa import application
 
-run = SupportAgent.run("My invoice is wrong.")
+run = SupportAgent.run_sync("My invoice is wrong.")
 application.run_store.save(run)
 ```
 
@@ -577,10 +585,10 @@ does not imply authority.**
 
 ## 11. Running in the Background
 
-Everything so far has run synchronously, `.run(...)` blocks until the
-Agent finishes. Some work (a long research task, a report) shouldn't
-hold up the caller. Runa doesn't introduce a separate job system for
-this; it's the same Run, advanced differently:
+Everything so far has run synchronously, `.run_sync(...)` blocks until
+the Agent finishes. Some work (a long research task, a report)
+shouldn't hold up the caller. Runa doesn't introduce a separate job
+system for this; it's the same Run, advanced differently:
 
 ```python
 run = SupportAgent.run_later("Draft a detailed billing summary for the last quarter.")
@@ -592,13 +600,20 @@ automatically once before dispatch and again at its next pause point
 (completion, failure, or an approval gate), so `runa runs show <id>`
 reflects what actually happened, no extra wiring required.
 
-Three ways to advance the same kind of Run:
+Four ways to advance the same kind of Run, one Execution observed
+differently, not four behaviors:
 
 ```text
-agent.run(...)         caller blocks until the Run finishes
-agent.run_async(...)   caller awaits the Run; I/O runs concurrently
-agent.run_later(...)   caller gets the Run immediately; a Queue advances it
+agent.run(...)         → the native async path: caller awaits the Run
+agent.run_sync(...)    → a synchronous adapter over run(): caller blocks until the Run finishes
+agent.run_stream(...)  → execute now, streaming: caller iterates output as it arrives
+agent.run_later(...)   → enqueue for later: caller gets the Run immediately; a Queue advances it
 ```
+
+Everything in this guide so far used `run_sync()`, the natural choice
+from ordinary synchronous code (a script, a sync web view, a REPL).
+Reach for `await agent.run(...)` directly once your own code is already
+async, `run_sync()` can't be called from inside a running event loop.
 
 If the process can crash mid-Run and losing that progress is
 unacceptable, use a `DurableQueue` (`SQLiteQueue`) instead of the
@@ -638,7 +653,7 @@ from app.agents.support_agent import SupportAgent
 
 
 def test_support_agent_completes():
-    run = SupportAgent.run("My invoice is wrong.")
+    run = SupportAgent.run_sync("My invoice is wrong.")
     assert run.completed
 ```
 

@@ -1,12 +1,13 @@
 """parallel_delegate.py: two sub-agents delegated to concurrently (manifesto §6).
 
 `AsyncDelegateAgent` is the concurrency-capable delegation for
-`Agent.delegations`: it runs the sub-agent through AsyncExecutor instead of a
-thread, so when a model turn requests both sub-agents at once, AsyncExecutor's
-existing concurrent tool-call batching (see AsyncExecutor's docstring) runs
-them as genuine concurrent async I/O rather than one network call at a time.
-A bare class in `delegations` (e.g. `delegations = [WeatherAgent]`) still
-works under AsyncExecutor, just via a thread per delegate instead.
+`Agent.delegations`: it awaits its Executor directly instead of wrapping it
+with `asyncio.run()` on a thread, so when a model turn requests both
+sub-agents at once, Executor's existing concurrent tool-call batching (see
+Executor's docstring) runs them as genuine concurrent async I/O rather than
+one network call at a time. A bare class in `delegations` (e.g.
+`delegations = [WeatherAgent]`) still works, just via `DelegateAgent`'s
+`asyncio.run()`-per-thread path instead.
 
 Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/parallel_delegate.py
@@ -44,5 +45,5 @@ class BriefingAgent(Agent):
 if __name__ == "__main__":
     configure(provider=OpenAIProvider(), async_provider=AsyncOpenAIProvider())
 
-    run = asyncio.run(BriefingAgent.run_async("Tokyo"))
+    run = asyncio.run(BriefingAgent.run("Tokyo"))
     print(run.result)

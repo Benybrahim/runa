@@ -12,8 +12,11 @@ Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/eval.py
 """
 
+import asyncio
+
 from runa import (
     Agent,
+    AsyncOpenAIProvider,
     EvalCase,
     Executor,
     Judge,
@@ -57,9 +60,9 @@ cases = [
 
 
 if __name__ == "__main__":
-    executor = Executor(provider=provider)
+    executor = Executor(provider=AsyncOpenAIProvider())
     agent = WeatherAgent()
 
-    for result in run_evals(agent, executor, cases):
+    for result in asyncio.run(run_evals(agent, executor, cases)):
         status = "PASS" if result.passed else f"FAIL: {result.error}"
         print(f"{result.case.name}: {status}")

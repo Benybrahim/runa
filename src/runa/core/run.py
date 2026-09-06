@@ -13,8 +13,9 @@ from runa.core.message import Message, ToolCall
 from runa.core.state import RunState
 
 if TYPE_CHECKING:
-    # Only Executor._seed reads Run.conversation, and Conversation.record
-    # takes a Run; an unconditional import here would cycle.
+    # Only Executor's seed_run reads Run.conversation, and
+    # Conversation.record takes a Run; an unconditional import here
+    # would cycle.
     from runa.core.conversation import Conversation
 
 
@@ -88,7 +89,7 @@ class Run:
 
     def begin_driving(self) -> None:
         """Claim exclusive execution of this Run object. Called by
-        Executor/AsyncExecutor at the start of `run()`.
+        `Executor` at the start of `run()`.
 
         A Run has no concurrency control of its own over `add_message`/
         `emit`/status transitions: two Executors advancing the same Run

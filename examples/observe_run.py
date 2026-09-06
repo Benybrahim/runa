@@ -9,7 +9,17 @@ Requires OPENAI_API_KEY in the environment.
 Run with: uv run python examples/observe_run.py
 """
 
-from runa import Agent, Executor, OpenAIProvider, Run, configure, tool
+import asyncio
+
+from runa import (
+    Agent,
+    AsyncOpenAIProvider,
+    Executor,
+    OpenAIProvider,
+    Run,
+    configure,
+    tool,
+)
 from runa.observability import instrument, timeline
 
 
@@ -24,12 +34,12 @@ class WeatherAgent(Agent):
 
 
 if __name__ == "__main__":
-    configure(provider=OpenAIProvider())
+    configure(provider=OpenAIProvider(), async_provider=AsyncOpenAIProvider())
 
     print("--- live, as events happen ---")
     run = Run(input="What's the weather in Tokyo?")
     instrument(run, lambda event: print(f"  {event.type.value}"))
-    Executor(OpenAIProvider()).run(WeatherAgent(), run)
+    asyncio.run(Executor(AsyncOpenAIProvider()).run(WeatherAgent(), run))
 
     print("\n--- after the fact, from the recorded timeline ---")
     for entry in timeline(run):

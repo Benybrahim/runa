@@ -64,7 +64,7 @@ def last_assistant_message(run: Run) -> Message | None:
     `run.messages[-1]` directly would see a TOOL message where an ASSISTANT
     one was expected and wrongly conclude the turn has no pending work left,
     calling the model again mid-turn and silently abandoning the rest of the
-    batch (`AsyncExecutor._call_tools` makes the same lookup, for the same
+    batch (`Executor._call_tools` makes the same lookup, for the same
     reason).
     """
     return next((m for m in reversed(run.messages) if m.role == Role.ASSISTANT), None)

@@ -1,8 +1,7 @@
-"""Logic shared between the sync and async Executors.
+"""Logic shared by `Executor` (see `runtime/executor.py`).
 
 `seed_run` and `tool_schemas` don't touch any Executor instance state, so
-both `Executor` and `AsyncExecutor` call these instead of each defining
-their own copy.
+they live here rather than as methods on the class.
 """
 
 from typing import TYPE_CHECKING, Any
@@ -21,7 +20,7 @@ def seed_run(agent: "Agent", run: Run) -> None:
     # an escape hatch, and a sub-agent's own Run under delegation.
     run.agent_name = agent.agent_name()
     # `agent_name` stays "who this Run was originally given to"; a Transfer
-    # delegation (see Executor._transfer) only ever updates this field, not
+    # delegation (see transfer_agent) only ever updates this field, not
     # agent_name, so provenance and "who's currently driving" stay distinct.
     run.active_agent_name = agent.agent_name()
     run.agent_version = agent.version
@@ -48,7 +47,7 @@ def transfer_agent(
 ) -> "Agent":
     """Hand control of `run` to the Agent `tool` wraps (a transfer=true call).
 
-    Shared by `Executor`/`AsyncExecutor`'s `_call_tool`. Unlike a Return
+    Shared by `Executor`'s `_call_tool`/`_call_tools`. Unlike a Return
     delegation, this doesn't create a nested Run: `run` itself keeps going,
     driven by a fresh instance of the delegated Agent from here on. The tool
     call still gets a normal TOOL-role result message (every tool call needs

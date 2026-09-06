@@ -1,9 +1,10 @@
-"""Runs the example scripts' Agent/logic against a FakeProvider.
+"""Runs the example scripts' Agent/logic against a FakeAsyncProvider.
 
 Examples themselves call a live provider (see their docstrings), so these
 tests import each script as a module (its `if __name__ == "__main__":` block
 never executes on import) and drive the same Agent classes through
-Executor/FakeProvider, to catch example rot without spending API credits.
+Executor/FakeAsyncProvider, to catch example rot without spending API
+credits.
 """
 
 import asyncio
@@ -16,7 +17,11 @@ import pytest
 from runa import Executor, Judge, Run, RunStatus, approve, configure, run_evals
 from runa.application import application
 from runa.core import Message, Role, ToolCall
-from tests.fakes import FakeAsyncProvider, FakeProvider, FakeStreamingProvider
+from tests.fakes import (
+    FakeAsyncProvider,
+    FakeAsyncStreamingProvider,
+    FakeProvider,
+)
 
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 
@@ -32,11 +37,12 @@ def _load(name: str) -> Any:
 @pytest.fixture(autouse=True)
 def _reset_default_provider(monkeypatch):
     monkeypatch.setattr(application.config, "provider", None)
+    monkeypatch.setattr(application.config, "async_provider", None)
 
 
 def test_hello_example():
     hello = _load("hello")
-    fake = FakeProvider(
+    fake = FakeAsyncProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -45,9 +51,9 @@ def test_hello_example():
             Message(role=Role.ASSISTANT, content="It's sunny in Tokyo."),
         ]
     )
-    configure(provider=fake)
+    configure(async_provider=fake)
 
-    run = hello.WeatherAgent.run("What's the weather in Tokyo?")
+    run = hello.WeatherAgent.run_sync("What's the weather in Tokyo?")
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "It's sunny in Tokyo."
@@ -55,7 +61,7 @@ def test_hello_example():
 
 def test_hello_anthropic_example():
     hello_anthropic = _load("hello_anthropic")
-    fake = FakeProvider(
+    fake = FakeAsyncProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -64,9 +70,9 @@ def test_hello_anthropic_example():
             Message(role=Role.ASSISTANT, content="It's sunny in Tokyo."),
         ]
     )
-    configure(provider=fake)
+    configure(async_provider=fake)
 
-    run = hello_anthropic.WeatherAgent.run("What's the weather in Tokyo?")
+    run = hello_anthropic.WeatherAgent.run_sync("What's the weather in Tokyo?")
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "It's sunny in Tokyo."
@@ -74,19 +80,19 @@ def test_hello_anthropic_example():
 
 def test_conversation_example():
     conversation_example = _load("conversation")
-    fake = FakeProvider(
+    fake = FakeAsyncProvider(
         [
             Message(role=Role.ASSISTANT, content="I'm sorry to hear that."),
             Message(role=Role.ASSISTANT, content="It was A123."),
         ]
     )
-    configure(provider=fake)
+    configure(async_provider=fake)
 
     conversation = conversation_example.Conversation()
-    first = conversation_example.SupportAgent.run(
+    first = conversation_example.SupportAgent.run_sync(
         "My order #A123 hasn't arrived.", conversation=conversation
     )
-    second = conversation_example.SupportAgent.run(
+    second = conversation_example.SupportAgent.run_sync(
         "What was that order number again?", conversation=conversation
     )
 
@@ -104,7 +110,7 @@ def test_conversation_example():
 
 def test_background_example():
     background = _load("background")
-    fake = FakeProvider(
+    fake = FakeAsyncProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -113,7 +119,7 @@ def test_background_example():
             Message(role=Role.ASSISTANT, content="It's sunny in Kyoto."),
         ]
     )
-    configure(provider=fake)
+    configure(async_provider=fake)
 
     run = background.WeatherAgent.run_later("What's the weather in Kyoto?")
 
@@ -123,7 +129,7 @@ def test_background_example():
 
 def test_approval_example():
     approval = _load("approval")
-    fake = FakeProvider(
+    fake = FakeAsyncProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -140,12 +146,12 @@ def test_approval_example():
     executor = Executor(provider=fake)
     agent = approval.SupportAgent()
 
-    run = executor.run(agent, Run(input="Refund order A123 for $42."))
+    run = asyncio.run(executor.run(agent, Run(input="Refund order A123 for $42.")))
     assert run.status == RunStatus.AWAITING_APPROVAL
 
     pending = next(tc for tc in run.tool_calls if not tc.completed)
     approve(run, pending.id)
-    run = executor.run(agent, run)
+    run = asyncio.run(executor.run(agent, run))
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "Refunded order A123."
@@ -156,7 +162,7 @@ def test_eval_example(monkeypatch):
     # present at import time, even though it's swapped for a fake below.
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     eval_example = _load("eval")
-    fake = FakeProvider(
+    fake = FakeAsyncProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -175,7 +181,7 @@ def test_eval_example(monkeypatch):
         FakeProvider([Message(role=Role.ASSISTANT, content="PASS")])
     )
 
-    results = run_evals(agent, executor, eval_example.cases)
+    results = asyncio.run(run_evals(agent, executor, eval_example.cases))
 
     assert all(result.passed for result in results), [
         (r.case.name, r.error) for r in results if not r.passed
@@ -184,7 +190,7 @@ def test_eval_example(monkeypatch):
 
 def test_streaming_example():
     streaming = _load("streaming")
-    provider = FakeStreamingProvider(
+    provider = FakeAsyncStreamingProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -195,10 +201,12 @@ def test_streaming_example():
     )
     seen: list[str] = []
 
-    run = Executor(provider).run(
-        streaming.WeatherAgent(),
-        Run(input="What's the weather in Tokyo?"),
-        on_chunk=lambda chunk: seen.append(chunk.text),
+    run = asyncio.run(
+        Executor(provider).run(
+            streaming.WeatherAgent(),
+            Run(input="What's the weather in Tokyo?"),
+            on_chunk=lambda chunk: seen.append(chunk.text),
+        )
     )
 
     assert run.status == RunStatus.COMPLETED
@@ -208,7 +216,7 @@ def test_streaming_example():
 
 def test_delegate_example():
     delegate = _load("delegate")
-    fake = FakeProvider(
+    fake = FakeAsyncProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -223,9 +231,9 @@ def test_delegate_example():
             Message(role=Role.ASSISTANT, content="Fusion is making progress."),
         ]
     )
-    configure(provider=fake)
+    configure(async_provider=fake)
 
-    run = delegate.LeadAgent.run("What's promising about fusion energy?")
+    run = delegate.LeadAgent.run_sync("What's promising about fusion energy?")
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "Fusion is making progress."
@@ -233,7 +241,7 @@ def test_delegate_example():
 
 def test_transfer_delegate_example():
     transfer_delegate = _load("transfer_delegate")
-    fake = FakeProvider(
+    fake = FakeAsyncProvider(
         [
             Message(
                 role=Role.ASSISTANT,
@@ -253,9 +261,9 @@ def test_transfer_delegate_example():
             ),
         ]
     )
-    configure(provider=fake)
+    configure(async_provider=fake)
 
-    run = transfer_delegate.TriageAgent.run(
+    run = transfer_delegate.TriageAgent.run_sync(
         "I was charged twice for my subscription this month."
     )
 
@@ -281,9 +289,9 @@ def test_parallel_delegate_example():
             Message(role=Role.ASSISTANT, content="Sunny and 22C; the local team won."),
         ]
     )
-    configure(provider=FakeProvider([]), async_provider=fake)
+    configure(async_provider=fake)
 
-    run = asyncio.run(parallel_delegate.BriefingAgent.run_async("Tokyo"))
+    run = asyncio.run(parallel_delegate.BriefingAgent.run("Tokyo"))
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "Sunny and 22C; the local team won."

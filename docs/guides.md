@@ -73,7 +73,7 @@ class ResearchAgent(Agent):
 Give it a Run:
 
 ```python
-run = ResearchAgent.run("What's the capital of France?")
+run = ResearchAgent.run_sync("What's the capital of France?")
 ```
 
 That's a complete Agent. Everything else in this document extends it: tools,
@@ -191,12 +191,12 @@ Create a Conversation when multiple Runs belong to the same interaction:
 ```python
 conversation = Conversation()
 
-SupportAgent.run(
+SupportAgent.run_sync(
     "My invoice is wrong.",
     conversation=conversation,
 )
 
-SupportAgent.run(
+SupportAgent.run_sync(
     "Can you explain the correction?",
     conversation=conversation,
 )
@@ -207,7 +207,7 @@ Conversation state survives across these executions.
 Run state does not.
 
 Only sequence Runs against a shared Conversation this way: finish one (including
-the `record()` that happens at the end of `.run()`) before starting the next.
+the `record()` that happens at the end of `run()`) before starting the next.
 Two Runs launched concurrently against the same Conversation (e.g. via
 `run_later()` on a `ThreadQueue`) are not merged: each seeds its history from
 the Conversation as it stood when that Run started, and whichever finishes
@@ -244,7 +244,7 @@ from runa.persistence import SQLiteConversationStore
 conversation_store = SQLiteConversationStore("conversations.db")
 conversation = Conversation()
 
-SupportAgent.run("My invoice is wrong.", conversation=conversation)
+SupportAgent.run_sync("My invoice is wrong.", conversation=conversation)
 conversation_store.save(conversation)
 ```
 
@@ -253,7 +253,7 @@ Look it up again, in a later process, by the id you saved:
 ```python
 conversation = conversation_store.get(conversation_id)  # conversation.id, saved earlier
 
-SupportAgent.run(
+SupportAgent.run_sync(
     "Can you explain the correction?",
     conversation=conversation,
 )
@@ -281,7 +281,7 @@ run = ResearchAgent.run_later("Produce a detailed report.")
 
 The returned object represents the same conceptual unit of work as `run()`.
 
-For durable background execution, configure a persistent Run store and an appropriate Queue: `configure(provider=..., run_store=SQLiteRunStore(...))`. `run_later()` saves the Run there itself when queuing onto a `DurableQueue`, once before dispatch (so recovery has something to find after a crash) and again once the Run reaches its next pause point (completion, failure, or an approval gate), so `runa runs show <id>` reflects what actually happened instead of the Run's last-queued status. No extra wiring needed beyond `configure()`.
+For durable background execution, configure a persistent Run store and an appropriate Queue: `configure(async_provider=..., run_store=SQLiteRunStore(...))` (`run_later()` resolves its default `Executor` from `async_provider`, the same as `run()`/`run_sync()`/`run_stream()`). `run_later()` saves the Run there itself when queuing onto a `DurableQueue`, once before dispatch (so recovery has something to find after a crash) and again once the Run reaches its next pause point (completion, failure, or an approval gate), so `runa runs show <id>` reflects what actually happened instead of the Run's last-queued status. No extra wiring needed beyond `configure()`.
 
 Do not create a separate “job object” in application code just because execution happens later.
 
@@ -349,7 +349,7 @@ In-process, the timeline is always available, on any Run, with no setup:
 ```python
 from runa.observability import timeline
 
-run = ResearchAgent.run("...")
+run = ResearchAgent.run_sync("...")
 for entry in timeline(run):
     print(entry.timestamp, entry.summary)
 ```
@@ -358,7 +358,7 @@ The CLI reads the same information back from a `RunStore` instead, so it
 only sees Runs that were actually saved there: `run_later()` saves
 automatically, but only when given a `DurableQueue` (see "Running in the
 Background" above; that's what lets `runa runs show` follow background
-work after a crash). A plain synchronous `Agent.run()`, and `run_later()`
+work after a crash). A plain `Agent.run_sync()`, and `run_later()`
 on the default `InlineQueue`, save nothing, on purpose (persistence stays
 outside the core execution primitive). Save one explicitly if you want to
 inspect it later from the CLI instead of in-process:
@@ -366,7 +366,7 @@ inspect it later from the CLI instead of in-process:
 ```python
 from runa import application
 
-run = ResearchAgent.run("...")
+run = ResearchAgent.run_sync("...")
 application.run_store.save(run)
 ```
 
@@ -408,7 +408,7 @@ Use ordinary tests for deterministic application invariants:
 
 ```python
 def test_research_completes():
-    run = ResearchAgent.run("Research fusion energy.")
+    run = ResearchAgent.run_sync("Research fusion energy.")
     assert run.completed
 ```
 
@@ -555,7 +555,7 @@ be cancelled by requesting it, not by mutating the Run directly:
 run.request_cancel()
 ```
 
-The owning `Executor`/`AsyncExecutor` checks this once per step and performs
+The owning `Executor` checks this once per step and performs
 the actual cancellation itself, at the next step boundary. Calling
 `run.cancel()` directly from a different thread than the one driving the Run
 races that loop and can raise `IllegalTransition`.
@@ -652,14 +652,14 @@ A retry should not accidentally duplicate a side effect.
 
 `RetryStrategy` covers tool calls, not the model call itself. A rate limit,
 timeout, or dropped connection from the model API fails the whole Run
-immediately unless the Provider is wrapped in `RetryingProvider` (or
-`AsyncRetryingProvider` for `run_async()`):
+immediately unless the AsyncProvider `Executor` actually drives is wrapped
+in `AsyncRetryingProvider`:
 
 ```python
-from runa import configure, RetryingProvider
-from runa.providers import AnthropicProvider
+from runa import configure, AsyncRetryingProvider
+from runa.providers import AsyncAnthropicProvider
 
-configure(provider=RetryingProvider(AnthropicProvider(), max_retries=3))
+configure(async_provider=AsyncRetryingProvider(AsyncAnthropicProvider(), max_retries=3))
 ```
 
 This is safe by construction, not just by convention: `Executor._call_model`
@@ -675,8 +675,8 @@ rate-limit or connection-error types), pass `is_retryable`:
 import anthropic
 
 configure(
-    provider=RetryingProvider(
-        AnthropicProvider(),
+    async_provider=AsyncRetryingProvider(
+        AsyncAnthropicProvider(),
         is_retryable=lambda exc: isinstance(
             exc, anthropic.RateLimitError | anthropic.APIConnectionError
         ),
@@ -684,10 +684,14 @@ configure(
 )
 ```
 
-Only `complete()` is retried: a `RetryingProvider` wrapping a streaming
-Provider no longer satisfies `StreamingProvider`, since a partially
-delivered stream can't be safely restarted once some chunks have already
-reached `on_chunk`.
+Only `complete()` is retried: an `AsyncRetryingProvider` wrapping a
+streaming Provider no longer satisfies `AsyncStreamingProvider`, since a
+partially delivered stream can't be safely restarted once some chunks have
+already reached `on_chunk`.
+
+`RetryingProvider` is the synchronous counterpart, for direct Provider use
+outside an Agent's own Execution, e.g. wrapping the Provider a `Judge`
+grades with.
 
 ---
 

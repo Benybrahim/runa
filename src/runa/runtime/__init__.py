@@ -1,6 +1,5 @@
 """Runtime: the execution loop that drives an Agent through a Run."""
 
-from runa.runtime.async_executor import AsyncExecutor
 from runa.runtime.async_provider import (
     AsyncProvider,
     AsyncRetryingProvider,
@@ -28,7 +27,6 @@ from runa.runtime.strategy import (
 
 __all__ = [
     "Action",
-    "AsyncExecutor",
     "AsyncProvider",
     "AsyncRetryingProvider",
     "AsyncStream",

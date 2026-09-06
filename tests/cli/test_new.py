@@ -23,7 +23,9 @@ def test_scaffold_project_writes_a_main_py_that_calls_configure(tmp_path):
 
     main_py = (project_dir / "main.py").read_text()
 
-    assert "configure(provider=" in main_py
+    assert "configure(" in main_py
+    assert "provider=OpenAIProvider()" in main_py
+    assert "async_provider=AsyncOpenAIProvider()" in main_py
 
 
 def test_scaffold_project_wires_up_a_durable_run_store(tmp_path):

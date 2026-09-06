@@ -72,7 +72,7 @@ An Agent is a definition, not an invocation.
 Execution is the process that progresses an Agent's behavior.
 
 ```python id="e7z1q5"
-run = ResearchAgent.run("Research fusion energy.")
+run = ResearchAgent.run_sync("Research fusion energy.")
 ```
 
 It reads the Agent's declaration and the current Run, calls the model, invokes tools, applies policy, decides what happens next, and records its progress on the Run.
@@ -90,6 +90,26 @@ Agent + Run
      ↓
  Repeat
 ```
+
+`Agent`'s Execution API is one Execution, observed four ways, not four
+different behaviors:
+
+```text
+run()         → the native async execution path
+run_sync()    → a synchronous adapter over run()
+run_stream()  → execute now, streaming output
+run_later()   → enqueue for later/background execution
+```
+
+`run()`/`run_sync()`/`run_stream()` all drive the Run to its next pause
+point before returning; they differ in whether the caller awaits, blocks,
+or observes output incrementally. `run_sync()` isn't a second execution
+model, it drives the exact same `Executor` loop as `run()` via
+`asyncio.run()`, so it can't be called from inside a running event loop.
+`run_later()` is the one that doesn't drive to a pause point synchronously
+at all: it hands the Run to a Queue and returns immediately, so it is the
+only member of the four that answers "when," not just "how." See
+[Background Execution](#background-execution).
 
 ---
 
@@ -238,10 +258,11 @@ and the model decides per call which outcome it wants:
 
 `DelegateAgent`/`AsyncDelegateAgent` are the two ways to override a
 delegation's `executor` (e.g. for tests, or a specific provider):
-`AsyncDelegateAgent` additionally runs the Return outcome through
-`AsyncExecutor` directly, so several delegates called in one model turn run
-as genuine concurrent async I/O rather than one thread each. Neither matters
-for Transfer, which never spawns a nested Run in the first place.
+`AsyncDelegateAgent` awaits the Return outcome's `Executor` directly instead
+of wrapping it with `asyncio.run()`, so several delegates called in one
+model turn run as genuine concurrent async I/O rather than one thread each.
+Neither matters for Transfer, which never spawns a nested Run in the first
+place.
 
 ---
 
@@ -505,8 +526,7 @@ In Runa's implementation, `DefaultStrategy` (`runtime/strategy.py`) *is*
 this loop: given a Run, it decides `CallModel`, `CallTool`, `Complete`, or
 `Fail` from what has already happened, the Executor performs that
 decision, and the cycle repeats. Reach for a custom Strategy, passed
-explicitly to `Executor`/`AsyncExecutor`, only when the loop's shape
-itself must change:
+explicitly to `Executor`, only when the loop's shape itself must change:
 
 ```python
 executor = Executor(provider, strategy=CustomStrategy())

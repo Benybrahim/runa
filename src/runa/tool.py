@@ -108,7 +108,7 @@ class ParentRunAware(Protocol):
     """A Tool that wants to know which Run it's being called from.
 
     A separate, optional protocol, like `StreamingProvider`/`DurableQueue`
-    elsewhere in Runa, not a method every Tool must implement. The Executor
+    elsewhere in Runa, not a method every Tool must implement. `Executor`
     calls `bind_parent_run_id()` right before `call()` for any Tool that
     satisfies this, structurally, with no base class to opt into.
     `DelegateAgent`/`AsyncDelegateAgent` (see agent.py) use it to stamp the
@@ -130,12 +130,12 @@ class DelegatesToAgent(Protocol):
     """A Tool that wraps an Agent as a delegation (see `Agent.delegations`).
 
     Structural, like `ParentRunAware` above: `DelegateAgent`/
-    `AsyncDelegateAgent` (agent.py) satisfy it without `Executor`/
-    `AsyncExecutor` needing to import agent.py directly (agent.py already
-    imports `Executor`/`AsyncExecutor`, so that import would cycle).
-    `Executor`/`AsyncExecutor` use it to detect a `transfer=true` call and
-    hand off the active Agent instead of running `call()` normally, via
-    `new_agent_instance()`; see `Executor._transfer`.
+    `AsyncDelegateAgent` (agent.py) satisfy it without `Executor` needing
+    to import agent.py directly (agent.py already imports `Executor`, so
+    that import would cycle). `Executor` uses it to detect a
+    `transfer=true` call and hand off the active Agent instead of running
+    `call()` normally, via `new_agent_instance()`; see
+    `runtime._shared.transfer_agent`.
     """
 
     def new_agent_instance(self) -> Any: ...

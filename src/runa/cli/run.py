@@ -1,8 +1,9 @@
 """cli/run.py: `runa run`, invoke an Agent from argv.
 
 The CLI never contains logic of its own (see cli.md): this is a thin
-wrapper over the same `Agent.run()` a developer would call from `main.py`.
-The Run is saved to the app's configured RunStore afterward
+wrapper over the same `Agent.run_sync()` a developer would call from
+`main.py`'s own synchronous code. The Run is saved to the app's configured
+RunStore afterward
 (`application.run_store.save(run)`), the same explicit step
 docs/guides.md's "Inspecting Runs" asks a developer to take, so `runa runs
 show <id>` can find it right after `runa run` prints it, without requiring
@@ -68,7 +69,7 @@ def run_agent(name: str, input: str, *, root: Path) -> str:
 
     with loaded_app(root):
         agent_cls = find_agent_class(name, agents_dir=agents_dir)
-        run = agent_cls.run(input)
+        run = agent_cls.run_sync(input)
         application.run_store.save(run)
 
     header = f"Run {run.id} ({run.status.value})"

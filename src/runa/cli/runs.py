@@ -10,7 +10,7 @@ in-memory and won't outlive the process that created the run.
 
 Approving or denying here only moves the Run's status (see `approval.py`
 docstring); it does not execute the tool. Resuming actual execution is the
-same as resuming any other paused Run: call the Executor again with the
+same as resuming any other paused Run: call `Executor.run()` again with the
 Agent that produced it.
 """
 

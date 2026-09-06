@@ -6,6 +6,7 @@ imports each `app/evaluations/` module and hands what it declares to
 CLI-only harness.
 """
 
+import asyncio
 import importlib
 from pathlib import Path
 
@@ -33,9 +34,9 @@ def run_project_evals(root: Path) -> list[EvalResult]:
         )
 
     with loaded_app(root):
-        executor = Executor(provider=application.provider)
+        executor = Executor(provider=application.async_provider)
 
-        results: list[EvalResult] = []
+        modules = []
         for eval_file in sorted(evaluations_dir.glob("*.py")):
             if eval_file.stem == "__init__":
                 continue
@@ -46,5 +47,12 @@ def run_project_evals(root: Path) -> list[EvalResult]:
                 raise InvalidEvalModule(
                     f"{eval_file} must define module-level `agent` and `cases`"
                 )
-            results.extend(run_evals(agent, executor, cases))
-        return results
+            modules.append((agent, cases))
+
+        async def _run_all() -> list[EvalResult]:
+            results: list[EvalResult] = []
+            for agent, cases in modules:
+                results.extend(await run_evals(agent, executor, cases))
+            return results
+
+        return asyncio.run(_run_all())
