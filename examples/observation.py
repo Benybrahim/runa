@@ -1,4 +1,4 @@
-"""observe_run.py: print a Run's timeline, in-process and live.
+"""observation.py: print a Run's timeline, in-process and live.
 
 `timeline(run)` reads a human-readable view straight off `run.events`, no
 setup, no separate tracing system. `instrument(run, subscriber)` does the
@@ -6,7 +6,7 @@ same thing live, calling `subscriber` with each `Event` as the Run emits
 it, so you can print progress as execution happens rather than after.
 
 Requires OPENAI_API_KEY in the environment.
-Run with: uv run python examples/observe_run.py
+Run with: uv run python examples/observation.py
 """
 
 import asyncio

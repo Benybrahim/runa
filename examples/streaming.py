@@ -1,21 +1,21 @@
 """streaming.py: print the model's answer as it streams in.
 
-`Provider.complete()` always returns one whole `Message`; for a chat-shaped
-consumer that wants to show text as it's generated, `Executor.run(...,
-on_chunk=...)` is the opt-in path: pass a `StreamingProvider` (both
-`AnthropicProvider` and `OpenAIProvider` implement one) and a callback.
-The Run's messages, events, and final state end up identical to the
-non-streaming path; `on_chunk` only changes what's observed while a
-CallModel step is in flight, so it composes with tools, retries, and
-approval exactly like the plain `run()` does.
+`Agent.run()` always returns one whole `Run`; for a chat-shaped consumer
+that wants to show text as it's generated, `Agent.run_stream()` is the
+opt-in path: it drives the exact same `Executor` loop, just observed as an
+async iterator of `StreamChunk`s instead of only returning the completed
+`Run` at the end. `stream.run` is that same `Run`, available immediately
+and filling in as you iterate, so the Run's messages, events, and final
+state end up identical to the non-streaming path.
 
-Requires OPENAI_API_KEY in the environment.
-Run with: uv run python examples/streaming.py
+Requires `model` to resolve to a `StreamingProvider` (both
+`AnthropicProvider` and `OpenAIProvider` implement one). Requires
+OPENAI_API_KEY in the environment. Run with: uv run python examples/streaming.py
 """
 
 import asyncio
 
-from runa import Agent, Executor, OpenAIProvider, Run, StreamChunk, tool
+from runa import Agent, StreamChunk, tool
 
 
 @tool
@@ -24,23 +24,18 @@ def get_weather(city: str) -> str:
 
 
 class WeatherAgent(Agent):
+    model = "gpt-5-nano"
     instructions = "Answer weather questions using the get_weather tool."
     tools = [get_weather]
 
 
-def print_as_it_arrives(chunk: StreamChunk) -> None:
-    print(chunk.text, end="", flush=True)
+async def main() -> None:
+    stream = WeatherAgent.run_stream("What's the weather in Tokyo?")
+    async for chunk in stream:
+        print(chunk.text, end="", flush=True)
+    print()  # the streamed text has no trailing newline
+    print("Final result:", stream.run.result)
 
 
 if __name__ == "__main__":
-    executor = Executor(OpenAIProvider())
-
-    run = asyncio.run(
-        executor.run(
-            WeatherAgent(),
-            Run(input="What's the weather in Tokyo?"),
-            on_chunk=print_as_it_arrives,
-        )
-    )
-    print()  # the streamed text has no trailing newline
-    print("Final result:", run.result)
+    asyncio.run(main())
