@@ -116,7 +116,7 @@ RUNA distinguishes state accordingly:
 
 * **Run state** belongs to one Run.
 * **Conversation state** spans related Runs.
-* **Application state** belongs to the application's domain.
+* **Domain state** belongs to the application's domain.
 
 State should be explicit rather than hidden behind one universal memory abstraction.
 

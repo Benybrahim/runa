@@ -171,7 +171,7 @@ class Agent:
     def before_run(self, run: Run) -> None:
         """Called once before the ReAct loop starts. Override to customize.
 
-        Use this to surface application State the model needs to see (see
+        Use this to surface domain State the model needs to see (see
         `runtime/_shared.seed_run`), not to decide what happens next: that
         is the Strategy's job, not the Agent's.
         """

@@ -189,7 +189,7 @@ conversation.state.summary
 conversation.state.preferences
 ```
 
-### Application State
+### Domain State
 
 Belongs to the application domain.
 

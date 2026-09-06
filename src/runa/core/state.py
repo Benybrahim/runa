@@ -1,16 +1,21 @@
-"""Explicit, scoped state containers.
+"""Runtime state containers with explicit lifetimes.
 
-Runa distinguishes Run state, Conversation state, and Application state
-rather than hiding them behind one universal memory abstraction. Application
-state is intentionally not modeled here; it belongs to the developer's own
-domain objects (Customer, Order, ResearchProject, ...).
+Runa models state owned by its runtime:
+
+- RunState: belongs to one Run.
+- ConversationState: spans multiple Runs.
+
+Domain state is intentionally not modeled here. It belongs to the
+developer's own domain objects (Customer, Order, ResearchProject, ...).
+
+State has a lifetime.
 """
 
 from typing import Any
 
 
 class _AttrDict(dict):
-    """A dict that also supports attribute access, e.g. state.plan."""
+    """A dict that also supports attribute access."""
 
     def __getattr__(self, name: str) -> Any:
         try:
@@ -29,8 +34,8 @@ class _AttrDict(dict):
 
 
 class RunState(_AttrDict):
-    """State scoped to a single Run's execution."""
+    """State owned by a single Run."""
 
 
 class ConversationState(_AttrDict):
-    """State that persists across interactions in a conversation."""
+    """State owned by a Conversation and shared across its Runs."""

@@ -17,7 +17,7 @@ Each guide covers one problem end to end. For the vocabulary they build on
 * [Defining an Agent](#defining-an-agent)
 * [Choosing a Model Provider](#choosing-a-model-provider)
 * [Building a Tool](#building-a-tool)
-* [Structuring Application State](#structuring-application-state)
+* [Structuring Domain State](#structuring-domain-state)
 * [Surfacing State to the Model](#surfacing-state-to-the-model)
 
 ## State & Conversations
@@ -178,7 +178,7 @@ responsible for behavior and the Tool responsible for the external operation.
 
 ---
 
-# Structuring Application State
+# Structuring Domain State
 
 Keep domain state in ordinary application objects.
 
