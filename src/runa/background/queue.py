@@ -174,8 +174,8 @@ def recover_pending(
     mid-execution checkpointing would need to resolve a harder problem
     first: `ToolCall.attempts` is incremented before a call runs (see
     `Executor._call_tool`), so a crash between that increment and the call
-    returning would otherwise look like a *completed* call on resume
-    (`ToolCall.completed` only checks `attempts > 0 and error is None`) and
+    returning would otherwise look like a *succeeded* call on resume
+    (`ToolCall.succeeded` only checks `attempts > 0 and error is None`) and
     get silently skipped rather than retried or flagged, the same
     attempted-vs-observed-effect ambiguity `EffectStatus.UNKNOWN` already
     models for a single retried call (architecture.md §13), not yet

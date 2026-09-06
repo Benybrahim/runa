@@ -86,7 +86,7 @@ class DefaultStrategy:
             return CallModel()
 
         pending = next(
-            (tc for tc in last_assistant.tool_calls if not tc.completed), None
+            (tc for tc in last_assistant.tool_calls if not tc.succeeded), None
         )
         if pending is not None:
             if pending.error is not None:

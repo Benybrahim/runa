@@ -317,7 +317,7 @@ class Executor:
         # named_tool_call came from this same lookup, so it's never None here.
         last_assistant = last_assistant_message(run)
         assert last_assistant is not None
-        pending = [tc for tc in last_assistant.tool_calls if not tc.completed]
+        pending = [tc for tc in last_assistant.tool_calls if not tc.succeeded]
         candidates = [tc for tc in pending if tc is named_tool_call or tc.error is None]
 
         tools = agent.resolved_tools()

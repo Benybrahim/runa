@@ -125,7 +125,7 @@ def test_approval_example():
     run = asyncio.run(executor.run(agent, Run(input="Refund order A123 for $42.")))
     assert run.status == RunStatus.AWAITING_APPROVAL
 
-    pending = next(tc for tc in run.tool_calls if not tc.completed)
+    pending = next(tc for tc in run.tool_calls if not tc.succeeded)
     approve(run, pending.id)
     run = asyncio.run(executor.run(agent, run))
 

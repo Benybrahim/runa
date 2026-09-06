@@ -40,7 +40,7 @@ if __name__ == "__main__":
     run = asyncio.run(executor.run(agent, Run(input="Refund order A123 for $42.")))
 
     if run.status == RunStatus.AWAITING_APPROVAL:
-        pending = next(tc for tc in run.tool_calls if not tc.completed)
+        pending = next(tc for tc in run.tool_calls if not tc.succeeded)
         print(f"approval requested: {pending.name}({pending.arguments})")
 
         approve(run, pending.id)

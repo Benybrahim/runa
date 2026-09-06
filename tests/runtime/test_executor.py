@@ -101,8 +101,8 @@ def test_executor_runs_every_tool_call_requested_in_a_single_turn():
     assert result.status == RunStatus.COMPLETED
     assert result.result == "Both are sunny."
     tokyo, osaka = result.tool_calls
-    assert tokyo.completed and tokyo.result == "Tokyo: sunny"
-    assert osaka.completed and osaka.result == "Osaka: sunny"
+    assert tokyo.succeeded and tokyo.result == "Tokyo: sunny"
+    assert osaka.succeeded and osaka.result == "Osaka: sunny"
 
     # both tool results are fed back before the model is asked again
     roles = [message.role for message in result.messages]
@@ -658,7 +658,7 @@ def test_gated_tool_call_pauses_the_run_for_approval():
     assert len(provider.calls) == 1  # never got past the gate to call again
     pending = result.tool_calls[0]
     assert pending.approved is None
-    assert not pending.completed
+    assert not pending.succeeded
 
 
 def test_runnable_siblings_execute_while_a_gated_call_blocks_the_batch():
@@ -691,8 +691,8 @@ def test_runnable_siblings_execute_while_a_gated_call_blocks_the_batch():
     assert run.status == RunStatus.AWAITING_APPROVAL
     send_email_call = next(tc for tc in run.tool_calls if tc.name == "SendEmail")
     weather_call = next(tc for tc in run.tool_calls if tc.name == "GetWeatherAsync")
-    assert not send_email_call.completed
-    assert weather_call.completed
+    assert not send_email_call.succeeded
+    assert weather_call.succeeded
     assert weather_call.result == "Kyoto: sunny"
 
 
@@ -772,8 +772,8 @@ def test_approving_gated_calls_one_at_a_time_eventually_runs_them_all():
 
     assert run.status == RunStatus.COMPLETED
     assert run.result == "done"
-    assert email_call.completed and email_call.result == "emailed a@b.com"
-    assert sms_call.completed and sms_call.result == "texted 555"
+    assert email_call.succeeded and email_call.result == "emailed a@b.com"
+    assert sms_call.succeeded and sms_call.result == "texted 555"
 
 
 def test_tool_returning_an_artifact_records_it_on_the_run():
