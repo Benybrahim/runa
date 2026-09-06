@@ -192,7 +192,13 @@ def test_round_trips_a_non_json_safe_input_and_result_as_strings():
 
 def test_round_trips_agent_nameentity_and_version():
     store = SQLiteRunStore(":memory:")
-    run = Run(input="hi", agent_name="ResearchAgent", agent_version="1.2.0")
+    run = Run(
+        input="hi",
+        agent_name="ResearchAgent",
+        agent_version="1.2.0",
+        active_agent_name="ResearchAgent",
+        active_agent_version="1.2.0",
+    )
 
     store.save(run)
     loaded = store.get(run.id)
@@ -200,6 +206,8 @@ def test_round_trips_agent_nameentity_and_version():
 
     assert loaded.agent_name == "ResearchAgent"
     assert loaded.agent_version == "1.2.0"
+    assert loaded.active_agent_name == "ResearchAgent"
+    assert loaded.active_agent_version == "1.2.0"
 
 
 def test_list_filters_by_agent_name():

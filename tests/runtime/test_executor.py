@@ -13,10 +13,11 @@ from runa.core import (
     Message,
     Role,
     Run,
-    RunAlreadyDriving,
     RunStatus,
     ToolCall,
 )
+from runa.runtime.driving import RunAlreadyDriving
+from runa.runtime.driving import default_guard as driving_guard
 from runa.runtime.executor import Executor
 from runa.runtime.provider import RetryingProvider, StreamChunk
 from runa.runtime.retry import RetryStrategy
@@ -542,12 +543,12 @@ def test_run_raises_when_another_executor_is_already_driving_it():
     provider = FakeProvider(responses=[])
     executor = Executor(provider)
     run = Run(input="hi")
-    run.begin_driving()  # simulate another Executor already in flight
+    driving_guard.begin(run.id)  # simulate another Executor already in flight
     try:
         with pytest.raises(RunAlreadyDriving):
             asyncio.run(executor.run(WeatherAgent(), run))
     finally:
-        run.end_driving()
+        driving_guard.end(run.id)
 
     # the guard fires before any seeding/model call, so nothing ran
     assert provider.calls == []

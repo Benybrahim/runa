@@ -1,5 +1,6 @@
 """Runtime: the execution loop that drives an Agent through a Run."""
 
+from runa.runtime.driving import RunAlreadyDriving
 from runa.runtime.executor import Executor
 from runa.runtime.provider import (
     Provider,
@@ -30,6 +31,7 @@ __all__ = [
     "Provider",
     "RetryStrategy",
     "RetryingProvider",
+    "RunAlreadyDriving",
     "Strategy",
     "Stream",
     "StreamChunk",

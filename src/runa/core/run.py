@@ -1,6 +1,5 @@
 """Run: the primary unit of computation in Runa."""
 
-import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -46,13 +45,6 @@ class IllegalTransition(Exception):
     """Raised when a Run is asked to move to a status it cannot reach."""
 
 
-class RunAlreadyDriving(Exception):
-    """Raised when a second Executor tries to drive a Run already in flight.
-
-    See `Run.begin_driving()`.
-    """
-
-
 @dataclass
 class Run:
     input: Any
@@ -60,6 +52,7 @@ class Run:
     agent_name: str | None = None
     active_agent_name: str | None = None
     agent_version: str | None = None
+    active_agent_version: str | None = None
     parent_run_id: str | None = None
     conversation_id: str | None = None
     state: RunState = field(default_factory=RunState)
@@ -72,49 +65,6 @@ class Run:
     status: RunStatus = RunStatus.CREATED
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     cancel_requested: bool = False
-
-    def __post_init__(self) -> None:
-        # Not a dataclass field: a lock can't be meaningfully copied,
-        # compared, or serialized, and run_from_dict() reconstructs a Run
-        # through this same __init__/__post_init__ path, so every instance
-        # (freshly created or deserialized) gets its own.
-        self._drive_lock = threading.Lock()
-        self._driving = False
-
-    def begin_driving(self) -> None:
-        """Claim exclusive execution of this Run object. Called by
-        `Executor` at the start of `run()`.
-
-        A Run has no concurrency control of its own over `add_message`/
-        `emit`/status transitions: two Executors advancing the same Run
-        object at once would otherwise interleave their steps with no
-        error at all, silently duplicating model calls and tool side
-        effects instead of failing loudly. Raises `RunAlreadyDriving` if
-        another Executor is already driving this Run.
-
-        This only catches this one framework entry point being called
-        twice on the same in-memory object, not two separate `Run`
-        objects loaded for the same persisted `run_id` (that hazard is a
-        `RunStore`/application concern; see also `ThreadQueue`'s docstring,
-        which already warns against reading a queued Run from another
-        thread, and `Conversation`'s docstring for the analogous boundary
-        there).
-        """
-        with self._drive_lock:
-            if self._driving:
-                raise RunAlreadyDriving(
-                    f"Run {self.id} is already being driven by another "
-                    "Executor: two Executors cannot advance the same Run "
-                    "object concurrently"
-                )
-            self._driving = True
-
-    def end_driving(self) -> None:
-        """Release the claim `begin_driving()` took. Always call this in a
-        `finally`, so a Run stays drivable again after its Executor call
-        returns, including when that call raised."""
-        with self._drive_lock:
-            self._driving = False
 
     def emit(self, event_type: EventType, **data: Any) -> Event:
         event = Event(type=event_type, data=data)

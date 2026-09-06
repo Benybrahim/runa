@@ -35,6 +35,7 @@ from runa.core import (
     ToolCall,
 )
 from runa.runtime._shared import model_context, seed_run, tool_schemas, transfer_agent
+from runa.runtime.driving import default_guard as driving_guard
 from runa.runtime.provider import Provider, StreamChunk, StreamingProvider
 from runa.runtime.strategy import (
     Action,
@@ -52,6 +53,20 @@ if TYPE_CHECKING:
     # Agent.run() constructs an Executor, so a runtime import here would
     # cycle back through agent.py; this is used for type hints only.
     from runa.agent import Agent
+
+
+def _delegated_run_id(tool: Any) -> dict[str, str]:
+    """`{"run_id": ...}` for a Return delegation's nested Run, else `{}`.
+
+    `tool.last_run` is `DelegateAgent`'s own attribute (agent.py), not part
+    of the `DelegatesToAgent` protocol; read structurally so this module
+    doesn't need to import `DelegateAgent` and cycle back through agent.py.
+    """
+    if isinstance(tool, DelegatesToAgent):
+        last_run = getattr(tool, "last_run", None)
+        if last_run is not None:
+            return {"run_id": last_run.id}
+    return {}
 
 
 class Executor:
@@ -152,12 +167,12 @@ class Executor:
         re-invoke `after_run` (see `Run.is_terminal`).
 
         Raises `RunAlreadyDriving` if another Executor is already driving
-        this same Run object; see `runtime.driving.DrivingGuard`.
+        this same run id; see `runtime.driving.DrivingGuard`.
         """
         if run.is_terminal:
             return run
 
-        run.begin_driving()
+        driving_guard.begin(run.id)
         try:
             if run.status in (RunStatus.CREATED, RunStatus.QUEUED):
                 run.start()
@@ -207,7 +222,7 @@ class Executor:
                 if conversation is not None:
                     conversation.record(run)
         finally:
-            run.end_driving()
+            driving_guard.end(run.id)
         return run
 
     async def _apply(
@@ -362,6 +377,18 @@ class Executor:
         model sees; a plain value keeps working exactly as before, via
         `str(result)` (manifesto §10: artifacts are a type of tool result,
         not a separate API).
+
+        A Return delegation (`DelegateAgent`, a `DelegatesToAgent`) spawns
+        its own nested Run rather than running inline; that Run's id isn't
+        otherwise visible on `run`'s own event log (the two are separate
+        executions, see `docs/concepts.md`'s delegation section), so once
+        the call returns, `TOOL_COMPLETED`/`TOOL_FAILED` carry the child's
+        `run_id` alongside the ordinary tool-call data, whenever the tool
+        exposes one via `last_run` (structural, like `DelegatesToAgent`
+        itself: no need to import `DelegateAgent` here and cycle back
+        through `agent.py`). This is the observability path; `parent_run_id`
+        on the child itself remains the durable lineage a `RunStore` can
+        query with `list(parent_run_id=run.id)`.
         """
         tools = agent.resolved_tools()
         tool = tools.get(tool_call.name)
@@ -399,6 +426,7 @@ class Executor:
                 arguments=tool_call.arguments,
                 error=str(exc),
                 effect=EffectStatus.UNKNOWN.value,
+                **_delegated_run_id(tool),
             )
             return
 
@@ -424,4 +452,5 @@ class Executor:
             # the model itself was given.
             result=content,
             effect=EffectStatus.OBSERVED.value,
+            **_delegated_run_id(tool),
         )

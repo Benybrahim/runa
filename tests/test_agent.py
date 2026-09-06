@@ -341,6 +341,10 @@ def test_a_parent_agent_can_delegate_to_a_sub_agent():
     assert research_tool.last_run.agent_name == "ResearchAgent"
     # ...but records which Run delegated to it (architecture.md §15)
     assert research_tool.last_run.parent_run_id == run.id
+    # and the parent's own event log carries the child's id, so the two
+    # can be correlated without needing research_tool.last_run in memory
+    completed = next(e for e in run.events if e.type == EventType.TOOL_COMPLETED)
+    assert completed.data["run_id"] == research_tool.last_run.id
 
 
 def test_a_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
@@ -374,6 +378,9 @@ def test_a_delegated_run_that_fails_surfaces_as_a_failed_tool_call():
     # still reachable for inspection even though the delegated run failed
     assert research_tool.last_run is not None
     assert research_tool.last_run.status == RunStatus.FAILED
+    # the parent's own event log still carries the failed child's id
+    failed_event = next(e for e in run.events if e.type == EventType.TOOL_FAILED)
+    assert failed_event.data["run_id"] == research_tool.last_run.id
 
 
 def test_transfer_false_argument_still_goes_through_the_return_path():
@@ -414,9 +421,11 @@ def test_transfer_false_argument_still_goes_through_the_return_path():
 def test_transfer_swaps_the_active_agent():
     class SupportAgent(Agent):
         instructions = "You are support. Help directly."
+        version = "2.0"
 
     class TriageAgent(Agent):
         instructions = "Route billing questions to support."
+        version = "1.0"
         delegations = [SupportAgent]
 
     provider = FakeProvider(
@@ -441,8 +450,11 @@ def test_transfer_swaps_the_active_agent():
     assert run.result == "Sure, let's sort out your billing."
     # provenance (who this Run was given to) survives the handoff...
     assert run.agent_name == "TriageAgent"
-    # ...but who's currently driving it reflects the transfer
+    assert run.agent_version == "1.0"
+    # ...but who's currently driving it (name and version both) reflects
+    # the transfer
     assert run.active_agent_name == "SupportAgent"
+    assert run.active_agent_version == "2.0"
     # the new agent's own instructions reach the model as a fresh system message
     final_call_contents = [m.content for m in provider.calls[-1]["messages"]]
     assert "You are support. Help directly." in final_call_contents

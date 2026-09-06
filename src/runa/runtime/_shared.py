@@ -29,11 +29,13 @@ def seed_run(
     # constructed, including a Run driven straight through Executor as
     # an escape hatch, and a sub-agent's own Run under delegation.
     run.agent_name = agent.agent_name()
-    # `agent_name` stays "who this Run was originally given to"; a Transfer
-    # delegation (see transfer_agent) only ever updates this field, not
-    # agent_name, so provenance and "who's currently driving" stay distinct.
-    run.active_agent_name = agent.agent_name()
     run.agent_version = agent.version
+    # `agent_name`/`agent_version` stay "who this Run was originally given
+    # to"; a Transfer delegation (see transfer_agent) only ever updates the
+    # active_* pair below, so original provenance and "who's currently
+    # driving" (name and version both) stay distinct.
+    run.active_agent_name = agent.agent_name()
+    run.active_agent_version = agent.version
     run.conversation_id = conversation.id if conversation is not None else None
     if agent.instructions:
         run.add_message(Message(role=Role.SYSTEM, content=agent.instructions))
@@ -90,7 +92,11 @@ def transfer_agent(
     the same way `seed_run` introduces the first agent's instructions, so the
     model sees the new persona on its next turn. `agent.after_run()`
     fires on whichever agent is active when `run` completes, so a
-    transferred-to agent gets it, not the original.
+    transferred-to agent gets it, not the original. `run.active_agent_name`
+    and `run.active_agent_version` both update to the new agent's identity,
+    so provenance reflects which Agent definition actually produced the
+    rest of the transcript, not just which one the Run started with
+    (`run.agent_name`/`run.agent_version`, untouched here).
     """
     new_agent = tool.new_agent_instance()
     tool_call.attempts += 1
@@ -104,6 +110,7 @@ def transfer_agent(
         to_agent=new_agent.agent_name(),
     )
     run.active_agent_name = new_agent.agent_name()
+    run.active_agent_version = new_agent.version
     run.add_message(
         Message(
             role=Role.TOOL, content=str(tool_call.result), tool_call_id=tool_call.id
