@@ -1,0 +1,36 @@
+# Secrets / environment
+.env
+.env.*
+*.pem
+*.key
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Byte-compiled / caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Build / packaging artifacts
+build/
+dist/
+*.egg-info/
+
+# Lock files (noisy, rarely useful as context)
+uv.lock
+
+# Editor / IDE
+.idea/
+.vscode/
+
+# Claude Code internals
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+
+# Personal notes not part of the framework
+personal/
