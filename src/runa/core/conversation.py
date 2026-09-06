@@ -56,7 +56,6 @@ import uuid
 from dataclasses import dataclass, field
 
 from runa.core.message import Message, Role
-from runa.core.run import Run
 from runa.core.state import ConversationState
 
 
@@ -73,19 +72,17 @@ class Conversation:
         # freshly created or deserialized, gets its own.
         self._lock = threading.Lock()
 
-    def record(self, run: Run) -> None:
-        """Append a terminal Run's own messages onto this history.
+    def record(self, messages: list[Message]) -> None:
+        """Append messages to this conversation's durable history.
 
-        The system prompt is re-derived from `Agent.instructions` on every
-        Run, so it's excluded here rather than duplicated on the next turn.
-        `run.messages` holds only this Run's own turns (see the class
-        docstring), never a copy of this Conversation's prior history, so
-        appending is correct rather than duplicating what's already here.
+        SYSTEM messages are excluded because the system prompt is
+        re-derived from `Agent.instructions` on every Run, so it would
+        otherwise be duplicated on the next turn.
 
-        Locked so that two Runs finishing at nearly the same moment each
-        contribute one whole, uninterleaved set of turns. See the class
-        docstring for what this lock does *not* protect against.
+        Locked so that two callers recording at nearly the same moment each
+        contribute one whole, uninterleaved batch. See the class docstring
+        for what this lock does *not* protect against.
         """
-        messages = [m for m in run.messages if m.role != Role.SYSTEM]
+        messages = [m for m in messages if m.role != Role.SYSTEM]
         with self._lock:
             self.messages += messages

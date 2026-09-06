@@ -15,7 +15,7 @@ def test_record_captures_a_terminal_runs_messages():
     run.add_message(Message(role=Role.USER, content="hi"))
     run.add_message(Message(role=Role.ASSISTANT, content="hello"))
 
-    conversation.record(run)
+    conversation.record(run.messages)
 
     assert [m.content for m in conversation.messages] == ["hi", "hello"]
 
@@ -26,7 +26,7 @@ def test_record_excludes_the_system_prompt():
     run.add_message(Message(role=Role.SYSTEM, content="be helpful"))
     run.add_message(Message(role=Role.USER, content="hi"))
 
-    conversation.record(run)
+    conversation.record(run.messages)
 
     assert [m.role for m in conversation.messages] == [Role.USER]
 
@@ -37,7 +37,7 @@ def test_record_appends_rather_than_replaces():
     run = Run(input="hi")
     run.add_message(Message(role=Role.USER, content="fresh"))
 
-    conversation.record(run)
+    conversation.record(run.messages)
 
     assert [m.content for m in conversation.messages] == ["earlier", "fresh"]
 
@@ -47,12 +47,12 @@ def test_record_accumulates_across_successive_runs():
     first = Run(input="hi")
     first.add_message(Message(role=Role.USER, content="hi"))
     first.add_message(Message(role=Role.ASSISTANT, content="hello"))
-    conversation.record(first)
+    conversation.record(first.messages)
 
     second = Run(input="again")
     second.add_message(Message(role=Role.USER, content="again"))
     second.add_message(Message(role=Role.ASSISTANT, content="hi again"))
-    conversation.record(second)
+    conversation.record(second.messages)
 
     assert [m.content for m in conversation.messages] == [
         "hi",
@@ -78,7 +78,8 @@ def test_concurrent_record_calls_never_tear_or_interleave_messages():
         runs.append(run)
 
     threads = [
-        threading.Thread(target=conversation.record, args=(run,)) for run in runs
+        threading.Thread(target=conversation.record, args=(run.messages,))
+        for run in runs
     ]
     for thread in threads:
         thread.start()
@@ -109,7 +110,7 @@ def test_concurrent_runs_against_one_conversation_do_not_lose_turns():
     run_b = Run(input="b")
     run_b.add_message(Message(role=Role.USER, content="from b"))
 
-    conversation.record(run_a)
-    conversation.record(run_b)
+    conversation.record(run_a.messages)
+    conversation.record(run_b.messages)
 
     assert [m.content for m in conversation.messages] == ["from a", "from b"]

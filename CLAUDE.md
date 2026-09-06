@@ -44,7 +44,6 @@ Do not duplicate the philosophy from these documents here. This file is the oper
 * Ruff config: line length 88, target `py314`, rules `E`, `F`, `I`.
 * Prefer clear names, small responsibilities, minimal dependencies.
 * Avoid unnecessary inheritance hierarchies, metaprogramming, DSL complexity, god objects, and hidden behavior that makes debugging harder.
-* Prefer explicit behavior over surprising magic.
 * Keep dependencies flowing outward from core primitives toward infrastructure implementations.
 * Provider-specific concepts must remain inside provider adapters.
 * Tests should verify deterministic invariants; evaluations should measure probabilistic agent behavior.

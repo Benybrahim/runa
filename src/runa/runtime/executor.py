@@ -220,7 +220,7 @@ class Executor:
                         stacklevel=2,
                     )
                 if conversation is not None:
-                    conversation.record(run)
+                    conversation.record(run.messages)
         finally:
             driving_guard.end(run.id)
         return run
