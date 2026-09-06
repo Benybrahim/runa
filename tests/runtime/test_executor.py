@@ -19,7 +19,7 @@ from runa.core import (
 from runa.runtime.executor import Executor
 from runa.runtime.provider import RetryingProvider, StreamChunk
 from runa.runtime.retry import RetryStrategy
-from runa.runtime.strategy import CallModel, Complete, Fail, Strategy
+from runa.runtime.strategy import CallModel, Complete, Strategy
 from runa.tool import Tool
 from tests.fakes import FakeProvider, FakeStreamingProvider
 
@@ -452,19 +452,13 @@ def test_agent_hooks_are_called_around_execution():
         def before_run(self, run):
             calls.append("before_run")
 
-        def plan(self, run):
-            calls.append("plan")
-
-        def review(self, run):
-            calls.append("review")
-
         def after_run(self, run):
             calls.append("after_run")
 
     provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="ok")])
     Executor(provider).run(HookedAgent(), Run(input="hi"))
 
-    assert calls == ["before_run", "plan", "review", "after_run"]
+    assert calls == ["before_run", "after_run"]
 
 
 def test_a_bug_in_before_run_fails_the_run_instead_of_crashing_and_stranding_it():
@@ -504,20 +498,6 @@ def test_a_bug_while_seeding_the_run_fails_it_instead_of_stranding_it():
     assert result.status == RunStatus.FAILED
     assert "bug while rendering input" in (result.error or "")
     assert len(provider.calls) == 0  # never reached the step loop
-
-
-def test_a_bug_in_plan_fails_the_run_the_same_way_as_before_run():
-    class BuggyAgent(Agent):
-        def plan(self, run):
-            raise RuntimeError("bug in plan")
-
-    provider = FakeProvider(responses=[])
-    run = Run(input="hi")
-
-    result = Executor(provider).run(BuggyAgent(), run)
-
-    assert result.status == RunStatus.FAILED
-    assert result.error == "bug in plan"
 
 
 def test_a_bug_in_after_run_does_not_crash_or_falsify_an_already_completed_run(
@@ -621,58 +601,14 @@ def test_two_threads_driving_the_same_run_do_not_silently_corrupt_it():
     assert [m.role for m in run.messages].count(Role.ASSISTANT) == 1
 
 
-def test_review_hook_is_skipped_when_the_run_fails_instead_of_completing():
-    calls = []
-
-    class HookedAgent(Agent):
-        def review(self, run):
-            calls.append("review")
-
-        def after_run(self, run):
-            calls.append("after_run")
-
-    class AlwaysFail:
-        def step(self, run):
-            return Fail(error="nope")
-
-    provider = FakeProvider(responses=[])
-    Executor(provider, strategy=AlwaysFail()).run(HookedAgent(), Run(input="hi"))
-
-    assert calls == ["after_run"]
-
-
-def test_review_hook_can_revise_the_result():
-    class ReviewingAgent(Agent):
-        def review(self, run):
-            return f"revised: {run.messages[-1].content}"
-
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="draft")])
-
-    result = Executor(provider).run(ReviewingAgent(), Run(input="hi"))
-
-    assert result.result == "revised: draft"
-
-
-def test_review_hook_returning_none_keeps_the_strategys_result():
-    class SilentReviewAgent(Agent):
-        def review(self, run):
-            pass  # falls off the end, i.e. returns None
-
-    provider = FakeProvider(responses=[Message(role=Role.ASSISTANT, content="draft")])
-
-    result = Executor(provider).run(SilentReviewAgent(), Run(input="hi"))
-
-    assert result.result == "draft"
-
-
-def test_plan_is_not_re_run_when_resuming_a_paused_run():
+def test_before_run_is_not_re_run_when_resuming_a_paused_run():
     calls = []
 
     class HookedAgent(Agent):
         tools = []
 
-        def plan(self, run):
-            calls.append("plan")
+        def before_run(self, run):
+            calls.append("before_run")
 
     class SendEmail(Tool):
         requires_approval = True
@@ -700,7 +636,7 @@ def test_plan_is_not_re_run_when_resuming_a_paused_run():
     approve(run, run.tool_calls[0].id)
     executor.run(agent, run)
 
-    assert calls == ["plan"]
+    assert calls == ["before_run"]
 
 
 def test_gated_tool_call_pauses_the_run_for_approval():

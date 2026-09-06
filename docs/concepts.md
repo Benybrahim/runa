@@ -26,91 +26,78 @@ Result
 A Conversation carries state across Runs.
 
 ---
+## The Agent-Run-Execution (ARE) Pattern
 
-# The Agent-Run-Execution (ARE) Pattern
+ARE is the core pattern Runa is built around.
 
-ARE is the pattern Runa is built around. It divides an agent application
-into three layers, each with a specific responsibility:
-
-```text
+```text id="hvbq6c"
 Agent
-  ↓ declares behavior
+  ↓ defines behavior
 Execution
   ↓ progresses it
 Run
-  ↓ persists it
+  ↓ persists what happened
 ```
 
-## Why ARE
+The three concepts answer different questions:
 
-Agent applications combine ordinary application code with probabilistic
-decision-making, external capabilities, durable execution, and real-world
-consequences. Separating what an agent does (Agent) from how it gets done
-right now (Execution) from what happened (Run) keeps that complexity
-tractable: persistence, background execution, approval, observability, and
-evaluation can all be built around the Run without reaching into how an
-Agent is defined or how Execution is implemented.
-
-One Agent can produce many Runs. Changing an Agent's definition does not
-retroactively change historical Runs.
+```text id="s7hndc"
+Agent     → What behavior does this application provide?
+Execution → What is happening now, and what happens next?
+Run       → What happened?
+```
 
 ---
 
-# Agent
+### Agent
 
 An Agent is an application object that defines behavior and capabilities.
 
-```python
-class ResearchAgent(Agent):
+```python id="vds2ai"
+class MyAgent(Agent):
     instructions = """
-    Research questions carefully.
-    Prefer reliable sources.
+    My Agent instruction
     """
 
     tools = [WebSearch]
+    delegations = [MyAgent2, MyAgent3]
 ```
 
-The Agent answers:
-
-> **What behavior does this part of the application provide?**
-
-An Agent is a definition.
-
-It is not an execution.
+An Agent is a definition, not an invocation.
 
 ---
 
-# Execution
+### Execution
 
-Execution is what progresses an Agent's behavior: calling the model, invoking tools, applying policy, and deciding what happens next.
+Execution is the process that progresses an Agent's behavior.
 
-```python
+```python id="e7z1q5"
 run = ResearchAgent.run("Research fusion energy.")
 ```
 
-Calling `Agent.run()` is what starts Execution. In Runa's implementation, Execution is the `Executor`/`AsyncExecutor` driving a `Strategy`; most applications never touch either directly.
+It reads the Agent's declaration and the current Run, calls the model, invokes tools, applies policy, decides what happens next, and records its progress on the Run.
 
-Execution answers:
-
-> **What is happening right now, and what happens next?**
-
-Execution is a process, not a record. It reads an Agent's declaration and a Run's accumulated state, and it writes new state, events, and actions back onto that Run as it goes.
+```text id="kbyazb"
+Agent + Run
+     ↓
+ Execution
+     ↓
+ Decide
+     ↓
+ Act
+     ↓
+ Update Run
+     ↓
+ Repeat
+```
 
 ---
 
-# Run
+### Run
 
-A Run is the persisted record of one Agent invocation: what Execution has done so far, and what it produced.
+A Run is the persisted record of one Agent invocation and its execution.
 
-The Run answers:
-
-> **What happened when this Agent executed?**
-
-A Run has an identity and lifecycle.
-
-Conceptually:
-
-```text
+```text id="xqhh7s"
 Run
 ├── Input
 ├── Goal
@@ -123,103 +110,48 @@ Run
 └── Status
 ```
 
-The Run is where Execution's progress is persisted, which makes it the common boundary for the rest of the framework.
-
-Persistence, background execution, observability, approval, retry behavior, and evaluation operate around the Run.
+A Run has its own identity and lifecycle.
 
 ---
 
-# Agent, Execution, and Run
-
-This distinction is fundamental.
-
-```text
-ResearchAgent
-    = behavior declaration
-
-Execution
-    = the process advancing Run #482 right now
-
-Run #482
-    = the persisted record of that invocation
-```
+### Relationship
 
 One Agent can produce many Runs:
 
-```text
+```text id="h8umbl"
 ResearchAgent
     ├── Run #481
     ├── Run #482
     └── Run #483
 ```
 
-A change to an Agent definition does not retroactively change historical Runs.
+For each invocation, Execution progresses that Agent's behavior and persists what happens to its Run.
 
-Durable Runs should retain enough identity and provenance to explain which Agent produced them.
-
----
-
-# Model Context
-
-What a model call sees is not a persisted object. It is a projection
-Execution builds from `Agent.instructions`, the Run's accumulated
-`Messages`, and whatever `State` the application chooses to surface, at
-the moment a model call happens.
-
-```text
-Instructions
-Messages
-Selected State
-        ↓
-   Model input
-        ↓
-      Agent
-```
-
-> **Model context is a projection of the Run for a particular model call. RunState is the persistent execution state it is drawn from.**
-
-Runa does not keep a separate `Context` type alongside `State`. The two
-would share the same free-form, attribute-accessible shape (see below);
-the only thing a distinct type bought was auto-rendering a whole container
-into a system message before every Run, which does not scale as a
-default. State can hold working data the model should not see
-(accumulated findings, internal bookkeeping); surfacing all of it
-automatically means the framework would need an allowlist/denylist
-convention to claw that back. Runa leaves the selection explicit instead.
-
-In Runa's implementation, `Agent.before_run(run)` and `Agent.plan(run)`
-are where an application does this: read whatever `run.state` (or
-`run.conversation.state`) is relevant, and call `run.add_message(...)` to
-put it in front of the model, in whatever shape the prompt needs:
-
-```python
-class SupportAgent(Agent):
-    def before_run(self, run):
-        if run.state.resources:
-            run.add_message(
-                Message(
-                    role=Role.SYSTEM,
-                    content=f"Resources: {run.state.resources}",
-                )
-            )
-```
-
-`before_run`/`plan` are the same hooks Execution already calls once,
-right after seeding a Run's instructions and input message and before the
-step loop starts, so this needs no new framework machinery. What the
-model actually saw stays inspectable the same way everything else does:
-the messages these hooks add are ordinary Run messages, in `run.messages`
-alongside every other turn.
+Changing an Agent's definition does not retroactively change historical Runs. Durable Runs should retain enough identity and provenance to explain which Agent definition produced them.
 
 ---
 
-# State
+### Why ARE
+
+Agent applications combine probabilistic decisions, application code, external capabilities, persistence, and real-world side effects.
+
+ARE keeps these concerns separate:
+
+* **Agent** defines behavior.
+* **Execution** progresses behavior.
+* **Run** persists what happened.
+
+**Because progress is recorded on the Run, persistence, background execution, approval, observability, retry behavior, and evaluation can operate around the Run without coupling themselves to Agent definitions or Execution internals.**
+
+---
+
+## State
 
 State is information that persists according to a defined lifetime.
 
 Runa distinguishes:
 
-## Run State
+### Run State
 
 Belongs to one Run.
 
@@ -228,7 +160,7 @@ run.state.sources
 run.state.findings
 ```
 
-## Conversation State
+### Conversation State
 
 Spans multiple Runs.
 
@@ -237,7 +169,7 @@ conversation.state.summary
 conversation.state.preferences
 ```
 
-## Application State
+### Application State
 
 Belongs to the application domain.
 
@@ -428,6 +360,17 @@ a human. This is deliberately separate from `requires_approval`, which
 always defers to a human: Policy is for rules the application can decide
 on its own; approval is for decisions that need a person.
 
+Runa has no separate `guardrails` concept. A guardrail is a rule an
+application wants enforced around model behavior, which is exactly what a
+Policy is; introducing a second name for the same idea would only add a
+second place to look.
+
+`requires_approval` belongs to the Tool being called, not the Agent
+calling it: set it on the Tool (`class TransferFunds(Tool):
+requires_approval = True`, or `@tool(requires_approval=True)`), and every
+Agent that declares that Tool inherits the gate. Approval is a property
+of the action, not a per-agent override list.
+
 ---
 
 # Event
@@ -526,25 +469,60 @@ pattern this implies for concurrent work.
 
 # Strategy
 
-A Strategy controls how a Run advances.
-
-It is a runtime mechanism, not normally the application's primary programming model.
+Every Runa Agent uses the same control loop: a ReAct-style cycle of
+observe, decide, act, and repeat.
 
 ```text
 Agent
-  ↓
-Run
-  ↓
-Strategy
-  ↓
+  ↓ declares capabilities + constraints
 Execution
+  ↓
+ReAct strategy
+  ↓
+Action
+  ├── Tool
+  ├── Delegate
+  ├── State update
+  └── Finish
+  ↓
+Run updated
+  ↓
+Repeat
 ```
 
-Use the default strategy whenever possible.
+> **Every Runa Agent uses a ReAct-style execution loop: observe state,
+> decide an action, execute it, observe the result, and repeat until
+> completion.**
 
-Use custom Strategies when the execution loop itself needs to change shape.
+Applications do not choose between a planner, an orchestrator, a
+reflection loop, and ReAct. There is one loop. A Strategy is what
+implements it, and Strategy is a runtime mechanism, not normally the
+application's primary programming model, and not a field on `Agent`:
+choosing between execution strategies is not part of the normal Agent
+configuration surface.
 
-Planning, reflection, ReAct, graph execution, and multi-agent patterns are not mandatory Runa concepts.
+In Runa's implementation, `DefaultStrategy` (`runtime/strategy.py`) *is*
+this loop: given a Run, it decides `CallModel`, `CallTool`, `Complete`, or
+`Fail` from what has already happened, the Executor performs that
+decision, and the cycle repeats. Reach for a custom Strategy, passed
+explicitly to `Executor`/`AsyncExecutor`, only when the loop's shape
+itself must change:
+
+```python
+executor = Executor(provider, strategy=CustomStrategy())
+```
+
+This is an escape hatch for the rare case that needs it, not a normal
+Agent configuration knob.
+
+Use Agent lifecycle hooks (`before_run`/`after_run`) for behavior around
+the loop; reach for a custom Strategy only when the loop itself must work
+differently. See [Choosing Between Agent Hooks and
+Strategy](guides.md#choosing-between-agent-hooks-and-strategy).
+
+The canonical principle:
+
+> **Agent declares. ReAct decides. Execution performs. Run records.**
 
 > **Standardize execution, not intelligence.**
 

@@ -8,7 +8,6 @@ from runa.agent import (
     AsyncDelegateAgent,
     DelegateAgent,
     DuplicateToolName,
-    UnknownApprovalTool,
 )
 from runa.application import ProviderNotConfigured, application, configure
 from runa.core import Conversation, EventType, Message, Role, Run, RunStatus, ToolCall
@@ -24,11 +23,6 @@ class Ledger(Tool):
 
 class Reporting(Tool):
     def call(self) -> None:
-        pass
-
-
-class TransferFunds(Tool):
-    def call(self, amount: float) -> None:
         pass
 
 
@@ -57,28 +51,12 @@ def test_duplicate_tool_names_raise_at_class_definition():
             tools = [Ledger, Ledger]
 
 
-def test_requires_approval_must_reference_a_declared_tool():
-    with pytest.raises(UnknownApprovalTool):
-
-        class BrokenAgent(Agent):
-            tools = [Ledger]
-            requires_approval = [TransferFunds]
-
-
-def test_requires_approval_marks_matching_tool_name():
-    class FinanceAgent(Agent):
-        tools = [Ledger, Reporting, TransferFunds]
-        requires_approval = [TransferFunds]
-
-    assert FinanceAgent.approval_tool_names() == {"TransferFunds"}
-
-
-def test_tool_level_requires_approval_is_respected_without_declaration():
+def test_approval_tool_names_reflects_tool_level_requires_approval():
     approval_tool = Ledger()
     approval_tool.requires_approval = True
 
     class FinanceAgent(Agent):
-        tools = [approval_tool]
+        tools = [approval_tool, Reporting]
 
     assert FinanceAgent.approval_tool_names() == {"Ledger"}
 
@@ -90,8 +68,6 @@ def test_default_hooks_are_noops():
     agent = SimpleAgent()
     run = Run(input="hi")
     agent.before_run(run)
-    agent.plan(run)
-    agent.review(run)
     agent.after_run(run)
 
 
@@ -655,6 +631,8 @@ def test_a_denying_policy_fails_the_run_without_calling_the_tool_or_a_human():
 
 def test_a_policy_runs_before_approval_so_a_denied_call_never_pauses_for_a_human():
     class TransferFunds(Tool):
+        requires_approval = True
+
         def call(self, amount: float) -> None:
             pass
 
@@ -663,7 +641,6 @@ def test_a_policy_runs_before_approval_so_a_denied_call_never_pauses_for_a_human
 
     class FinanceAgent(Agent):
         tools = [TransferFunds]
-        requires_approval = [TransferFunds]
         policies = [deny_large_transfers]
 
     provider = FakeProvider(

@@ -79,8 +79,9 @@ def _json_safe(value: Any) -> Any:
     `Run.input` and `Run.result` get the same treatment for the same reason:
     `Agent.run(input: Any, ...)` places no constraint on `input`, and
     architecture.md §2 explicitly expects `Result` to hold structured,
-    application-defined objects, not just text; `agent.review()` can return
-    any value as the Run's final result. A Run round-tripped through a store
+    application-defined objects, not just text; the Strategy's `Complete`
+    action can carry any value as the Run's final result. A Run round-tripped
+    through a store
     loses the original object's type either way once it isn't JSON-safe (a
     dataclass decoded back from JSON is a plain dict, not that dataclass);
     the choice here is only between that degraded-but-present `str()` form

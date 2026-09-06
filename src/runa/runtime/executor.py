@@ -57,18 +57,15 @@ class Executor:
     pause (background handoff, approval) gets a fresh budget rather than
     inheriting elapsed wait time. `None` (the default) means no timeout.
 
-    Agent hooks fire in one fixed order: seeding, then `before_run` and
-    `plan` once, before the first Strategy step; `review` once, when the
-    Strategy decides to Complete, its return value replaces the Strategy's
-    draft result unless it returns `None` (manifesto §6's "reflection");
-    `after_run` once the Run reaches a terminal status. Resuming a paused
-    Run skips seeding/`before_run`/`plan`: they're a start-of-run setup
-    phase, not re-run on every resume.
+    Agent hooks fire in one fixed order: seeding, then `before_run` once,
+    before the first Strategy step; `after_run` once the Run reaches a
+    terminal status. Resuming a paused Run skips seeding/`before_run`:
+    they're a start-of-run setup phase, not re-run on every resume.
 
-    A bug while seeding the Run (`seed_run`) or in `before_run`/`plan` fails
+    A bug while seeding the Run (`seed_run`) or in `before_run` fails
     the Run with that exception as `Run.error`, same as a bug in the
     Strategy loop itself: `run.start()` moves the Run to RUNNING *before*
-    any of the three runs, so leaving an exception there unhandled would
+    either one runs, so leaving an exception there unhandled would
     strand the Run at RUNNING forever instead of a terminal status,
     indistinguishable from one still genuinely in progress, and, for a Run
     driven from a background thread (`run_later()` on a `ThreadQueue`/
@@ -134,7 +131,6 @@ class Executor:
                 try:
                     seed_run(agent, run)
                     agent.before_run(run)
-                    agent.plan(run)
                 except Exception as exc:  # same guarantee as the step loop below
                     run.fail(error=str(exc))
             elif run.status in (RunStatus.PAUSED, RunStatus.AWAITING_APPROVAL):
@@ -196,8 +192,7 @@ class Executor:
         elif isinstance(action, CallTool):
             return self._call_tool(agent, run, action.tool_call)
         elif isinstance(action, Complete):
-            revised = agent.review(run)
-            run.complete(result=action.result if revised is None else revised)
+            run.complete(result=action.result)
         elif isinstance(action, Fail):
             run.fail(error=action.error)
         else:

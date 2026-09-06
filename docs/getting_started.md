@@ -506,17 +506,25 @@ statements scattered through your tool code.
 tool is. Suppose the support Agent grows a `RefundCustomer` tool,
 something you want a human to sign off on before it actually happens.
 
-Declare that at the Agent boundary:
+Declare that on the tool itself, not the Agent that uses it:
 
 ```python
-from app.tools.refund_customer_tool import RefundCustomerTool
+from runa import Tool
+
+
+class RefundCustomerTool(Tool):
+    requires_approval = True
+
+    def call(self, order_id: str, amount: float) -> str: ...
 
 
 class SupportAgent(Agent):
     tools = [KnowledgeBaseTool, CreateTicketTool, RefundCustomerTool]
-
-    requires_approval = [RefundCustomerTool]
 ```
+
+Approval is a property of the action, not something every Agent that
+happens to use `RefundCustomerTool` has to remember to declare
+separately.
 
 When execution reaches that tool call, the Run pauses instead of
 executing it:
@@ -557,12 +565,11 @@ def block_large_refunds(run, tool_call) -> bool:
 class SupportAgent(Agent):
     tools = [KnowledgeBaseTool, CreateTicketTool, RefundCustomerTool]
     policies = [block_large_refunds]
-    requires_approval = [RefundCustomerTool]
 ```
 
 Use `policies` for what's always true regardless of who's watching; use
-`requires_approval` for the decisions that should always go to a person.
-The underlying principle, stated once in
+the tool's `requires_approval` for the decisions that should always go to
+a person. The underlying principle, stated once in
 [RUNA.md](../RUNA.md#7-capabilities-do-not-imply-authority): **intelligence
 does not imply authority.**
 

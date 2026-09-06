@@ -245,20 +245,6 @@ def test_async_run_raises_when_another_executor_is_already_driving_it():
     assert run.status == RunStatus.CREATED
 
 
-def test_async_executor_review_hook_can_revise_the_result():
-    class ReviewingAgent(Agent):
-        def review(self, run):
-            return f"revised: {run.messages[-1].content}"
-
-    provider = FakeAsyncProvider(
-        responses=[Message(role=Role.ASSISTANT, content="draft")]
-    )
-
-    run = asyncio.run(AsyncExecutor(provider).run(ReviewingAgent(), Run(input="hi")))
-
-    assert run.result == "revised: draft"
-
-
 def test_async_on_chunk_receives_deltas_and_the_run_completes_normally():
     provider = FakeAsyncStreamingProvider(
         responses=[Message(role=Role.ASSISTANT, content="hi there")]

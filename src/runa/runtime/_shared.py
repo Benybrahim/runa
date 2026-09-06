@@ -54,9 +54,9 @@ def transfer_agent(
     call still gets a normal TOOL-role result message (every tool call needs
     one), followed by a SYSTEM message carrying the new agent's instructions,
     the same way `seed_run` introduces the first agent's instructions, so the
-    model sees the new persona on its next turn. `agent.review()`/
-    `agent.after_run()` fire on whichever agent is active when `run`
-    completes, so a transferred-to agent gets them, not the original.
+    model sees the new persona on its next turn. `agent.after_run()`
+    fires on whichever agent is active when `run` completes, so a
+    transferred-to agent gets it, not the original.
     """
     new_agent = tool.new_agent_instance()
     tool_call.attempts += 1

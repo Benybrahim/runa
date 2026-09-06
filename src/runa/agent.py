@@ -55,10 +55,6 @@ class DuplicateToolName(Exception):
     """Raised when two tools declared on an Agent share a name."""
 
 
-class UnknownApprovalTool(Exception):
-    """Raised when `requires_approval` names a tool not present in `tools`."""
-
-
 def _resolve_tool(entry: ToolEntry) -> Tool:
     if isinstance(entry, Tool):
         return entry
@@ -70,9 +66,9 @@ def _resolve_tool(entry: ToolEntry) -> Tool:
 class Agent:
     """Base class for declaring an agent's instructions and capabilities.
 
-    Subclass and set `instructions`, `tools`, and optionally
-    `requires_approval` and `model` at the class level. A reader should be
-    able to see what an agent can do from its class body alone:
+    Subclass and set `instructions`, `tools`, and optionally `model` at the
+    class level. A reader should be able to see what an agent can do from
+    its class body alone:
 
         class SupportAgent(Agent):
             tools = [KnowledgeBase, CreateTicket]
@@ -83,18 +79,22 @@ class Agent:
             '''
     """
 
-    instructions: ClassVar[str] = ""
-    tools: ClassVar[list[ToolEntry]] = []
-    delegations: ClassVar[list["DelegationEntry"]] = []
-    requires_approval: ClassVar[list[ToolEntry]] = []
-    policies: ClassVar[list[Policy]] = []
-    model: ClassVar[str | None] = None
+    # Identity
     name: ClassVar[str | None] = None
     version: ClassVar[str | None] = None
 
+    # Declaration
+    instructions: ClassVar[str] = ""
+    model: ClassVar[str | None] = None
+    tools: ClassVar[list[ToolEntry]] = []
+    delegations: ClassVar[list["DelegationEntry"]] = []
+
+    # Constraints
+    policies: ClassVar[list[Policy]] = []
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
-        cls.approval_tool_names()  # resolved eagerly so mistakes surface at import time
+        cls.resolved_tools()  # resolved eagerly so mistakes surface at import time
 
     @classmethod
     def agent_name(cls) -> str:
@@ -136,23 +136,22 @@ class Agent:
 
     @classmethod
     def approval_tool_names(cls) -> frozenset[str]:
+        """Names of resolved tools that require approval before running.
+
+        Approval is a property of the Tool being called, not something an
+        Agent declares separately: set `requires_approval = True` on the
+        Tool itself (or `@tool(requires_approval=True)`), and any Agent
+        that declares it inherits the gate automatically.
+        """
         cached = cls.__dict__.get("_approval_tool_names")
         if cached is not None:
             return cached
 
-        tools = cls.resolved_tools()
-        names = {name for name, tool in tools.items() if tool.requires_approval}
-        for entry in cls.requires_approval:
-            resolved_tool = _resolve_tool(entry)
-            name = resolved_tool.tool_name()
-            if name not in tools:
-                raise UnknownApprovalTool(
-                    f"{cls.__name__}.requires_approval names {name!r}, "
-                    "which is not declared in `tools`"
-                )
-            names.add(name)
-
-        result = frozenset(names)
+        result = frozenset(
+            name
+            for name, tool in cls.resolved_tools().items()
+            if tool.requires_approval
+        )
         cls._approval_tool_names = result
         return result
 
@@ -168,24 +167,20 @@ class Agent:
         """
         return all(policy(run, tool_call) for policy in type(self).policies)
 
+    # Lifecycle
+
     def before_run(self, run: Run) -> None:
-        """Called before execution begins. Override to customize."""
+        """Called once before the ReAct loop starts. Override to customize.
 
-    def plan(self, run: Run) -> None:
-        """Called to plan before acting. Override to customize."""
-
-    def review(self, run: Run) -> Any | None:
-        """Called to review the draft result before completion.
-
-        Override to customize. Return a value to replace the Strategy's
-        draft result with it (manifesto §6's "reflection"); return `None`
-        (the default; an override that falls off the end returns `None`
-        automatically) to leave it as the Strategy decided.
+        Use this to surface application State the model needs to see (see
+        `runtime/_shared.seed_run`), not to decide what happens next: that
+        is the Strategy's job, not the Agent's.
         """
-        return None
 
     def after_run(self, run: Run) -> None:
         """Called after execution completes. Override to customize."""
+
+    # Execution API
 
     @classmethod
     def run(

@@ -160,8 +160,8 @@ Do not turn durable application concepts into “agent memory” merely because 
 What a model call sees is a projection Execution builds from
 `Agent.instructions`, the Run's messages, and whatever State the
 application explicitly puts in front of it, not something Runa assembles
-for you. Use `before_run`/`plan` to add it as an ordinary system message
-when the Agent needs information the application already has:
+for you. Use `before_run` to add it as an ordinary system message when
+the Agent needs information the application already has:
 
 ```python
 class SupportAgent(Agent):
@@ -439,16 +439,21 @@ runa eval    # runs app/evaluations/
 
 # Adding Human Approval
 
-Declare approval requirements at the Agent boundary:
+Declare approval requirements on the Tool itself, not the Agent that uses it:
 
 ```python
+class TransferFunds(Tool):
+    requires_approval = True
+
+    def call(self, amount: float) -> str: ...
+
+
 class FinanceAgent(Agent):
     tools = [TransferFunds]
-
-    requires_approval = [
-        TransferFunds,
-    ]
 ```
+
+Any Agent that declares `TransferFunds` inherits the gate automatically:
+approval is a property of the action, not a per-agent override list.
 
 When execution reaches that action:
 
@@ -602,9 +607,16 @@ Effect
 over allowing a model response to directly perform an irreversible side effect.
 
 Declare Policy checks on the Agent for rules the application can decide on
-its own, without a human:
+its own, without a human, and declare approval on the Tool itself for
+calls that should always get a human decision:
 
 ```python
+class TransferFunds(Tool):
+    requires_approval = True  # still gate the rest on a human
+
+    def call(self, amount: float) -> str: ...
+
+
 def block_large_transfers(run, tool_call) -> bool:
     return tool_call.arguments.get("amount", 0) <= 10_000
 
@@ -612,13 +624,14 @@ def block_large_transfers(run, tool_call) -> bool:
 class FinanceAgent(Agent):
     tools = [TransferFunds]
     policies = [block_large_transfers]
-    requires_approval = [TransferFunds]  # still gate the rest on a human
 ```
 
 A Policy that returns `False` fails the Run outright, before it can ever
 reach approval. Use Policy for rules that are always true regardless of who
-is watching; use `requires_approval` for the calls that should always get
-a human decision.
+is watching; use the Tool's `requires_approval` for the calls that should
+always get a human decision. There is no separate `guardrails` concept:
+a guardrail is a rule the application wants enforced, which is what a
+Policy already is.
 
 For actions that may be retried, define idempotency semantics in the tool:
 

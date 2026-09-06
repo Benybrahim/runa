@@ -7,7 +7,6 @@ from runa.agent import (
     DelegateAgent,
     DuplicateToolName,
     Policy,
-    UnknownApprovalTool,
 )
 from runa.application import (
     Application,
@@ -177,7 +176,6 @@ __all__ = [
     "TimelineEntry",
     "Tool",
     "ToolCall",
-    "UnknownApprovalTool",
     "UnknownProvider",
     "UnknownToolCall",
     "Verdict",

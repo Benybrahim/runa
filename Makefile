@@ -35,7 +35,6 @@ examples:
 	uv run python examples/approval.py
 	uv run python examples/eval.py
 	uv run python examples/delegate.py
-	uv run python examples/plan_and_review.py
 	uv run python examples/streaming.py
 
 clean:
