@@ -5,7 +5,7 @@ from dataclasses import MISSING, dataclass, fields, replace
 from typing import Any, Literal
 
 from agents import Agent as BaseAgent
-from agents import RunConfig, RunContextWrapper, Runner
+from agents import RunConfig, RunContextWrapper, RunHooks, Runner
 from agents.extensions.models.litellm_provider import LitellmProvider
 from agents.items import TResponseInputItem
 
@@ -103,25 +103,35 @@ class Agent(BaseAgent):
         super().__init__(**kwargs)
         self.history: list[TResponseInputItem] = []
 
-    async def run(self, message: str, context: Any = None) -> str:
+    async def run(
+        self, message: str, context: Any = None, hooks: RunHooks[Any] | None = None
+    ) -> str:
         """Run a turn asynchronously, appending it to the conversation history.
 
         `context` is available to a single-argument `instructions` callable (and to tools,
-        guardrails, etc.) as-is; it is never sent to the model.
+        guardrails, etc.) as-is; it is never sent to the model. `hooks` receives lifecycle
+        callbacks (`on_agent_start`, `on_tool_end`, etc.) from the underlying SDK's `Runner`.
         """
         turn_input = [*self.history, {"role": "user", "content": message}]
-        result = await Runner.run(self, turn_input, context=context, run_config=_RUN_CONFIG)
+        result = await Runner.run(
+            self, turn_input, context=context, hooks=hooks, run_config=_RUN_CONFIG
+        )
         self.history = result.to_input_list()
         return result.final_output
 
-    def run_sync(self, message: str, context: Any = None) -> str:
+    def run_sync(
+        self, message: str, context: Any = None, hooks: RunHooks[Any] | None = None
+    ) -> str:
         """Run a turn synchronously, appending it to the conversation history.
 
         `context` is available to a single-argument `instructions` callable (and to tools,
-        guardrails, etc.) as-is; it is never sent to the model.
+        guardrails, etc.) as-is; it is never sent to the model. `hooks` receives lifecycle
+        callbacks (`on_agent_start`, `on_tool_end`, etc.) from the underlying SDK's `Runner`.
         """
         turn_input = [*self.history, {"role": "user", "content": message}]
-        result = Runner.run_sync(self, turn_input, context=context, run_config=_RUN_CONFIG)
+        result = Runner.run_sync(
+            self, turn_input, context=context, hooks=hooks, run_config=_RUN_CONFIG
+        )
         self.history = result.to_input_list()
         return result.final_output
 
