@@ -6,6 +6,7 @@ from typing import Any, Literal
 from agents import Agent as BaseAgent
 from agents import RunConfig, Runner
 from agents.extensions.models.litellm_provider import LitellmProvider
+from agents.guardrail import InputGuardrail, OutputGuardrail
 from agents.items import TResponseInputItem
 
 _RUN_CONFIG = RunConfig(model_provider=LitellmProvider())
@@ -46,7 +47,7 @@ class Agent(BaseAgent):
     model = "gpt-5.4-nano"
 
     def __init__(self, **kwargs: Any) -> None:
-        """Build kwargs from class attributes and wire up any subagents."""
+        """Build kwargs from class attributes and wire up any subagents and guardrails."""
         for f in fields(BaseAgent):
             value = getattr(type(self), f.name, MISSING)
             if value is not MISSING:
@@ -66,6 +67,20 @@ class Agent(BaseAgent):
                 tools.append(agent.as_tool(None, None))
         kwargs["handoffs"] = handoffs
         kwargs["tools"] = tools
+        input_guardrails = list(kwargs.get("input_guardrails", []))
+        output_guardrails = list(kwargs.get("output_guardrails", []))
+        for g in getattr(type(self), "guardrails", []):
+            if isinstance(g, InputGuardrail):
+                input_guardrails.append(g)
+            elif isinstance(g, OutputGuardrail):
+                output_guardrails.append(g)
+            else:
+                raise TypeError(
+                    f"guardrails entries must be @Guardrail.input/@Guardrail.output, "
+                    f"got {type(g).__name__}"
+                )
+        kwargs["input_guardrails"] = input_guardrails
+        kwargs["output_guardrails"] = output_guardrails
         super().__init__(**kwargs)
         self.history: list[TResponseInputItem] = []
 
