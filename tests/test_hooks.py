@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 
 import pytest
 from agents import RunContextWrapper, RunHooks
@@ -9,7 +10,7 @@ from agents.items import ModelResponse
 from agents.run_context import AgentHookContext
 from agents.usage import Usage
 
-from runa import Agent, LoggingAgentHooks, LoggingRunHooks, MetricsRunHooks
+from runa import Agent, LoggingAgentHooks, LoggingRunHooks, MetricsRunHooks, TracingRunHooks
 from runa.tool import tool as tool_decorator
 
 
@@ -101,6 +102,23 @@ def test_metrics_run_hooks_count_every_callback() -> None:
     assert hooks.usage.input_tokens == 10
     assert hooks.usage.output_tokens == 5
     assert hooks.usage.total_tokens == 15
+
+
+def test_tracing_run_hooks_log_every_callback_with_elapsed_time(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Each `TracingRunHooks` `on_*_end` callback logs the elapsed time since its start."""
+    with caplog.at_level(logging.DEBUG, logger="runa"):
+        asyncio.run(_run_all_run_hooks(TracingRunHooks()))
+
+    messages = [r.getMessage() for r in caplog.records]
+    assert messages[0] == "agent start: Researcher"
+    assert re.fullmatch(r"agent end: Researcher -> 'final output' \(\d+\.\d+ms\)", messages[1])
+    assert messages[2] == "handoff: Researcher -> Translator"
+    assert messages[3] == "tool start: search (Researcher)"
+    assert re.fullmatch(r"tool end: search -> 'tool result' \(\d+\.\d+ms\)", messages[4])
+    assert messages[5] == "llm start: Researcher"
+    assert re.fullmatch(r"llm end: Researcher \(\d+\.\d+ms\)", messages[6])
 
 
 def test_agent_hooks_log_every_callback(caplog: pytest.LogCaptureFixture) -> None:

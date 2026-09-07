@@ -1,6 +1,7 @@
 """Built-in `RunHooks` implementations."""
 
 import logging
+import time
 from typing import Any
 
 from agents import AgentHooks, RunHooks
@@ -118,6 +119,66 @@ class MetricsRunHooks(RunHooks[Any]):
         """Count `agent`'s model call and accumulate its token usage."""
         self.llm_ends += 1
         self.usage.add(response.usage)
+
+
+class TracingRunHooks(RunHooks[Any]):
+    """Logs each lifecycle event of a run with the elapsed time since its matching start.
+
+    Complements `LoggingRunHooks`, which logs that an event happened, by also logging how long
+    it took: each `on_*_end` callback logs the elapsed time since the matching `on_*_start`.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the start-time stacks used to pair `on_*_start`/`on_*_end` callbacks."""
+        self._agent_starts: list[float] = []
+        self._tool_starts: list[float] = []
+        self._llm_starts: list[float] = []
+
+    async def on_agent_start(self, context: AgentHookContext[Any], agent: Any) -> None:
+        """Log that `agent` is about to run and record the start time."""
+        self._agent_starts.append(time.monotonic())
+        logger.info("agent start: %s", agent.name)
+
+    async def on_agent_end(self, context: AgentHookContext[Any], agent: Any, output: Any) -> None:
+        """Log the final output `agent` produced and the elapsed time since it started."""
+        elapsed_ms = (time.monotonic() - self._agent_starts.pop()) * 1000
+        logger.info("agent end: %s -> %r (%.1fms)", agent.name, output, elapsed_ms)
+
+    async def on_handoff(
+        self, context: RunContextWrapper[Any], from_agent: Any, to_agent: Any
+    ) -> None:
+        """Log a handoff between agents."""
+        logger.info("handoff: %s -> %s", from_agent.name, to_agent.name)
+
+    async def on_tool_start(self, context: RunContextWrapper[Any], agent: Any, tool: Tool) -> None:
+        """Log that `tool` is about to run and record the start time."""
+        self._tool_starts.append(time.monotonic())
+        logger.info("tool start: %s (%s)", tool.name, agent.name)
+
+    async def on_tool_end(
+        self, context: RunContextWrapper[Any], agent: Any, tool: Tool, result: object
+    ) -> None:
+        """Log the result `tool` returned and the elapsed time since it started."""
+        elapsed_ms = (time.monotonic() - self._tool_starts.pop()) * 1000
+        logger.info("tool end: %s -> %r (%.1fms)", tool.name, result, elapsed_ms)
+
+    async def on_llm_start(
+        self,
+        context: RunContextWrapper[Any],
+        agent: Any,
+        system_prompt: str | None,
+        input_items: list[TResponseInputItem],
+    ) -> None:
+        """Log that `agent` is about to call the model and record the start time."""
+        self._llm_starts.append(time.monotonic())
+        logger.debug("llm start: %s", agent.name)
+
+    async def on_llm_end(
+        self, context: RunContextWrapper[Any], agent: Any, response: ModelResponse
+    ) -> None:
+        """Log that `agent`'s model call returned and the elapsed time since it started."""
+        elapsed_ms = (time.monotonic() - self._llm_starts.pop()) * 1000
+        logger.debug("llm end: %s (%.1fms)", agent.name, elapsed_ms)
 
 
 class LoggingAgentHooks(AgentHooks[Any]):
