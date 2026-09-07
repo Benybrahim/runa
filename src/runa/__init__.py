@@ -1,9 +1,5 @@
 """Runa: an opinionated framework for agentic AI."""
 
-from agents import SQLiteSession
-from agents.extensions.memory.async_sqlite_session import AsyncSQLiteSession
-from agents.extensions.memory.redis_session import RedisSession
-
 from runa.agent import Agent, websocket_session
 from runa.approval import approval
 from runa.guardrail import guardrail
@@ -18,6 +14,7 @@ from runa.hooks import (
     RunHooks,
     TracingRunHooks,
 )
+from runa.session import AsyncSQLiteSession, RedisSession, SQLiteSession
 from runa.tool import tool
 
 __all__ = [
