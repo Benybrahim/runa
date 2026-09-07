@@ -3,7 +3,8 @@
 import inspect
 import json
 from collections.abc import Awaitable, Callable
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 
 from agents import (
     GuardrailFunctionOutput,
@@ -71,18 +72,51 @@ def _wrap_tool(
     return wrapper
 
 
+def _tool_input_guardrail(func: _Predicate) -> ToolInputGuardrail[Any]:
+    """Bind a predicate as a `ToolInputGuardrail`."""
+    return ToolInputGuardrail(
+        guardrail_function=_wrap_tool(func, on_output=False), name=func.__name__
+    )
+
+
+def _tool_output_guardrail(func: _Predicate) -> ToolOutputGuardrail[Any]:
+    """Bind a predicate as a `ToolOutputGuardrail`."""
+    return ToolOutputGuardrail(
+        guardrail_function=_wrap_tool(func, on_output=True), name=func.__name__
+    )
+
+
+@dataclass
+class _AgentInputGuardrail(InputGuardrail[Any]):
+    """An `InputGuardrail` that remembers its raw predicate, for reuse in `@tool(guardrail=..)`."""
+
+    predicate: _Predicate | None = None
+
+
+@dataclass
+class _AgentOutputGuardrail(OutputGuardrail[Any]):
+    """An `OutputGuardrail` that remembers its raw predicate, for reuse in `@tool(guardrail=..)`."""
+
+    predicate: _Predicate | None = None
+
+
 class Guardrail:
     """A predicate bound to neither side yet; `.input`/`.output` picks which.
 
     `@guardrail` wraps a plain `(value) -> bool` predicate — tripping the guardrail on `True` —
     into this, the same way `@tool` wraps a plain function into a `FunctionTool`. Read `.input`
-    to bind it as an `InputGuardrail` (the predicate always sees the latest user message as
-    plain text, regardless of whether the SDK passed a string or the running list of input
-    items) or `.output` to bind it as an `OutputGuardrail`, for an `Agent.guardrails` list.
-    Read `.tool_input`/`.tool_output` to bind it as a `ToolInputGuardrail`/`ToolOutputGuardrail`
-    instead, for a `@tool(guardrail=[...])` list — checked against the tool call's parsed
-    arguments and its return value, respectively. The predicate's docstring becomes
-    `output_info`. Listed bare (no binding), it's wired as both sides of whichever pair applies.
+    to bind it to the input side, `.output` for the output side. The same bound object works in
+    both places it's listed:
+
+    - In an `Agent.guardrails` list, it's an `InputGuardrail`/`OutputGuardrail` — the predicate
+      sees the latest user message as plain text (regardless of whether the SDK passed a string
+      or the running list of input items) on `.input`, or the agent's final output on `.output`.
+    - In a `@tool(guardrail=[...])` list, the same object is reinterpreted as a
+      `ToolInputGuardrail`/`ToolOutputGuardrail` — the predicate sees the tool call's arguments
+      (parsed from JSON into a dict) on `.input`, or the tool's raw return value on `.output`.
+
+    The predicate's docstring becomes `output_info`. Listed bare (no `.input`/`.output`), it's
+    wired as both sides of whichever pair applies.
     """
 
     def __init__(self, func: _Predicate) -> None:
@@ -91,30 +125,20 @@ class Guardrail:
 
     @property
     def input(self) -> InputGuardrail[Any]:
-        """Bind this predicate as an `InputGuardrail`."""
-        return InputGuardrail(
-            guardrail_function=_wrap(self._func, reduce_input=True), name=self._func.__name__
+        """Bind this predicate to the input side."""
+        return _AgentInputGuardrail(
+            guardrail_function=_wrap(self._func, reduce_input=True),
+            name=self._func.__name__,
+            predicate=self._func,
         )
 
     @property
     def output(self) -> OutputGuardrail[Any]:
-        """Bind this predicate as an `OutputGuardrail`."""
-        return OutputGuardrail(
-            guardrail_function=_wrap(self._func, reduce_input=False), name=self._func.__name__
-        )
-
-    @property
-    def tool_input(self) -> ToolInputGuardrail[Any]:
-        """Bind this predicate as a `ToolInputGuardrail`, checked against the call's arguments."""
-        return ToolInputGuardrail(
-            guardrail_function=_wrap_tool(self._func, on_output=False), name=self._func.__name__
-        )
-
-    @property
-    def tool_output(self) -> ToolOutputGuardrail[Any]:
-        """Bind this predicate as a `ToolOutputGuardrail`, checked against the return value."""
-        return ToolOutputGuardrail(
-            guardrail_function=_wrap_tool(self._func, on_output=True), name=self._func.__name__
+        """Bind this predicate to the output side."""
+        return _AgentOutputGuardrail(
+            guardrail_function=_wrap(self._func, reduce_input=False),
+            name=self._func.__name__,
+            predicate=self._func,
         )
 
 
@@ -123,19 +147,75 @@ def guardrail(func: _Predicate) -> Guardrail:
     return Guardrail(func)
 
 
-ToolGuardrailsList = list["ToolInputGuardrail[Any] | ToolOutputGuardrail[Any] | Guardrail"]
+GuardrailsList = list["InputGuardrail[Any] | OutputGuardrail[Any] | Guardrail"]
+GuardrailsDict = dict[Literal["input", "output"], GuardrailsList]
+
+ToolGuardrailsList = list[
+    ToolInputGuardrail[Any]
+    | ToolOutputGuardrail[Any]
+    | InputGuardrail[Any]
+    | OutputGuardrail[Any]
+    | Guardrail
+]
+ToolGuardrailsDict = dict[Literal["input", "output"], ToolGuardrailsList]
+
+
+def _entries(guardrails: Any) -> list[Any]:
+    """Normalize a flat list or `{"input": [...], "output": [...]}` dict to a flat entry list.
+
+    A bare `Guardrail` nested in a dict bucket binds to that bucket's side; everything else
+    (already-bound entries, native SDK guardrails) passes through untouched.
+    """
+    if not isinstance(guardrails, dict):
+        return list(guardrails)
+    return [
+        getattr(sub, mode) if isinstance(sub, Guardrail) else sub
+        for mode, subs in guardrails.items()
+        for sub in subs
+    ]
+
+
+def flatten_agent_guardrails(
+    guardrails: GuardrailsList | GuardrailsDict,
+) -> tuple[list[InputGuardrail[Any]], list[OutputGuardrail[Any]]]:
+    """Split an `Agent.guardrails` list/dict into input/output lists; bare entries wire as both."""
+    input_guardrails: list[InputGuardrail[Any]] = []
+    output_guardrails: list[OutputGuardrail[Any]] = []
+    for entry in _entries(guardrails):
+        if isinstance(entry, Guardrail):
+            input_guardrails.append(entry.input)
+            output_guardrails.append(entry.output)
+        elif isinstance(entry, InputGuardrail):
+            input_guardrails.append(entry)
+        elif isinstance(entry, OutputGuardrail):
+            output_guardrails.append(entry)
+        else:
+            raise TypeError(
+                f"guardrails entries must be @guardrail predicates bound via "
+                f".input/.output, got {type(entry).__name__}"
+            )
+    return input_guardrails, output_guardrails
 
 
 def flatten_tool_guardrails(
-    guardrails: ToolGuardrailsList,
+    guardrails: ToolGuardrailsList | ToolGuardrailsDict,
 ) -> tuple[list[ToolInputGuardrail[Any]], list[ToolOutputGuardrail[Any]]]:
-    """Split a `@tool(guardrail=[...])` list into input/output lists; bare entries wire as both."""
+    """Split a `@tool(guardrail=...)` list/dict into input/output lists; bare entries wire as both.
+
+    Accepts native `ToolInputGuardrail`/`ToolOutputGuardrail`, a bare `@guardrail` predicate, or
+    the same `.input`/`.output`-bound object used for `Agent.guardrails` — reused here against
+    the tool call's arguments/return value instead of the agent's input/output.
+    """
     input_guardrails: list[ToolInputGuardrail[Any]] = []
     output_guardrails: list[ToolOutputGuardrail[Any]] = []
-    for entry in guardrails:
+    for entry in _entries(guardrails):
         if isinstance(entry, Guardrail):
-            input_guardrails.append(entry.tool_input)
-            output_guardrails.append(entry.tool_output)
+            input_guardrails.append(_tool_input_guardrail(entry._func))
+            output_guardrails.append(_tool_output_guardrail(entry._func))
+        elif isinstance(entry, _AgentInputGuardrail) and entry.predicate is not None:
+            input_guardrails.append(_tool_input_guardrail(entry.predicate))
+        elif isinstance(entry, _AgentOutputGuardrail) and entry.predicate is not None:
+            output_guardrails.append(_tool_output_guardrail(entry.predicate))
         elif isinstance(entry, ToolInputGuardrail):
             input_guardrails.append(entry)
         elif isinstance(entry, ToolOutputGuardrail):
@@ -143,9 +223,18 @@ def flatten_tool_guardrails(
         else:
             raise TypeError(
                 f"guardrail entries must be @guardrail predicates bound via "
-                f".tool_input/.tool_output, got {type(entry).__name__}"
+                f".input/.output (or native tool guardrails), got {type(entry).__name__}"
             )
     return input_guardrails, output_guardrails
 
 
-__all__ = ["Guardrail", "flatten_tool_guardrails", "guardrail"]
+__all__ = [
+    "Guardrail",
+    "GuardrailsDict",
+    "GuardrailsList",
+    "ToolGuardrailsDict",
+    "ToolGuardrailsList",
+    "flatten_agent_guardrails",
+    "flatten_tool_guardrails",
+    "guardrail",
+]

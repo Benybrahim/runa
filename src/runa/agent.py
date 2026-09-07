@@ -6,39 +6,14 @@ from typing import Any, Literal
 from agents import Agent as BaseAgent
 from agents import RunConfig, Runner
 from agents.extensions.models.litellm_provider import LitellmProvider
-from agents.guardrail import InputGuardrail, OutputGuardrail
 from agents.items import TResponseInputItem
 
-from runa.guardrail import Guardrail
+from runa.guardrail import flatten_agent_guardrails
 
 _RUN_CONFIG = RunConfig(model_provider=LitellmProvider())
 
 SubagentsList = list["type[Agent] | Subagent"]
 SubagentsDict = dict[Literal["handoff", "delegate", "auto"], SubagentsList]
-
-GuardrailsList = list["InputGuardrail[Any] | OutputGuardrail[Any] | Guardrail"]
-GuardrailsDict = dict[Literal["input", "output"], GuardrailsList]
-
-
-def _flatten_guardrails(guardrails: GuardrailsList | GuardrailsDict) -> GuardrailsList:
-    """Normalize the `guardrails` class attribute to the flat list the wiring loop expects.
-
-    Accepts either a plain list (each entry `.input`/`.output`-bound, or a bare `@guardrail`
-    entry, which wires it as both) or a `{"input": [...], "output": [...]}` dict, where the key
-    binds any bare entry to just that side.
-    """
-    if isinstance(guardrails, dict):
-        entries = [
-            getattr(sub, mode) if isinstance(sub, Guardrail) else sub
-            for mode, subs in guardrails.items()
-            for sub in subs
-        ]
-    else:
-        entries = list(guardrails)
-    flat: GuardrailsList = []
-    for entry in entries:
-        flat.extend((entry.input, entry.output) if isinstance(entry, Guardrail) else (entry,))
-    return flat
 
 
 def _flatten_subagents(subagents: SubagentsList | SubagentsDict) -> SubagentsList:
@@ -93,20 +68,14 @@ class Agent(BaseAgent):
                 tools.append(agent.as_tool(None, None))
         kwargs["handoffs"] = handoffs
         kwargs["tools"] = tools
-        input_guardrails = list(kwargs.get("input_guardrails", []))
-        output_guardrails = list(kwargs.get("output_guardrails", []))
-        for g in _flatten_guardrails(getattr(type(self), "guardrails", [])):
-            if isinstance(g, InputGuardrail):
-                input_guardrails.append(g)
-            elif isinstance(g, OutputGuardrail):
-                output_guardrails.append(g)
-            else:
-                raise TypeError(
-                    f"guardrails entries must be @guardrail predicates bound via "
-                    f".input/.output, got {type(g).__name__}"
-                )
-        kwargs["input_guardrails"] = input_guardrails
-        kwargs["output_guardrails"] = output_guardrails
+        new_input_guardrails, new_output_guardrails = flatten_agent_guardrails(
+            getattr(type(self), "guardrails", [])
+        )
+        kwargs["input_guardrails"] = [*kwargs.get("input_guardrails", []), *new_input_guardrails]
+        kwargs["output_guardrails"] = [
+            *kwargs.get("output_guardrails", []),
+            *new_output_guardrails,
+        ]
         super().__init__(**kwargs)
         self.history: list[TResponseInputItem] = []
 

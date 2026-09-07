@@ -1,4 +1,4 @@
-"""Tests for the `@tool` decorator's `guardrail=`/`require_approval=` wiring."""
+"""Tests for the `@tool` decorator's `guardrail=` wiring."""
 
 import asyncio
 from collections.abc import Awaitable
@@ -50,7 +50,7 @@ def block_long(output: str) -> bool:
 
 @tool
 def bare() -> str:
-    """Return a constant string, with no guardrails or approval requirement."""
+    """Return a constant string, with no guardrails."""
     return "ok"
 
 
@@ -63,9 +63,9 @@ def test_bare_tool_has_no_guardrails_or_approval() -> None:
 
 
 def test_guardrail_list_splits_by_binding() -> None:
-    """`.tool_input`/`.tool_output`-bound entries land in their matching SDK list."""
+    """`.input`/`.output`-bound entries land in their matching SDK tool-guardrail list."""
 
-    @tool(guardrail=[block_args.tool_input, block_long.tool_output])
+    @tool(guardrail=[block_args.input, block_long.output])
     def now() -> str:
         """Return a constant string."""
         return "now"
@@ -86,8 +86,20 @@ def test_bare_guardrail_wires_both_sides() -> None:
     assert [g.get_name() for g in now.tool_output_guardrails or []] == ["block_args"]
 
 
+def test_dict_guardrails_wire_by_key() -> None:
+    """A `{"input": [...], "output": [...]}` dict binds each bare entry by its key."""
+
+    @tool(guardrail={"input": [block_args], "output": [block_long]})
+    def now() -> str:
+        """Return a constant string."""
+        return "now"
+
+    assert [g.get_name() for g in now.tool_input_guardrails or []] == ["block_args"]
+    assert [g.get_name() for g in now.tool_output_guardrails or []] == ["block_long"]
+
+
 def test_invalid_guardrail_entry_raises() -> None:
-    """A `guardrail` entry not bound via `.tool_input`/`.tool_output` is rejected."""
+    """A `guardrail` entry not bound via `.input`/`.output` is rejected."""
     with pytest.raises(TypeError, match="guardrail entries must be"):
 
         @tool(guardrail=cast(Any, [lambda value: False]))
@@ -96,10 +108,10 @@ def test_invalid_guardrail_entry_raises() -> None:
             return "now"
 
 
-def test_require_approval_forwards_to_needs_approval() -> None:
-    """`require_approval=True` forwards to the SDK's `needs_approval`."""
+def test_needs_approval_passes_through_natively() -> None:
+    """`needs_approval=True` forwards straight through to `function_tool`, unmodified."""
 
-    @tool(require_approval=True)
+    @tool(needs_approval=True)
     def now() -> str:
         """Return a constant string."""
         return "now"
@@ -108,16 +120,26 @@ def test_require_approval_forwards_to_needs_approval() -> None:
 
 
 def test_tool_input_guardrail_sees_parsed_arguments() -> None:
-    """A `.tool_input`-bound predicate receives the tool call's arguments as a parsed dict."""
-    bound = block_args.tool_input
+    """An `.input`-bound predicate, reused in a tool context, sees parsed call arguments."""
 
+    @tool(guardrail=[block_args.input])
+    def now() -> str:
+        """Return a constant string."""
+        return "now"
+
+    (bound,) = now.tool_input_guardrails or []
     assert _tripped(_run(bound, _Data(tool_arguments='{"x": 1}')))
     assert not _tripped(_run(bound, _Data(tool_arguments="{}")))
 
 
 def test_tool_output_guardrail_sees_return_value() -> None:
-    """A `.tool_output`-bound predicate receives the tool's raw return value."""
-    bound = block_long.tool_output
+    """An `.output`-bound predicate, reused in a tool context, sees the tool's return value."""
 
+    @tool(guardrail=[block_long.output])
+    def now() -> str:
+        """Return a constant string."""
+        return "now"
+
+    (bound,) = now.tool_output_guardrails or []
     assert _tripped(_run(bound, _Data(tool_arguments="{}", output="x" * 101)))
     assert not _tripped(_run(bound, _Data(tool_arguments="{}", output="short")))

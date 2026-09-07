@@ -26,7 +26,14 @@ def no_args(args: dict) -> bool:
     return bool(args)
 
 
-@tool(guardrail=[no_args.tool_input, block_long.tool_output])
+@guardrail
+def log_call(value: object) -> bool:
+    """Print the value seen on either side of the call, but never trip."""
+    print(f"now(): {value!r}")
+    return False
+
+
+@tool(guardrail=[no_args.input, block_long.output, log_call])
 def now() -> str:
     """Return the current local time as an ISO 8601 string."""
     return datetime.now().isoformat()
