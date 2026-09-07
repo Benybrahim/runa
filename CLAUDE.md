@@ -15,10 +15,10 @@ Runa is an opinionated Python framework for agentic AI.
 
 - Zen of Python: `import this`
 - Less is better than more.
-- Don't write comments, code should explain itself.
+- No Comments.
+- Always give oneliner commit message: `feat`, `fix`, `docs`, `test`, `refactor`
 
 ## Code Conventions
 
 * Python 3.14, managed with `uv`.
 * Ruff config: line length 100, target `py314`, rules `E`, `F`, `I`. `B`, `SIM`, `UP`
-

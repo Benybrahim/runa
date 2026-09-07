@@ -5,13 +5,7 @@
 Runa is an agent application framework that includes everything needed to
 build and run reliable, stateful agents.
 
-## Features
-
-- [Observability](docs/concepts.md#observability), to watch a Run live or replay its event history afterward
-- [Evaluation](docs/concepts.md#evaluation), a harness to grade Agent behavior against cases, distinct from deterministic tests
-- [A CLI](docs/cli.md), to scaffold and operate an application
-
-## Getting Started
+## Quick Start
 
 1. Runa hasn't made a tagged release yet. Install it straight from the repo
    with [uv](https://docs.astral.sh/uv/):
@@ -51,15 +45,6 @@ build and run reliable, stateful agents.
     * [Getting Started with Runa](docs/getting_started.md)
     * [Runa Guides](docs/guides.md)
 
-## Contributing
-
-We encourage you to contribute to Runa! Please check out the
-[Contributing to Runa guide](./CONTRIBUTING.md) for guidelines about how to proceed.
-
-Trying to report a possible security vulnerability in Runa? Please
-check out our [security policy](./SECURITY.md) for guidelines about how to proceed.
-
-Everyone interacting in Runa is expected to follow the Runa [code of conduct](./CODE_OF_CONDUCT.md).
 
 ## License
 
