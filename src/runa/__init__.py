@@ -1,5 +1,7 @@
 """Runa: an opinionated framework for agentic AI."""
 
+from agents import SQLiteSession
+
 from runa.agent import Agent, websocket_session
 from runa.approval import approval
 from runa.guardrail import guardrail
@@ -26,6 +28,7 @@ __all__ = [
     "LoggingRunHooks",
     "MetricsRunHooks",
     "RunHooks",
+    "SQLiteSession",
     "TracingRunHooks",
     "approval",
     "guardrail",
