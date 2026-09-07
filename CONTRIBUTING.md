@@ -1,24 +1,22 @@
-## Contributing to Runa
+# Contributing
 
-**Security vulnerability?** Don't open an issue, see [SECURITY.md](./SECURITY.md).
+Thanks for your interest in contributing to Runa.
 
-**Bug?** Search [Issues](https://github.com/Benybrahim/runa/issues) first, then
-open one with a minimal repro.
+## Getting Started
 
-**Fixing a bug?** Open a PR. Run `make check` first, and read
-[RUNA.md](./RUNA.md) and [CLAUDE.md](./CLAUDE.md) so the patch fits Runa's
-conventions.
+1. Fork the repository
+2. Create a branch
+3. Make your changes
+4. Add or update tests
+5. Open a pull request
 
-**Cosmetic-only patch?** `make format` and `make lint-fix` already keep the
-codebase consistent, so bundle formatting changes with a substantive one
-instead of sending them alone.
+## Guidelines
 
-**New feature or behavior change?** Open an issue first and describe the
-problem. Runa is opinionated, work through [`RUNA.md`](./RUNA.md)'s "Runa Standard" before
-proposing a new abstraction. Wait for feedback before opening a PR for
-anything touching core architecture.
+* Keep changes focused and small
+* Follow the existing code style
+* Add tests when appropriate
+* Update documentation when needed
 
-**Docs?** Live in [`docs/`](./docs). PR them like a code change, and keep
-vocabulary consistent with [`concepts.md`](./docs/concepts.md).
+For bugs and feature requests, please open an issue first when possible.
 
-By participating, you agree to follow the [Code of Conduct](./CODE_OF_CONDUCT.md).
+Thank you for contributing.

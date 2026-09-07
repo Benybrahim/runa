@@ -1,19 +1,20 @@
-# Security Policy
+# Security
 
-## Reporting a vulnerability
+## Reporting a Vulnerability
 
-If you believe you've found a security vulnerability in Runa, please report it privately rather than opening a public issue.
+Please do not open public issues for security vulnerabilities.
 
-The preferred channel is [GitHub's private vulnerability reporting](https://github.com/Benybrahim/runa/security/advisories/new) on this repository ("Security" tab → "Report a vulnerability"). This repository does not yet have a dedicated security email or bug bounty program: private reporting through GitHub is the mechanism available today.
+Report vulnerabilities privately to the maintainers with:
 
-Please include:
+- A clear description of the issue
+- Steps to reproduce
+- Potential impact
+- Suggested mitigation, if available
 
-* A description of the vulnerability and its potential impact
-* Steps to reproduce it
-* Any relevant code, configuration, or logs
+We will acknowledge reports and work to resolve confirmed vulnerabilities as quickly as possible.
 
-We'll acknowledge reports and work with you on a fix and disclosure timeline before any public disclosure.
+## Scope
 
-## Supported versions
+Please only test against your own deployments or environments where you have explicit permission.
 
-Runa is pre-1.0 and under active development. Security fixes are made against the latest release on `main`; there is no long-term-support branch at this stage.
+Thank you for helping keep Runa secure.

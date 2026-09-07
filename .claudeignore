@@ -31,6 +31,3 @@ uv.lock
 # Claude Code internals
 .claude/worktrees/
 .claude/scheduled_tasks.lock
-
-# Personal notes not part of the framework
-personal/
