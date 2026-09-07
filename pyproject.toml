@@ -10,7 +10,7 @@ dependencies = [
     "aiosqlite>=0.20.0",
     "anthropic>=0.40.0",
     "openai>=1.0.0",
-    "openai-agents[litellm,redis]>=0.22.0",
+    "openai-agents[litellm,redis,sqlalchemy]>=0.22.0",
 ]
 
 [project.scripts]

@@ -14,7 +14,7 @@ from runa.hooks import (
     RunHooks,
     TracingRunHooks,
 )
-from runa.session import AsyncSQLiteSession, RedisSession, SQLiteSession
+from runa.session import AsyncSQLiteSession, RedisSession, SQLAlchemySession, SQLiteSession
 from runa.tool import tool
 
 __all__ = [
@@ -29,6 +29,7 @@ __all__ = [
     "MetricsRunHooks",
     "RedisSession",
     "RunHooks",
+    "SQLAlchemySession",
     "SQLiteSession",
     "TracingRunHooks",
     "approval",

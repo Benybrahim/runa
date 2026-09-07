@@ -5,6 +5,7 @@ from typing import Any
 from agents import OpenAIResponsesCompactionSession
 from agents.extensions.memory.async_sqlite_session import AsyncSQLiteSession as _AsyncSQLiteSession
 from agents.extensions.memory.redis_session import RedisSession as _RedisSession
+from agents.extensions.memory.sqlalchemy_session import SQLAlchemySession as _SQLAlchemySession
 from agents.memory.session import SessionABC
 from agents.memory.sqlite_session import SQLiteSession as _SQLiteSession
 
@@ -36,4 +37,8 @@ class RedisSession(_Compactable, _RedisSession):
     """`RedisSession` with `.compact()` sugar."""
 
 
-__all__ = ["AsyncSQLiteSession", "RedisSession", "SQLiteSession"]
+class SQLAlchemySession(_Compactable, _SQLAlchemySession):
+    """`SQLAlchemySession` with `.compact()` sugar."""
+
+
+__all__ = ["AsyncSQLiteSession", "RedisSession", "SQLAlchemySession", "SQLiteSession"]
