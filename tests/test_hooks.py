@@ -5,7 +5,7 @@ import logging
 import re
 
 import pytest
-from agents import RunContextWrapper, RunHooks
+from agents import AgentHooks, RunContextWrapper, RunHooks
 from agents.items import ModelResponse
 from agents.run_context import AgentHookContext
 from agents.usage import Usage
@@ -13,6 +13,7 @@ from agents.usage import Usage
 from runa import (
     Agent,
     AuditRunHooks,
+    CompositeAgentHooks,
     CompositeRunHooks,
     LoggingAgentHooks,
     LoggingRunHooks,
@@ -63,7 +64,7 @@ async def _run_all_run_hooks(hooks: RunHooks[None]) -> None:
     await hooks.on_llm_end(context, researcher, _response)
 
 
-async def _run_all_agent_hooks(hooks: LoggingAgentHooks) -> None:
+async def _run_all_agent_hooks(hooks: AgentHooks[None]) -> None:
     context: RunContextWrapper[None] = RunContextWrapper(context=None)
     agent_context: AgentHookContext[None] = AgentHookContext(context=None)
     researcher, translator = Researcher(), Translator()
@@ -185,6 +186,50 @@ def test_agent_hooks_log_every_callback(caplog: pytest.LogCaptureFixture) -> Non
         "llm start: Researcher",
         "llm end: Researcher",
     ]
+
+
+def test_composite_agent_hooks_logs_counts_and_records_every_callback(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """`CompositeAgentHooks` logs, counts, and audits every callback from one hook instance."""
+    hooks = CompositeAgentHooks()
+    with caplog.at_level(logging.DEBUG, logger="runa"):
+        asyncio.run(_run_all_agent_hooks(hooks))
+
+    messages = [r.getMessage() for r in caplog.records]
+    assert messages == [
+        "agent start: Researcher",
+        "agent end: Researcher -> 'final output'",
+        "handoff: Translator -> Researcher",
+        "tool start: search (Researcher)",
+        "tool end: search -> 'tool result'",
+        "llm start: Researcher",
+        "llm end: Researcher",
+    ]
+
+    assert hooks.starts == 1
+    assert hooks.ends == 1
+    assert hooks.handoffs == 1
+    assert hooks.tool_starts == 1
+    assert hooks.tool_ends == 1
+    assert hooks.llm_starts == 1
+    assert hooks.llm_ends == 1
+    assert hooks.usage.requests == 1
+    assert hooks.usage.input_tokens == 10
+    assert hooks.usage.output_tokens == 5
+    assert hooks.usage.total_tokens == 15
+
+    assert [e.event for e in hooks.events] == [
+        "start",
+        "end",
+        "handoff",
+        "tool_start",
+        "tool_end",
+        "llm_start",
+        "llm_end",
+    ]
+    assert hooks.events[2].agent == "Researcher"
+    assert hooks.events[2].detail == "from Translator"
 
 
 def test_agent_hooks_can_be_set_on_an_agent_class() -> None:

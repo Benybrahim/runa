@@ -185,7 +185,7 @@ class TracingRunHooks(RunHooks[Any]):
 
 @dataclass(frozen=True)
 class AuditEvent:
-    """A single timestamped entry in an `AuditRunHooks` trail."""
+    """A single timestamped entry in an `AuditRunHooks`/`CompositeAgentHooks` trail."""
 
     timestamp: float
     """The `time.time()` value when the event occurred."""
@@ -321,6 +321,7 @@ class LoggingAgentHooks(AgentHooks[Any]):
 
     Assign an instance to an `Agent` subclass's `hooks` class attribute to log that agent's
     own callbacks; unlike `LoggingRunHooks`, this is scoped to one agent rather than a run.
+    See also `CompositeAgentHooks`, which combines this with metrics and audit tracking.
     """
 
     async def on_start(self, context: AgentHookContext[Any], agent: Any) -> None:
@@ -360,3 +361,86 @@ class LoggingAgentHooks(AgentHooks[Any]):
     ) -> None:
         """Log that `agent`'s model call returned."""
         logger.debug("llm end: %s", agent.name)
+
+
+class CompositeAgentHooks(AgentHooks[Any]):
+    """Combines logging, metrics, and audit tracking for a single agent into one `AgentHooks`.
+
+    Assign an instance to an `Agent` subclass's `hooks` class attribute to log every callback
+    (`self.logging`, a `LoggingAgentHooks`), count them and accumulate model token usage
+    (`self.metrics`), and record a timestamped audit trail (`self.audit`), all from one hook
+    instance, since an `Agent` accepts only a single `hooks`. Tracing is left out: elapsed time
+    is a per-run concern (see `TracingRunHooks`), not one that makes sense accumulated across an
+    agent's whole lifetime.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the logging, metrics, and audit state each callback updates."""
+        self.logging = LoggingAgentHooks()
+
+        self.starts = 0
+        self.ends = 0
+        self.handoffs = 0
+        self.tool_starts = 0
+        self.tool_ends = 0
+        self.llm_starts = 0
+        self.llm_ends = 0
+        self.usage = Usage()
+
+        self.events: list[AuditEvent] = []
+
+    def _record(self, event: str, agent: Any, detail: str) -> None:
+        self.events.append(AuditEvent(time.time(), event, agent.name, detail))
+
+    async def on_start(self, context: AgentHookContext[Any], agent: Any) -> None:
+        """Log, count, and record that `agent` is about to run."""
+        await self.logging.on_start(context, agent)
+        self.starts += 1
+        self._record("start", agent, "start")
+
+    async def on_end(self, context: AgentHookContext[Any], agent: Any, output: Any) -> None:
+        """Log, count, and record the final output `agent` produced."""
+        await self.logging.on_end(context, agent, output)
+        self.ends += 1
+        self._record("end", agent, repr(output))
+
+    async def on_handoff(self, context: RunContextWrapper[Any], agent: Any, source: Any) -> None:
+        """Log, count, and record that `source` handed off to `agent`."""
+        await self.logging.on_handoff(context, agent, source)
+        self.handoffs += 1
+        self._record("handoff", agent, f"from {source.name}")
+
+    async def on_tool_start(self, context: RunContextWrapper[Any], agent: Any, tool: Tool) -> None:
+        """Log, count, and record that `tool` is about to run."""
+        await self.logging.on_tool_start(context, agent, tool)
+        self.tool_starts += 1
+        self._record("tool_start", agent, tool.name)
+
+    async def on_tool_end(
+        self, context: RunContextWrapper[Any], agent: Any, tool: Tool, result: object
+    ) -> None:
+        """Log, count, and record the result `tool` returned."""
+        await self.logging.on_tool_end(context, agent, tool, result)
+        self.tool_ends += 1
+        self._record("tool_end", agent, f"{tool.name} -> {result!r}")
+
+    async def on_llm_start(
+        self,
+        context: RunContextWrapper[Any],
+        agent: Any,
+        system_prompt: str | None,
+        input_items: list[TResponseInputItem],
+    ) -> None:
+        """Log, count, and record that `agent` is about to call the model."""
+        await self.logging.on_llm_start(context, agent, system_prompt, input_items)
+        self.llm_starts += 1
+        self._record("llm_start", agent, "start")
+
+    async def on_llm_end(
+        self, context: RunContextWrapper[Any], agent: Any, response: ModelResponse
+    ) -> None:
+        """Log, count, and record that `agent`'s model call returned."""
+        await self.logging.on_llm_end(context, agent, response)
+        self.llm_ends += 1
+        self.usage.add(response.usage)
+        self._record("llm_end", agent, "end")
