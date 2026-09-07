@@ -6,7 +6,7 @@ from dataclasses import MISSING, dataclass, fields, replace
 from typing import Any, Literal
 
 from agents import Agent as BaseAgent
-from agents import RunConfig, RunContextWrapper, RunHooks, Runner, StreamEvent
+from agents import RunConfig, RunContextWrapper, RunHooks, Runner, Session, StreamEvent
 from agents import responses_websocket_session as websocket_session
 from agents.extensions.models.litellm_provider import LitellmProvider
 from agents.items import TResponseInputItem
@@ -126,7 +126,11 @@ class Agent(BaseAgent):
         self._last_response_id: str | None = None
 
     async def run(
-        self, message: str, context: Any = None, hooks: RunHooks[Any] | None = None
+        self,
+        message: str,
+        context: Any = None,
+        hooks: RunHooks[Any] | None = None,
+        session: Session | None = None,
     ) -> str:
         """Run a turn asynchronously, appending it to the conversation history.
 
@@ -134,16 +138,26 @@ class Agent(BaseAgent):
         guardrails, etc.) as-is; it is never sent to the model. `hooks` receives lifecycle
         callbacks (`on_agent_start`, `on_tool_end`, etc.) from the underlying SDK's `Runner`;
         it defaults to every built-in `RunHooks` (logging, metrics, tracing, audit) combined.
+
+        Pass a `session` (e.g. `SQLiteSession`) to persist conversation history there instead
+        of on `self.history`; the session supplies prior turns automatically, so only the new
+        `message` is sent as input, and `self.history` is left untouched.
         """
-        turn_input = [*self.history, {"role": "user", "content": message}]
+        turn_input = (
+            message
+            if session is not None
+            else [*self.history, {"role": "user", "content": message}]
+        )
         result = await Runner.run(
             self,
             turn_input,
             context=context,
             hooks=hooks or _default_hooks(),
             run_config=_RUN_CONFIG,
+            session=session,
         )
-        self.history = result.to_input_list()
+        if session is None:
+            self.history = result.to_input_list()
         return result.final_output
 
     async def run_streamed(
@@ -193,7 +207,11 @@ class Agent(BaseAgent):
         self.history = result.to_input_list()
 
     def run_sync(
-        self, message: str, context: Any = None, hooks: RunHooks[Any] | None = None
+        self,
+        message: str,
+        context: Any = None,
+        hooks: RunHooks[Any] | None = None,
+        session: Session | None = None,
     ) -> str:
         """Run a turn synchronously, appending it to the conversation history.
 
@@ -201,16 +219,26 @@ class Agent(BaseAgent):
         guardrails, etc.) as-is; it is never sent to the model. `hooks` receives lifecycle
         callbacks (`on_agent_start`, `on_tool_end`, etc.) from the underlying SDK's `Runner`;
         it defaults to every built-in `RunHooks` (logging, metrics, tracing, audit) combined.
+
+        Pass a `session` (e.g. `SQLiteSession`) to persist conversation history there instead
+        of on `self.history`; the session supplies prior turns automatically, so only the new
+        `message` is sent as input, and `self.history` is left untouched.
         """
-        turn_input = [*self.history, {"role": "user", "content": message}]
+        turn_input = (
+            message
+            if session is not None
+            else [*self.history, {"role": "user", "content": message}]
+        )
         result = Runner.run_sync(
             self,
             turn_input,
             context=context,
             hooks=hooks or _default_hooks(),
             run_config=_RUN_CONFIG,
+            session=session,
         )
-        self.history = result.to_input_list()
+        if session is None:
+            self.history = result.to_input_list()
         return result.final_output
 
 
