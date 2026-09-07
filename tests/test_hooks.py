@@ -4,12 +4,12 @@ import asyncio
 import logging
 
 import pytest
-from agents import RunContextWrapper
+from agents import RunContextWrapper, RunHooks
 from agents.items import ModelResponse
 from agents.run_context import AgentHookContext
 from agents.usage import Usage
 
-from runa import Agent, LoggingAgentHooks, LoggingRunHooks
+from runa import Agent, LoggingAgentHooks, LoggingRunHooks, MetricsRunHooks
 from runa.tool import tool as tool_decorator
 
 
@@ -33,10 +33,14 @@ def search(query: str) -> str:
     return query
 
 
-_response = ModelResponse(output=[], usage=Usage(), response_id=None)
+_response = ModelResponse(
+    output=[],
+    usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+    response_id=None,
+)
 
 
-async def _run_all_run_hooks(hooks: LoggingRunHooks) -> None:
+async def _run_all_run_hooks(hooks: RunHooks[None]) -> None:
     context: RunContextWrapper[None] = RunContextWrapper(context=None)
     agent_context: AgentHookContext[None] = AgentHookContext(context=None)
     researcher, translator = Researcher(), Translator()
@@ -79,6 +83,24 @@ def test_run_hooks_log_every_callback(caplog: pytest.LogCaptureFixture) -> None:
         "llm start: Researcher",
         "llm end: Researcher",
     ]
+
+
+def test_metrics_run_hooks_count_every_callback() -> None:
+    """`MetricsRunHooks` counts each callback and accumulates token usage from `on_llm_end`."""
+    hooks = MetricsRunHooks()
+    asyncio.run(_run_all_run_hooks(hooks))
+
+    assert hooks.agent_starts == 1
+    assert hooks.agent_ends == 1
+    assert hooks.handoffs == 1
+    assert hooks.tool_starts == 1
+    assert hooks.tool_ends == 1
+    assert hooks.llm_starts == 1
+    assert hooks.llm_ends == 1
+    assert hooks.usage.requests == 1
+    assert hooks.usage.input_tokens == 10
+    assert hooks.usage.output_tokens == 5
+    assert hooks.usage.total_tokens == 15
 
 
 def test_agent_hooks_log_every_callback(caplog: pytest.LogCaptureFixture) -> None:
