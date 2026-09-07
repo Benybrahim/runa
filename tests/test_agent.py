@@ -299,3 +299,82 @@ def test_run_sync_explicit_hooks_override_the_default(monkeypatch: pytest.Monkey
     Researcher().run_sync("hi", hooks=custom_hooks)
 
     assert captured["hooks"] is custom_hooks
+
+
+class _FakeStreamingResult:
+    """A stand-in for `RunResultStreaming`, just enough for `Agent.run_streamed` to consume."""
+
+    def __init__(self, events: list[Any]) -> None:
+        self._events = events
+
+    async def stream_events(self) -> Any:
+        for event in self._events:
+            yield event
+
+    def to_input_list(self) -> list[Any]:
+        return [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "ok"}]
+
+
+def test_run_streamed_yields_events_and_updates_history(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`run_streamed` yields every SDK stream event, then appends the turn to history."""
+    fake_events = ["event-1", "event-2"]
+
+    def fake_run_streamed(*args: Any, **kwargs: Any) -> _FakeStreamingResult:
+        return _FakeStreamingResult(fake_events)
+
+    monkeypatch.setattr("runa.agent.Runner.run_streamed", staticmethod(fake_run_streamed))
+
+    agent = Researcher()
+
+    async def _consume() -> list[Any]:
+        return [event async for event in agent.run_streamed("hi")]
+
+    events = asyncio.run(_consume())
+
+    assert events == fake_events
+    assert agent.history == [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "ok"},
+    ]
+
+
+def test_run_streamed_defaults_to_every_built_in_hook(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`run_streamed` defaults to a `CompositeRunHooks` combining every built-in hook."""
+    captured: dict[str, Any] = {}
+
+    def fake_run_streamed(*args: Any, hooks: Any, **kwargs: Any) -> _FakeStreamingResult:
+        captured["hooks"] = hooks
+        return _FakeStreamingResult([])
+
+    monkeypatch.setattr("runa.agent.Runner.run_streamed", staticmethod(fake_run_streamed))
+
+    async def _consume() -> None:
+        async for _ in Researcher().run_streamed("hi"):
+            pass
+
+    asyncio.run(_consume())
+
+    hooks = captured["hooks"]
+    assert isinstance(hooks, CompositeRunHooks)
+    hook_types = {type(h) for h in hooks.hooks}
+    assert hook_types == {LoggingRunHooks, MetricsRunHooks, TracingRunHooks, AuditRunHooks}
+
+
+def test_run_streamed_explicit_hooks_override_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An explicit `hooks` argument is used instead of the default combined hooks."""
+    captured: dict[str, Any] = {}
+    custom_hooks = LoggingRunHooks()
+
+    def fake_run_streamed(*args: Any, hooks: Any, **kwargs: Any) -> _FakeStreamingResult:
+        captured["hooks"] = hooks
+        return _FakeStreamingResult([])
+
+    monkeypatch.setattr("runa.agent.Runner.run_streamed", staticmethod(fake_run_streamed))
+
+    async def _consume() -> None:
+        async for _ in Researcher().run_streamed("hi", hooks=custom_hooks):
+            pass
+
+    asyncio.run(_consume())
+
+    assert captured["hooks"] is custom_hooks

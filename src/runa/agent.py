@@ -1,11 +1,12 @@
 """Class-based Agent built on the OpenAI Agents SDK."""
 
 import inspect
+from collections.abc import AsyncIterator
 from dataclasses import MISSING, dataclass, fields, replace
 from typing import Any, Literal
 
 from agents import Agent as BaseAgent
-from agents import RunConfig, RunContextWrapper, RunHooks, Runner
+from agents import RunConfig, RunContextWrapper, RunHooks, Runner, StreamEvent
 from agents.extensions.models.litellm_provider import LitellmProvider
 from agents.items import TResponseInputItem
 
@@ -141,6 +142,29 @@ class Agent(BaseAgent):
         )
         self.history = result.to_input_list()
         return result.final_output
+
+    async def run_streamed(
+        self, message: str, context: Any = None, hooks: RunHooks[Any] | None = None
+    ) -> AsyncIterator[StreamEvent]:
+        """Run a turn as a stream of events, appending it to the conversation history.
+
+        Yields the underlying SDK's `StreamEvent`s (`raw_response_event`,
+        `run_item_stream_event`, `agent_updated_stream_event`) as they arrive. `context` and
+        `hooks` behave as in `run`/`run_sync`. The conversation history is updated only once the
+        stream is fully consumed, so a caller that stops iterating early leaves `self.history`
+        unchanged.
+        """
+        turn_input = [*self.history, {"role": "user", "content": message}]
+        result = Runner.run_streamed(
+            self,
+            turn_input,
+            context=context,
+            hooks=hooks or _default_hooks(),
+            run_config=_RUN_CONFIG,
+        )
+        async for event in result.stream_events():
+            yield event
+        self.history = result.to_input_list()
 
     def run_sync(
         self, message: str, context: Any = None, hooks: RunHooks[Any] | None = None
