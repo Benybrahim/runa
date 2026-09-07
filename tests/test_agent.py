@@ -115,6 +115,50 @@ def test_no_subagents_leaves_handoffs_and_tools_empty() -> None:
     assert agent.tools == []
 
 
+def test_dict_subagents_wire_by_key() -> None:
+    """A `{"handoff": [...], "delegate": [...], "auto": [...]}` dict wires each bucket."""
+
+    class Helper(Agent):
+        name = "Helper"
+        instructions = "helper"
+
+    class Main(Agent):
+        name = "Main"
+        instructions = "main"
+        subagents = {
+            "handoff": [Researcher],
+            "delegate": [Translator],
+            "auto": [Helper],
+        }
+
+    agent = Main()
+
+    assert sorted(_handoff_names(agent)) == ["Helper", "Researcher"]
+    assert sorted(_tool_names(agent)) == sorted(
+        [Translator().as_tool(None, None).name, Helper().as_tool(None, None).name]
+    )
+
+
+def test_dict_subagents_delegate_bucket_keeps_tool_overrides() -> None:
+    """A `.delegate(...)` override still applies inside the dict format's `delegate` bucket."""
+
+    class Main(Agent):
+        name = "Main"
+        instructions = "main"
+        subagents = {
+            "delegate": [
+                Researcher.delegate(tool_name="do_research", tool_description="Look into it.")
+            ]
+        }
+
+    agent = Main()
+
+    (tool,) = agent.tools
+    assert isinstance(tool, FunctionTool)
+    assert tool.name == "do_research"
+    assert tool.description == "Look into it."
+
+
 def test_subagent_descriptor_returns_fresh_immutable_instance() -> None:
     """Each access to `.handoff`/`.delegate` is a new `Subagent`; overrides don't mutate it."""
     first = Researcher.handoff

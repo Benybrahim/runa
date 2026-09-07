@@ -4,8 +4,30 @@ from dataclasses import MISSING, dataclass, fields, replace
 from typing import Any, Literal
 
 from agents import Agent as BaseAgent
-from agents import Runner
+from agents import RunConfig, Runner
+from agents.extensions.models.litellm_provider import LitellmProvider
 from agents.items import TResponseInputItem
+
+_RUN_CONFIG = RunConfig(model_provider=LitellmProvider())
+
+SubagentsList = list["type[Agent] | Subagent"]
+SubagentsDict = dict[Literal["handoff", "delegate", "auto"], SubagentsList]
+
+
+def _flatten_subagents(subagents: SubagentsList | SubagentsDict) -> SubagentsList:
+    """Normalize the `subagents` class attribute to the flat list the wiring loop expects.
+
+    Accepts either a plain list (each entry bare, or `.handoff`/`.delegate`-wrapped) or a
+    `{"handoff": [...], "delegate": [...], "auto": [...]}` dict, where the key supplies the
+    mode for any bare entry.
+    """
+    if not isinstance(subagents, dict):
+        return list(subagents)
+    flat: SubagentsList = []
+    for mode, subs in subagents.items():
+        for sub in subs:
+            flat.append(sub if mode == "auto" or isinstance(sub, Subagent) else Subagent(sub, mode))
+    return flat
 
 
 class _Mode:
@@ -31,7 +53,7 @@ class Agent(BaseAgent):
                 kwargs.setdefault(f.name, value)
         handoffs = list(kwargs.get("handoffs", []))
         tools = list(kwargs.get("tools", []))
-        for sub in getattr(type(self), "subagents", []):
+        for sub in _flatten_subagents(getattr(type(self), "subagents", [])):
             if isinstance(sub, Subagent):
                 agent = sub.agent()
                 if sub.mode == "handoff":
@@ -50,14 +72,14 @@ class Agent(BaseAgent):
     async def run(self, message: str) -> str:
         """Run a turn asynchronously, appending it to the conversation history."""
         turn_input = [*self.history, {"role": "user", "content": message}]
-        result = await Runner.run(self, turn_input)
+        result = await Runner.run(self, turn_input, run_config=_RUN_CONFIG)
         self.history = result.to_input_list()
         return result.final_output
 
     def run_sync(self, message: str) -> str:
         """Run a turn synchronously, appending it to the conversation history."""
         turn_input = [*self.history, {"role": "user", "content": message}]
-        result = Runner.run_sync(self, turn_input)
+        result = Runner.run_sync(self, turn_input, run_config=_RUN_CONFIG)
         self.history = result.to_input_list()
         return result.final_output
 
