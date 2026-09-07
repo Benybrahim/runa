@@ -10,7 +10,14 @@ from agents.items import ModelResponse
 from agents.run_context import AgentHookContext
 from agents.usage import Usage
 
-from runa import Agent, LoggingAgentHooks, LoggingRunHooks, MetricsRunHooks, TracingRunHooks
+from runa import (
+    Agent,
+    AuditRunHooks,
+    LoggingAgentHooks,
+    LoggingRunHooks,
+    MetricsRunHooks,
+    TracingRunHooks,
+)
 from runa.tool import tool as tool_decorator
 
 
@@ -119,6 +126,28 @@ def test_tracing_run_hooks_log_every_callback_with_elapsed_time(
     assert re.fullmatch(r"tool end: search -> 'tool result' \(\d+\.\d+ms\)", messages[4])
     assert messages[5] == "llm start: Researcher"
     assert re.fullmatch(r"llm end: Researcher \(\d+\.\d+ms\)", messages[6])
+
+
+def test_audit_run_hooks_record_every_callback() -> None:
+    """`AuditRunHooks` records one timestamped `AuditEvent` per callback, in order."""
+    hooks = AuditRunHooks()
+    asyncio.run(_run_all_run_hooks(hooks))
+
+    assert [e.event for e in hooks.events] == [
+        "agent_start",
+        "agent_end",
+        "handoff",
+        "tool_start",
+        "tool_end",
+        "llm_start",
+        "llm_end",
+    ]
+    assert all(e.timestamp > 0 for e in hooks.events)
+    assert hooks.events[1].agent == "Researcher"
+    assert hooks.events[1].detail == "'final output'"
+    assert hooks.events[2].agent == "Translator"
+    assert hooks.events[2].detail == "from Researcher"
+    assert hooks.events[4].detail == "search -> 'tool result'"
 
 
 def test_agent_hooks_log_every_callback(caplog: pytest.LogCaptureFixture) -> None:
