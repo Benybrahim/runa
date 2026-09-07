@@ -2,7 +2,7 @@
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from agents import FunctionTool, RunContextWrapper
@@ -304,8 +304,9 @@ def test_run_sync_explicit_hooks_override_the_default(monkeypatch: pytest.Monkey
 class _FakeStreamingResult:
     """A stand-in for `RunResultStreaming`, just enough for `Agent.run_streamed` to consume."""
 
-    def __init__(self, events: list[Any]) -> None:
+    def __init__(self, events: list[Any], last_response_id: str | None = None) -> None:
         self._events = events
+        self.last_response_id = last_response_id
 
     async def stream_events(self) -> Any:
         for event in self._events:
@@ -377,4 +378,35 @@ def test_run_streamed_explicit_hooks_override_the_default(monkeypatch: pytest.Mo
 
     asyncio.run(_consume())
 
-    assert captured["hooks"] is custom_hooks
+
+class _FakeWebSocketSession:
+    """A stand-in for `ResponsesWebSocketSession`, recording each `run_streamed` call it gets."""
+
+    def __init__(self, response_ids: list[str]) -> None:
+        self._response_ids = list(response_ids)
+        self.calls: list[dict[str, Any]] = []
+
+    def run_streamed(self, agent: Any, message: Any, **kwargs: Any) -> _FakeStreamingResult:
+        self.calls.append({"agent": agent, "message": message, **kwargs})
+        return _FakeStreamingResult([], last_response_id=self._response_ids.pop(0))
+
+
+def test_run_streamed_with_session_threads_previous_response_id() -> None:
+    """A `session` sends only the new message and chains `previous_response_id` across turns."""
+    session = cast("Any", _FakeWebSocketSession(["resp-1", "resp-2"]))
+    agent = Researcher()
+
+    async def _consume() -> None:
+        async for _ in agent.run_streamed("hi", session=session):
+            pass
+        async for _ in agent.run_streamed("again", session=session):
+            pass
+
+    asyncio.run(_consume())
+
+    first_call, second_call = session.calls
+    assert first_call["message"] == "hi"
+    assert first_call["previous_response_id"] is None
+    assert second_call["message"] == "again"
+    assert second_call["previous_response_id"] == "resp-1"
+    assert agent._last_response_id == "resp-2"

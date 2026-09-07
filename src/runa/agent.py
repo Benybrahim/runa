@@ -7,8 +7,10 @@ from typing import Any, Literal
 
 from agents import Agent as BaseAgent
 from agents import RunConfig, RunContextWrapper, RunHooks, Runner, StreamEvent
+from agents import responses_websocket_session as websocket_session
 from agents.extensions.models.litellm_provider import LitellmProvider
 from agents.items import TResponseInputItem
+from agents.responses_websocket_session import ResponsesWebSocketSession
 
 from runa.guardrail import flatten_agent_guardrails
 from runa.hooks import (
@@ -121,6 +123,7 @@ class Agent(BaseAgent):
         ]
         super().__init__(**kwargs)
         self.history: list[TResponseInputItem] = []
+        self._last_response_id: str | None = None
 
     async def run(
         self, message: str, context: Any = None, hooks: RunHooks[Any] | None = None
@@ -144,7 +147,11 @@ class Agent(BaseAgent):
         return result.final_output
 
     async def run_streamed(
-        self, message: str, context: Any = None, hooks: RunHooks[Any] | None = None
+        self,
+        message: str,
+        context: Any = None,
+        hooks: RunHooks[Any] | None = None,
+        session: ResponsesWebSocketSession | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Run a turn as a stream of events, appending it to the conversation history.
 
@@ -153,7 +160,26 @@ class Agent(BaseAgent):
         `hooks` behave as in `run`/`run_sync`. The conversation history is updated only once the
         stream is fully consumed, so a caller that stops iterating early leaves `self.history`
         unchanged.
+
+        Pass a `session` (from `websocket_session()`) to run over a shared, kept-warm OpenAI
+        Responses websocket connection. Continuity across turns is then carried server-side via
+        `previous_response_id` instead of resending `self.history`, so only the new `message` is
+        sent as input.
         """
+        if session is not None:
+            result = session.run_streamed(
+                self,
+                message,
+                context=context,
+                hooks=hooks or _default_hooks(),
+                previous_response_id=self._last_response_id,
+            )
+            async for event in result.stream_events():
+                yield event
+            self._last_response_id = result.last_response_id
+            self.history = result.to_input_list()
+            return
+
         turn_input = [*self.history, {"role": "user", "content": message}]
         result = Runner.run_streamed(
             self,
@@ -202,3 +228,6 @@ class Subagent:
     ) -> Subagent:
         """Return a copy with the tool name/description overridden."""
         return replace(self, tool_name=tool_name, tool_description=tool_description)
+
+
+__all__ = ["Agent", "Subagent", "websocket_session"]
