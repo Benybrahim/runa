@@ -1,0 +1,59 @@
+"""Built-in `RunHooks` implementations."""
+
+import logging
+from typing import Any
+
+from agents import RunHooks
+from agents.items import ModelResponse, TResponseInputItem
+from agents.run_context import AgentHookContext, RunContextWrapper
+from agents.tool import Tool
+
+logger = logging.getLogger("runa")
+
+
+class LoggingRunHooks(RunHooks[Any]):
+    """Logs each lifecycle event of a run through the standard `logging` module.
+
+    `Agent.run`/`run_sync` use an instance of this as the default `hooks` so every run is
+    logged without the caller having to ask; passing an explicit `hooks` overrides it.
+    """
+
+    async def on_agent_start(self, context: AgentHookContext[Any], agent: Any) -> None:
+        """Log that `agent` is about to run."""
+        logger.info("agent start: %s", agent.name)
+
+    async def on_agent_end(self, context: AgentHookContext[Any], agent: Any, output: Any) -> None:
+        """Log the final output `agent` produced."""
+        logger.info("agent end: %s -> %r", agent.name, output)
+
+    async def on_handoff(
+        self, context: RunContextWrapper[Any], from_agent: Any, to_agent: Any
+    ) -> None:
+        """Log a handoff between agents."""
+        logger.info("handoff: %s -> %s", from_agent.name, to_agent.name)
+
+    async def on_tool_start(self, context: RunContextWrapper[Any], agent: Any, tool: Tool) -> None:
+        """Log that `tool` is about to run."""
+        logger.info("tool start: %s (%s)", tool.name, agent.name)
+
+    async def on_tool_end(
+        self, context: RunContextWrapper[Any], agent: Any, tool: Tool, result: object
+    ) -> None:
+        """Log the result `tool` returned."""
+        logger.info("tool end: %s -> %r", tool.name, result)
+
+    async def on_llm_start(
+        self,
+        context: RunContextWrapper[Any],
+        agent: Any,
+        system_prompt: str | None,
+        input_items: list[TResponseInputItem],
+    ) -> None:
+        """Log that `agent` is about to call the model."""
+        logger.debug("llm start: %s", agent.name)
+
+    async def on_llm_end(
+        self, context: RunContextWrapper[Any], agent: Any, response: ModelResponse
+    ) -> None:
+        """Log that `agent`'s model call returned."""
+        logger.debug("llm end: %s", agent.name)

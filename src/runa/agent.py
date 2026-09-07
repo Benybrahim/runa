@@ -10,8 +10,10 @@ from agents.extensions.models.litellm_provider import LitellmProvider
 from agents.items import TResponseInputItem
 
 from runa.guardrail import flatten_agent_guardrails
+from runa.hooks import LoggingRunHooks
 
 _RUN_CONFIG = RunConfig(model_provider=LitellmProvider())
+_DEFAULT_HOOKS = LoggingRunHooks()
 
 
 def _adapt_instructions(instructions: Any) -> Any:
@@ -110,11 +112,16 @@ class Agent(BaseAgent):
 
         `context` is available to a single-argument `instructions` callable (and to tools,
         guardrails, etc.) as-is; it is never sent to the model. `hooks` receives lifecycle
-        callbacks (`on_agent_start`, `on_tool_end`, etc.) from the underlying SDK's `Runner`.
+        callbacks (`on_agent_start`, `on_tool_end`, etc.) from the underlying SDK's `Runner`;
+        it defaults to `LoggingRunHooks`, which logs those callbacks via `logging`.
         """
         turn_input = [*self.history, {"role": "user", "content": message}]
         result = await Runner.run(
-            self, turn_input, context=context, hooks=hooks, run_config=_RUN_CONFIG
+            self,
+            turn_input,
+            context=context,
+            hooks=hooks or _DEFAULT_HOOKS,
+            run_config=_RUN_CONFIG,
         )
         self.history = result.to_input_list()
         return result.final_output
@@ -126,11 +133,16 @@ class Agent(BaseAgent):
 
         `context` is available to a single-argument `instructions` callable (and to tools,
         guardrails, etc.) as-is; it is never sent to the model. `hooks` receives lifecycle
-        callbacks (`on_agent_start`, `on_tool_end`, etc.) from the underlying SDK's `Runner`.
+        callbacks (`on_agent_start`, `on_tool_end`, etc.) from the underlying SDK's `Runner`;
+        it defaults to `LoggingRunHooks`, which logs those callbacks via `logging`.
         """
         turn_input = [*self.history, {"role": "user", "content": message}]
         result = Runner.run_sync(
-            self, turn_input, context=context, hooks=hooks, run_config=_RUN_CONFIG
+            self,
+            turn_input,
+            context=context,
+            hooks=hooks or _DEFAULT_HOOKS,
+            run_config=_RUN_CONFIG,
         )
         self.history = result.to_input_list()
         return result.final_output

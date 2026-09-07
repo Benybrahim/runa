@@ -4,10 +4,12 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
+import pytest
 from agents import FunctionTool, RunContextWrapper
 
 from runa import Agent
-from runa.agent import Subagent
+from runa.agent import _DEFAULT_HOOKS, Subagent
+from runa.hooks import LoggingRunHooks
 
 
 def _handoff_names(agent: Agent) -> list[str]:
@@ -248,3 +250,43 @@ def test_string_instructions_pass_through_unchanged() -> None:
     prompt = asyncio.run(Researcher().get_system_prompt(RunContextWrapper(context=None)))
 
     assert prompt == "You research topics."
+
+
+class _FakeResult:
+    """A stand-in for `RunResult`, just enough for `Agent.run`/`run_sync` to consume."""
+
+    final_output = "ok"
+
+    def to_input_list(self) -> list[Any]:
+        return []
+
+
+def test_run_sync_defaults_to_shared_logging_hooks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`run_sync` passes the shared `LoggingRunHooks` instance when no `hooks` is given."""
+    captured: dict[str, Any] = {}
+
+    def fake_run_sync(*args: Any, hooks: Any, **kwargs: Any) -> _FakeResult:
+        captured["hooks"] = hooks
+        return _FakeResult()
+
+    monkeypatch.setattr("runa.agent.Runner.run_sync", staticmethod(fake_run_sync))
+
+    Researcher().run_sync("hi")
+
+    assert captured["hooks"] is _DEFAULT_HOOKS
+
+
+def test_run_sync_explicit_hooks_override_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An explicit `hooks` argument is used instead of the default `LoggingRunHooks`."""
+    captured: dict[str, Any] = {}
+    custom_hooks = LoggingRunHooks()
+
+    def fake_run_sync(*args: Any, hooks: Any, **kwargs: Any) -> _FakeResult:
+        captured["hooks"] = hooks
+        return _FakeResult()
+
+    monkeypatch.setattr("runa.agent.Runner.run_sync", staticmethod(fake_run_sync))
+
+    Researcher().run_sync("hi", hooks=custom_hooks)
+
+    assert captured["hooks"] is custom_hooks
