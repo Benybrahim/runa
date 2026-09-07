@@ -23,15 +23,21 @@ GuardrailsDict = dict[Literal["input", "output"], GuardrailsList]
 def _flatten_guardrails(guardrails: GuardrailsList | GuardrailsDict) -> GuardrailsList:
     """Normalize the `guardrails` class attribute to the flat list the wiring loop expects.
 
-    Accepts either a plain list (each entry `.input`/`.output`-bound already) or a
-    `{"input": [...], "output": [...]}` dict, where the key binds any bare `@guardrail` entry.
+    Accepts either a plain list (each entry `.input`/`.output`-bound, or a bare `@guardrail`
+    entry, which wires it as both) or a `{"input": [...], "output": [...]}` dict, where the key
+    binds any bare entry to just that side.
     """
-    if not isinstance(guardrails, dict):
-        return list(guardrails)
+    if isinstance(guardrails, dict):
+        entries = [
+            getattr(sub, mode) if isinstance(sub, Guardrail) else sub
+            for mode, subs in guardrails.items()
+            for sub in subs
+        ]
+    else:
+        entries = list(guardrails)
     flat: GuardrailsList = []
-    for mode, subs in guardrails.items():
-        for sub in subs:
-            flat.append(getattr(sub, mode) if isinstance(sub, Guardrail) else sub)
+    for entry in entries:
+        flat.extend((entry.input, entry.output) if isinstance(entry, Guardrail) else (entry,))
     return flat
 
 

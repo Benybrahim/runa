@@ -71,16 +71,18 @@ def test_invalid_guardrail_entry_raises() -> None:
         Support()
 
 
-def test_bare_guardrail_without_binding_raises() -> None:
-    """A `@guardrail` predicate listed without `.input`/`.output` is ambiguous, so it's rejected."""
+def test_bare_guardrail_wires_both_input_and_output() -> None:
+    """A `@guardrail` predicate listed without `.input`/`.output` is wired as both."""
 
     class Support(Agent):
         name = "Support"
         instructions = "support"
         guardrails = [block_empty]
 
-    with pytest.raises(TypeError, match="guardrails entries must be"):
-        Support()
+    agent = Support()
+
+    assert [g.name for g in agent.input_guardrails] == ["block_empty"]
+    assert [g.name for g in agent.output_guardrails] == ["block_empty"]
 
 
 def test_explicit_input_guardrails_kwarg_merges_with_class_attribute() -> None:
