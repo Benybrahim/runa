@@ -15,15 +15,15 @@ Runa is an opinionated Python framework for agentic AI.
 
 - `import this`
 - Less is better than more.
-- Files should tell a story from top to bottom. Start with the most important concepts and progressively move into details.
+- Important things come first.
+- Let Ruff keep code simple.
+- Let types speak for themselves.
+- Let docstrings explain what types cannot.
+- One commit, one clear message.
+- Code that does not pass Test is not done.
+- Test behavior, not implementation. Prefer real objects; mock the boundaries.
+- Python 3.14, managed with `uv`.
 
-## Code Conventions
 
-* Python 3.14, managed with `uv`.
-* Ruff config: line length 100, target `py314`, rules `E`, `F`, `I`. `B`, `SIM`, `UP`, `D`.
-* Use `Sphinx/reST` without `type` and `rtype` for docstrings.
-* Always give oneliner commit message: `feat`, `fix`, `docs`, `test`, `refactor`.
-* Always pass `make check`.
-* Add Tests as needed. Test one behavior, prefer real objects, mock boundaries, and assert outcomes over implementation.
 
 

@@ -8,22 +8,6 @@ from agents import Runner
 from agents.items import TResponseInputItem
 
 
-@dataclass(frozen=True)
-class Subagent:
-    """A wired-up subagent, attached as a handoff or a delegate tool."""
-
-    agent: type[Agent]
-    mode: Literal["handoff", "delegate"]
-    tool_name: str | None = None
-    tool_description: str | None = None
-
-    def __call__(
-        self, *, tool_name: str | None = None, tool_description: str | None = None
-    ) -> Subagent:
-        """Return a copy with the tool name/description overridden."""
-        return replace(self, tool_name=tool_name, tool_description=tool_description)
-
-
 class _Mode:
     def __init__(self, mode: Literal["handoff", "delegate"]) -> None:
         self.mode: Literal["handoff", "delegate"] = mode
@@ -57,7 +41,7 @@ class Agent(BaseAgent):
             else:
                 agent = sub()
                 handoffs.append(agent)
-                tools.append(agent.as_tool())
+                tools.append(agent.as_tool(None, None))
         kwargs["handoffs"] = handoffs
         kwargs["tools"] = tools
         super().__init__(**kwargs)
@@ -76,3 +60,19 @@ class Agent(BaseAgent):
         result = Runner.run_sync(self, turn_input)
         self.history = result.to_input_list()
         return result.final_output
+
+
+@dataclass(frozen=True)
+class Subagent:
+    """A wired-up subagent, attached as a handoff or a delegate tool."""
+
+    agent: type[Agent]
+    mode: Literal["handoff", "delegate"]
+    tool_name: str | None = None
+    tool_description: str | None = None
+
+    def __call__(
+        self, *, tool_name: str | None = None, tool_description: str | None = None
+    ) -> Subagent:
+        """Return a copy with the tool name/description overridden."""
+        return replace(self, tool_name=tool_name, tool_description=tool_description)
