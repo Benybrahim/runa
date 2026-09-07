@@ -1,6 +1,7 @@
 """Runa: an opinionated framework for agentic AI."""
 
 from runa.agent import Agent, websocket_session
+from runa.approval import approval
 from runa.guardrail import guardrail
 from runa.hooks import (
     AgentHooks,
@@ -26,6 +27,7 @@ __all__ = [
     "MetricsRunHooks",
     "RunHooks",
     "TracingRunHooks",
+    "approval",
     "guardrail",
     "tool",
     "websocket_session",
