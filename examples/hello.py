@@ -1,6 +1,7 @@
 """A minimal agent with a tool, a handoff, a delegate, and a guardrail."""
 
 import re
+from dataclasses import dataclass
 from datetime import datetime
 
 from runa import Agent, guardrail, tool
@@ -18,6 +19,18 @@ def block_empty(input: str) -> bool:
 def block_long(output: str) -> bool:
     """Trip when the reply runs longer than 500 characters."""
     return len(output) > 500
+
+
+@dataclass
+class Context:
+    """Per-run data threaded into `Assistant.instructions` below."""
+
+    user_name: str
+
+
+def instructions(context: Context) -> str:
+    """Greet the user by name, resolved fresh on every run from `Agent.run`'s `context=`."""
+    return f"You are a friendly assistant helping {context.user_name}."
 
 
 @guardrail
@@ -70,11 +83,12 @@ class Assistant(Agent):
     """A friendly assistant that can delegate to a researcher, translator, or summarizer."""
 
     name = "Assistant"
-    instructions = "You are a friendly assistant."
+    # A single-arg `(context) -> str` callable; Agent adapts it to the SDK's 2-arg shape at init.
+    instructions = instructions  # pyright: ignore[reportAssignmentType]
     tools = [now]
     subagents = [Researcher.handoff, Translator.delegate, Summarizer]
     guardrails = [block_empty.input, block_long.output, contains_pii]
 
 
 agent = Assistant()
-print(agent.run_sync("What time is it right now?"))
+print(agent.run_sync("What time is it right now?", context=Context(user_name="Ada")))

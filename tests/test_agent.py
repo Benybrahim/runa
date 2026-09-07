@@ -1,6 +1,10 @@
 """Tests for the handoff / delegate / auto subagent wiring in `Agent`."""
 
-from agents import FunctionTool
+import asyncio
+from dataclasses import dataclass
+from typing import Any
+
+from agents import FunctionTool, RunContextWrapper
 
 from runa import Agent
 from runa.agent import Subagent
@@ -194,3 +198,53 @@ def test_history_starts_empty() -> None:
     agent = Researcher()
 
     assert agent.history == []
+
+
+@dataclass
+class _Ctx:
+    """A minimal run context used by the dynamic-instructions tests below."""
+
+    label: str
+
+
+def _single_arg_instructions(context: _Ctx) -> str:
+    return f"context={context.label}"
+
+
+def _two_arg_instructions(context: RunContextWrapper[_Ctx], agent: Any) -> str:
+    return f"{agent.name}:{context.context.label}"
+
+
+def test_single_arg_instructions_resolves_from_run_context() -> None:
+    """A one-parameter `(context) -> str` `instructions` is adapted to the SDK's 2-arg shape."""
+
+    class Dynamic(Agent):
+        name = "Dynamic"
+        instructions = _single_arg_instructions  # pyright: ignore[reportAssignmentType]
+
+    agent = Dynamic()
+
+    prompt = asyncio.run(agent.get_system_prompt(RunContextWrapper(context=_Ctx(label="hi"))))
+
+    assert prompt == "context=hi"
+
+
+def test_two_arg_instructions_still_supported() -> None:
+    """A native SDK-style `(context, agent) -> str` `instructions` passes through unadapted."""
+
+    class Dynamic(Agent):
+        name = "Dynamic"
+        instructions = _two_arg_instructions
+
+    agent = Dynamic()
+
+    prompt = asyncio.run(agent.get_system_prompt(RunContextWrapper(context=_Ctx(label="hi"))))
+
+    assert prompt == "Dynamic:hi"
+
+
+def test_string_instructions_pass_through_unchanged() -> None:
+    """Plain string instructions are unaffected by the dynamic-instructions adapter."""
+    prompt = asyncio.run(Researcher().get_system_prompt(RunContextWrapper(context=None)))
+
+    assert prompt == "You research topics."

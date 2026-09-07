@@ -19,11 +19,7 @@ Runa is an opinionated Python framework for agentic AI.
 - Let Ruff keep code simple.
 - Let types speak for themselves.
 - Let docstrings explain what types cannot.
-- One commit, one clear message.
 - Code that does not pass Test is not done.
 - Test behavior, not implementation. Prefer real objects; mock the boundaries.
 - Python 3.14, managed with `uv`.
-
-
-
-
+- Give oneliner commit message: `feat`, `fix`, `docs`, `refactor`, `test`

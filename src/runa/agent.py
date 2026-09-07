@@ -1,16 +1,38 @@
 """Class-based Agent built on the OpenAI Agents SDK."""
 
+import inspect
 from dataclasses import MISSING, dataclass, fields, replace
 from typing import Any, Literal
 
 from agents import Agent as BaseAgent
-from agents import RunConfig, Runner
+from agents import RunConfig, RunContextWrapper, Runner
 from agents.extensions.models.litellm_provider import LitellmProvider
 from agents.items import TResponseInputItem
 
 from runa.guardrail import flatten_agent_guardrails
 
 _RUN_CONFIG = RunConfig(model_provider=LitellmProvider())
+
+
+def _adapt_instructions(instructions: Any) -> Any:
+    """Let `instructions` be a `(context) -> str` callable instead of the SDK's `(context, agent)`.
+
+    The SDK calls `instructions(run_context, agent)` and requires exactly two parameters. A
+    single-parameter callable is wrapped so it receives just `run_context.context`, the object
+    passed to `Agent.run`/`run_sync`; anything else (a string, `None`, or an already
+    two-parameter callable) passes through unchanged.
+    """
+    if not callable(instructions):
+        return instructions
+    params = list(inspect.signature(instructions).parameters.values())
+    if len(params) != 1:
+        return instructions
+
+    def _resolved(run_context: RunContextWrapper[Any], _agent: BaseAgent) -> Any:
+        return instructions(run_context.context)
+
+    return _resolved
+
 
 SubagentsList = list["type[Agent] | Subagent"]
 SubagentsDict = dict[Literal["handoff", "delegate", "auto"], SubagentsList]
@@ -68,6 +90,8 @@ class Agent(BaseAgent):
                 tools.append(agent.as_tool(None, None))
         kwargs["handoffs"] = handoffs
         kwargs["tools"] = tools
+        if "instructions" in kwargs:
+            kwargs["instructions"] = _adapt_instructions(kwargs["instructions"])
         new_input_guardrails, new_output_guardrails = flatten_agent_guardrails(
             getattr(type(self), "guardrails", [])
         )
@@ -79,17 +103,25 @@ class Agent(BaseAgent):
         super().__init__(**kwargs)
         self.history: list[TResponseInputItem] = []
 
-    async def run(self, message: str) -> str:
-        """Run a turn asynchronously, appending it to the conversation history."""
+    async def run(self, message: str, context: Any = None) -> str:
+        """Run a turn asynchronously, appending it to the conversation history.
+
+        `context` is available to a single-argument `instructions` callable (and to tools,
+        guardrails, etc.) as-is; it is never sent to the model.
+        """
         turn_input = [*self.history, {"role": "user", "content": message}]
-        result = await Runner.run(self, turn_input, run_config=_RUN_CONFIG)
+        result = await Runner.run(self, turn_input, context=context, run_config=_RUN_CONFIG)
         self.history = result.to_input_list()
         return result.final_output
 
-    def run_sync(self, message: str) -> str:
-        """Run a turn synchronously, appending it to the conversation history."""
+    def run_sync(self, message: str, context: Any = None) -> str:
+        """Run a turn synchronously, appending it to the conversation history.
+
+        `context` is available to a single-argument `instructions` callable (and to tools,
+        guardrails, etc.) as-is; it is never sent to the model.
+        """
         turn_input = [*self.history, {"role": "user", "content": message}]
-        result = Runner.run_sync(self, turn_input, run_config=_RUN_CONFIG)
+        result = Runner.run_sync(self, turn_input, context=context, run_config=_RUN_CONFIG)
         self.history = result.to_input_list()
         return result.final_output
 
