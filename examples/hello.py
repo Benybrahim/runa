@@ -25,13 +25,20 @@ class Translator(Agent):
     instructions = "You translate text into French."
 
 
+class Summarizer(Agent):
+    """Summarizes text concisely."""
+
+    name = "Summarizer"
+    instructions = "You summarize text concisely."
+
+
 class Assistant(Agent):
-    """A friendly assistant that can delegate to a researcher or translator."""
+    """A friendly assistant that can delegate to a researcher, translator, or summarizer."""
 
     name = "Assistant"
     instructions = "You are a friendly assistant."
     tools = [now]
-    subagents = [Researcher.handoff, Translator.delegate]
+    subagents = [Researcher.handoff, Translator.delegate, Summarizer]
 
 
 agent = Assistant()

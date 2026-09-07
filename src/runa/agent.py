@@ -12,7 +12,7 @@ from agents.items import TResponseInputItem
 class Subagent:
     """A wired-up subagent, attached as a handoff or a delegate tool."""
 
-    agent: type[BaseAgent]
+    agent: type[Agent]
     mode: Literal["handoff", "delegate"]
     tool_name: str | None = None
     tool_description: str | None = None
@@ -28,7 +28,7 @@ class _Mode:
     def __init__(self, mode: Literal["handoff", "delegate"]) -> None:
         self.mode: Literal["handoff", "delegate"] = mode
 
-    def __get__(self, instance: object, owner: type[BaseAgent]) -> Subagent:
+    def __get__(self, instance: object, owner: type[Agent]) -> Subagent:
         return Subagent(owner, self.mode)
 
 
@@ -48,11 +48,16 @@ class Agent(BaseAgent):
         handoffs = list(kwargs.get("handoffs", []))
         tools = list(kwargs.get("tools", []))
         for sub in getattr(type(self), "subagents", []):
-            agent = sub.agent()
-            if sub.mode == "handoff":
-                handoffs.append(agent)
+            if isinstance(sub, Subagent):
+                agent = sub.agent()
+                if sub.mode == "handoff":
+                    handoffs.append(agent)
+                else:
+                    tools.append(agent.as_tool(sub.tool_name, sub.tool_description))
             else:
-                tools.append(agent.as_tool(sub.tool_name, sub.tool_description))
+                agent = sub()
+                handoffs.append(agent)
+                tools.append(agent.as_tool())
         kwargs["handoffs"] = handoffs
         kwargs["tools"] = tools
         super().__init__(**kwargs)
