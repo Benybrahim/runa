@@ -1,14 +1,20 @@
-"""A minimal agent with a tool, a handoff, and a delegate."""
+"""A minimal agent with a tool, a handoff, a delegate, and a guardrail."""
 
 from datetime import datetime
 
-from runa import Agent, tool
+from runa import Agent, guardrail, tool
 
 
 @tool
 def now() -> str:
     """Return the current local time as an ISO 8601 string."""
     return datetime.now().isoformat()
+
+
+@guardrail
+def block_empty(input: str) -> bool:
+    """Trip when the user sends an empty message."""
+    return not input.strip()
 
 
 class Researcher(Agent):
@@ -39,6 +45,7 @@ class Assistant(Agent):
     instructions = "You are a friendly assistant."
     tools = [now]
     subagents = [Researcher.handoff, Translator.delegate, Summarizer]
+    guardrails = [block_empty.input]
 
 
 agent = Assistant()

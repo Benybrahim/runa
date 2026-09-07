@@ -1,35 +1,49 @@
-"""Tests for the `Guardrail.input`/`Guardrail.output` wiring in `Agent`."""
+"""Tests for the `@guardrail` predicate wiring in `Agent`."""
+
+import asyncio
+from collections.abc import Awaitable
+from typing import Any, cast
 
 import pytest
-from agents import GuardrailFunctionOutput
+from agents import GuardrailFunctionOutput, InputGuardrail, OutputGuardrail
 
-from runa import Agent, Guardrail
+from runa import Agent, guardrail
 
-
-@Guardrail.input
-def block_topic(ctx, agent, input) -> GuardrailFunctionOutput:  # noqa: A002, ANN001
-    """Allow every input; used across tests."""
-    return GuardrailFunctionOutput(output_info=None, tripwire_triggered=False)
+_CTX = cast(Any, None)
+_AGENT = cast(Any, None)
 
 
-@Guardrail.output
-def block_profanity(ctx, agent, output) -> GuardrailFunctionOutput:  # noqa: ANN001
-    """Allow every output; used across tests."""
-    return GuardrailFunctionOutput(output_info=None, tripwire_triggered=False)
+def _run(g: InputGuardrail[Any] | OutputGuardrail[Any], value: Any) -> GuardrailFunctionOutput:
+    """Call a wrapped guardrail's function directly, awaiting its always-async wrapper."""
+    coro = cast(Awaitable[GuardrailFunctionOutput], g.guardrail_function(_CTX, _AGENT, value))
+    return asyncio.run(coro)
+
+
+@guardrail
+def block_empty(input: str) -> bool:
+    """Trip when the input is empty."""
+    return not input
+
+
+@guardrail
+def block_long(output: str) -> bool:
+    """Trip when the output is too long."""
+    return len(output) > 100
 
 
 def test_guardrails_split_into_input_and_output() -> None:
-    """A `guardrails` list is sorted into `input_guardrails`/`output_guardrails` by type."""
+    """A `guardrails` list is sorted into `input_guardrails`/`output_guardrails` by binding."""
+    bound_input, bound_output = block_empty.input, block_long.output
 
     class Support(Agent):
         name = "Support"
         instructions = "support"
-        guardrails = [block_topic, block_profanity]
+        guardrails = [bound_input, bound_output]
 
     agent = Support()
 
-    assert agent.input_guardrails == [block_topic]
-    assert agent.output_guardrails == [block_profanity]
+    assert agent.input_guardrails == [bound_input]
+    assert agent.output_guardrails == [bound_output]
 
 
 def test_no_guardrails_leaves_both_lists_empty() -> None:
@@ -46,12 +60,24 @@ def test_no_guardrails_leaves_both_lists_empty() -> None:
 
 
 def test_invalid_guardrail_entry_raises() -> None:
-    """A `guardrails` entry that isn't an `InputGuardrail`/`OutputGuardrail` is rejected."""
+    """A `guardrails` entry not bound via `.input`/`.output` is rejected."""
 
     class Support(Agent):
         name = "Support"
         instructions = "support"
-        guardrails = [lambda ctx, agent, input: None]
+        guardrails = [lambda value: False]
+
+    with pytest.raises(TypeError, match="guardrails entries must be"):
+        Support()
+
+
+def test_bare_guardrail_without_binding_raises() -> None:
+    """A `@guardrail` predicate listed without `.input`/`.output` is ambiguous, so it's rejected."""
+
+    class Support(Agent):
+        name = "Support"
+        instructions = "support"
+        guardrails = [block_empty]
 
     with pytest.raises(TypeError, match="guardrails entries must be"):
         Support()
@@ -59,13 +85,58 @@ def test_invalid_guardrail_entry_raises() -> None:
 
 def test_explicit_input_guardrails_kwarg_merges_with_class_attribute() -> None:
     """An explicit `input_guardrails` kwarg is preserved alongside the `guardrails` attribute."""
+    bound_input, bound_output = block_empty.input, block_long.output
 
     class Support(Agent):
         name = "Support"
         instructions = "support"
-        guardrails = [block_profanity]
+        guardrails = [bound_output]
 
-    agent = Support(input_guardrails=[block_topic])
+    agent = Support(input_guardrails=[bound_input])
 
-    assert agent.input_guardrails == [block_topic]
-    assert agent.output_guardrails == [block_profanity]
+    assert agent.input_guardrails == [bound_input]
+    assert agent.output_guardrails == [bound_output]
+
+
+def test_dict_guardrails_wire_by_key() -> None:
+    """A `{"input": [...], "output": [...]}` dict binds each bare entry by its key."""
+
+    class Support(Agent):
+        name = "Support"
+        instructions = "support"
+        guardrails = {"input": [block_empty], "output": [block_long]}
+
+    agent = Support()
+
+    assert [g.name for g in agent.input_guardrails] == ["block_empty"]
+    assert [g.name for g in agent.output_guardrails] == ["block_long"]
+
+
+def test_input_predicate_reduces_item_list_to_latest_text() -> None:
+    """`.input` hands the predicate plain text, even when the SDK passes an item list."""
+    turn_input = [{"role": "user", "content": ""}]
+
+    result = _run(block_empty.input, turn_input)
+
+    assert result.tripwire_triggered is True
+    assert result.output_info == "Trip when the input is empty."
+
+
+def test_output_predicate_false_does_not_trip() -> None:
+    """A predicate returning `False` leaves the guardrail untripped."""
+    result = _run(block_long.output, "short")
+
+    assert result.tripwire_triggered is False
+
+
+def test_async_predicate_is_awaited() -> None:
+    """An async predicate is awaited and still produces a `GuardrailFunctionOutput`."""
+
+    @guardrail
+    async def block_async(input: str) -> bool:
+        """Trip always, asynchronously."""
+        return True
+
+    result = _run(block_async.input, "x")
+
+    assert result.tripwire_triggered is True
