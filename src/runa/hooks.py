@@ -17,8 +17,9 @@ logger = logging.getLogger("runa")
 class LoggingRunHooks(RunHooks[Any]):
     """Logs each lifecycle event of a run through the standard `logging` module.
 
-    `Agent.run`/`run_sync` use an instance of this as the default `hooks` so every run is
-    logged without the caller having to ask; passing an explicit `hooks` overrides it.
+    `Agent.run`/`run_sync` combine an instance of this with every other built-in `RunHooks` as
+    the default `hooks`, via `CompositeRunHooks`, so every run is logged without the caller
+    having to ask; passing an explicit `hooks` overrides it.
     """
 
     async def on_agent_start(self, context: AgentHookContext[Any], agent: Any) -> None:
@@ -253,6 +254,66 @@ class AuditRunHooks(RunHooks[Any]):
     ) -> None:
         """Record that `agent`'s model call returned."""
         self._record("llm_end", agent, "end")
+
+
+class CompositeRunHooks(RunHooks[Any]):
+    """Fans out each lifecycle event of a run to a sequence of `RunHooks`, in order.
+
+    `Agent.run`/`run_sync` use this to combine every built-in `RunHooks` (`LoggingRunHooks`,
+    `MetricsRunHooks`, `TracingRunHooks`, `AuditRunHooks`) into the single `hooks` instance the
+    underlying SDK's `Runner` accepts.
+    """
+
+    def __init__(self, *hooks: RunHooks[Any]) -> None:
+        """Store `hooks` as the sequence each callback is dispatched to."""
+        self.hooks = hooks
+
+    async def on_agent_start(self, context: AgentHookContext[Any], agent: Any) -> None:
+        """Dispatch to each hook's `on_agent_start`."""
+        for hooks in self.hooks:
+            await hooks.on_agent_start(context, agent)
+
+    async def on_agent_end(self, context: AgentHookContext[Any], agent: Any, output: Any) -> None:
+        """Dispatch to each hook's `on_agent_end`."""
+        for hooks in self.hooks:
+            await hooks.on_agent_end(context, agent, output)
+
+    async def on_handoff(
+        self, context: RunContextWrapper[Any], from_agent: Any, to_agent: Any
+    ) -> None:
+        """Dispatch to each hook's `on_handoff`."""
+        for hooks in self.hooks:
+            await hooks.on_handoff(context, from_agent, to_agent)
+
+    async def on_tool_start(self, context: RunContextWrapper[Any], agent: Any, tool: Tool) -> None:
+        """Dispatch to each hook's `on_tool_start`."""
+        for hooks in self.hooks:
+            await hooks.on_tool_start(context, agent, tool)
+
+    async def on_tool_end(
+        self, context: RunContextWrapper[Any], agent: Any, tool: Tool, result: object
+    ) -> None:
+        """Dispatch to each hook's `on_tool_end`."""
+        for hooks in self.hooks:
+            await hooks.on_tool_end(context, agent, tool, result)
+
+    async def on_llm_start(
+        self,
+        context: RunContextWrapper[Any],
+        agent: Any,
+        system_prompt: str | None,
+        input_items: list[TResponseInputItem],
+    ) -> None:
+        """Dispatch to each hook's `on_llm_start`."""
+        for hooks in self.hooks:
+            await hooks.on_llm_start(context, agent, system_prompt, input_items)
+
+    async def on_llm_end(
+        self, context: RunContextWrapper[Any], agent: Any, response: ModelResponse
+    ) -> None:
+        """Dispatch to each hook's `on_llm_end`."""
+        for hooks in self.hooks:
+            await hooks.on_llm_end(context, agent, response)
 
 
 class LoggingAgentHooks(AgentHooks[Any]):

@@ -4,6 +4,7 @@ from runa.agent import Agent
 from runa.guardrail import guardrail
 from runa.hooks import (
     AuditRunHooks,
+    CompositeRunHooks,
     LoggingAgentHooks,
     LoggingRunHooks,
     MetricsRunHooks,
@@ -14,6 +15,7 @@ from runa.tool import tool
 __all__ = [
     "Agent",
     "AuditRunHooks",
+    "CompositeRunHooks",
     "LoggingAgentHooks",
     "LoggingRunHooks",
     "MetricsRunHooks",

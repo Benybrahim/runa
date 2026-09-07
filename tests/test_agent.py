@@ -8,8 +8,14 @@ import pytest
 from agents import FunctionTool, RunContextWrapper
 
 from runa import Agent
-from runa.agent import _DEFAULT_HOOKS, Subagent
-from runa.hooks import LoggingRunHooks
+from runa.agent import Subagent
+from runa.hooks import (
+    AuditRunHooks,
+    CompositeRunHooks,
+    LoggingRunHooks,
+    MetricsRunHooks,
+    TracingRunHooks,
+)
 
 
 def _handoff_names(agent: Agent) -> list[str]:
@@ -261,8 +267,8 @@ class _FakeResult:
         return []
 
 
-def test_run_sync_defaults_to_shared_logging_hooks(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`run_sync` passes the shared `LoggingRunHooks` instance when no `hooks` is given."""
+def test_run_sync_defaults_to_every_built_in_hook(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`run_sync` passes a `CompositeRunHooks` combining every built-in hook when none is given."""
     captured: dict[str, Any] = {}
 
     def fake_run_sync(*args: Any, hooks: Any, **kwargs: Any) -> _FakeResult:
@@ -273,11 +279,14 @@ def test_run_sync_defaults_to_shared_logging_hooks(monkeypatch: pytest.MonkeyPat
 
     Researcher().run_sync("hi")
 
-    assert captured["hooks"] is _DEFAULT_HOOKS
+    hooks = captured["hooks"]
+    assert isinstance(hooks, CompositeRunHooks)
+    hook_types = {type(h) for h in hooks.hooks}
+    assert hook_types == {LoggingRunHooks, MetricsRunHooks, TracingRunHooks, AuditRunHooks}
 
 
 def test_run_sync_explicit_hooks_override_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An explicit `hooks` argument is used instead of the default `LoggingRunHooks`."""
+    """An explicit `hooks` argument is used instead of the default combined hooks."""
     captured: dict[str, Any] = {}
     custom_hooks = LoggingRunHooks()
 

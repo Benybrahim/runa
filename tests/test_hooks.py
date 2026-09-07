@@ -13,6 +13,7 @@ from agents.usage import Usage
 from runa import (
     Agent,
     AuditRunHooks,
+    CompositeRunHooks,
     LoggingAgentHooks,
     LoggingRunHooks,
     MetricsRunHooks,
@@ -148,6 +149,25 @@ def test_audit_run_hooks_record_every_callback() -> None:
     assert hooks.events[2].agent == "Translator"
     assert hooks.events[2].detail == "from Researcher"
     assert hooks.events[4].detail == "search -> 'tool result'"
+
+
+def test_composite_run_hooks_dispatches_to_every_hook() -> None:
+    """`CompositeRunHooks` forwards each callback to every hook it was built from, in order."""
+    metrics, audit = MetricsRunHooks(), AuditRunHooks()
+    hooks = CompositeRunHooks(metrics, audit)
+    asyncio.run(_run_all_run_hooks(hooks))
+
+    assert metrics.agent_starts == 1
+    assert metrics.llm_ends == 1
+    assert [e.event for e in audit.events] == [
+        "agent_start",
+        "agent_end",
+        "handoff",
+        "tool_start",
+        "tool_end",
+        "llm_start",
+        "llm_end",
+    ]
 
 
 def test_agent_hooks_log_every_callback(caplog: pytest.LogCaptureFixture) -> None:
