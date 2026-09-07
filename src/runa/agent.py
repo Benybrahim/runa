@@ -11,6 +11,7 @@ from agents import responses_websocket_session as websocket_session
 from agents.extensions.models.litellm_provider import LitellmProvider
 from agents.items import TResponseInputItem
 from agents.responses_websocket_session import ResponsesWebSocketSession
+from agents.usage import Usage
 
 from runa.guardrail import flatten_agent_guardrails
 from runa.hooks import (
@@ -84,7 +85,13 @@ class _Mode:
 
 
 class Agent(BaseAgent):
-    """An Agent whose config comes from class attributes instead of __init__ args."""
+    """An Agent whose config comes from class attributes instead of __init__ args.
+
+    `usage` accumulates token usage across every `run`/`run_sync`/`run_streamed` call made on
+    this instance; `last_usage` holds just the most recent call's usage. Both are read from the
+    underlying SDK's `RunContextWrapper.usage`, which the `Runner` populates regardless of
+    `hooks`.
+    """
 
     handoff = _Mode("handoff")
     delegate = _Mode("delegate")
@@ -124,6 +131,8 @@ class Agent(BaseAgent):
         super().__init__(**kwargs)
         self.history: list[TResponseInputItem] = []
         self._last_response_id: str | None = None
+        self.usage = Usage()
+        self.last_usage = Usage()
 
     async def run(
         self,
@@ -142,6 +151,9 @@ class Agent(BaseAgent):
         Pass a `session` (e.g. `SQLiteSession`) to persist conversation history there instead
         of on `self.history`; the session supplies prior turns automatically, so only the new
         `message` is sent as input, and `self.history` is left untouched.
+
+        Token usage for this call is recorded to `self.last_usage` and accumulated into
+        `self.usage`, regardless of `session` or `hooks`.
         """
         turn_input = (
             message
@@ -156,6 +168,8 @@ class Agent(BaseAgent):
             run_config=_RUN_CONFIG,
             session=session,
         )
+        self.last_usage = result.context_wrapper.usage
+        self.usage.add(self.last_usage)
         if session is None:
             self.history = result.to_input_list()
         return result.final_output
@@ -179,6 +193,10 @@ class Agent(BaseAgent):
         Responses websocket connection. Continuity across turns is then carried server-side via
         `previous_response_id` instead of resending `self.history`, so only the new `message` is
         sent as input.
+
+        Token usage for this call is recorded to `self.last_usage` and accumulated into
+        `self.usage` once the stream is fully consumed; a caller that stops iterating early
+        leaves both unchanged, same as `self.history`.
         """
         if session is not None:
             result = session.run_streamed(
@@ -191,6 +209,8 @@ class Agent(BaseAgent):
             async for event in result.stream_events():
                 yield event
             self._last_response_id = result.last_response_id
+            self.last_usage = result.context_wrapper.usage
+            self.usage.add(self.last_usage)
             self.history = result.to_input_list()
             return
 
@@ -204,6 +224,8 @@ class Agent(BaseAgent):
         )
         async for event in result.stream_events():
             yield event
+        self.last_usage = result.context_wrapper.usage
+        self.usage.add(self.last_usage)
         self.history = result.to_input_list()
 
     def run_sync(
@@ -223,6 +245,9 @@ class Agent(BaseAgent):
         Pass a `session` (e.g. `SQLiteSession`) to persist conversation history there instead
         of on `self.history`; the session supplies prior turns automatically, so only the new
         `message` is sent as input, and `self.history` is left untouched.
+
+        Token usage for this call is recorded to `self.last_usage` and accumulated into
+        `self.usage`, regardless of `session` or `hooks`.
         """
         turn_input = (
             message
@@ -237,6 +262,8 @@ class Agent(BaseAgent):
             run_config=_RUN_CONFIG,
             session=session,
         )
+        self.last_usage = result.context_wrapper.usage
+        self.usage.add(self.last_usage)
         if session is None:
             self.history = result.to_input_list()
         return result.final_output

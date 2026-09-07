@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import pytest
 from agents import FunctionTool, RunContextWrapper
+from agents.usage import Usage
 
 from runa import Agent
 from runa.agent import Subagent
@@ -208,6 +209,14 @@ def test_history_starts_empty() -> None:
     assert agent.history == []
 
 
+def test_usage_starts_empty() -> None:
+    """A freshly constructed agent has no accumulated or last usage yet."""
+    agent = Researcher()
+
+    assert agent.usage == Usage()
+    assert agent.last_usage == Usage()
+
+
 @dataclass
 class _Ctx:
     """A minimal run context used by the dynamic-instructions tests below."""
@@ -262,6 +271,7 @@ class _FakeResult:
     """A stand-in for `RunResult`, just enough for `Agent.run`/`run_sync` to consume."""
 
     final_output = "ok"
+    context_wrapper = RunContextWrapper(context=None, usage=Usage(input_tokens=1, output_tokens=2))
 
     def to_input_list(self) -> list[Any]:
         return []
@@ -301,12 +311,33 @@ def test_run_sync_explicit_hooks_override_the_default(monkeypatch: pytest.Monkey
     assert captured["hooks"] is custom_hooks
 
 
+def test_run_sync_records_and_accumulates_usage(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`run_sync` records the call's usage to `last_usage` and adds it to `usage`."""
+
+    def fake_run_sync(*args: Any, **kwargs: Any) -> _FakeResult:
+        return _FakeResult()
+
+    monkeypatch.setattr("runa.agent.Runner.run_sync", staticmethod(fake_run_sync))
+
+    agent = Researcher()
+    agent.run_sync("hi")
+    agent.run_sync("again")
+
+    expected_call_usage = Usage(input_tokens=1, output_tokens=2)
+    assert agent.last_usage == expected_call_usage
+    assert agent.usage.input_tokens == 2
+    assert agent.usage.output_tokens == 4
+
+
 class _FakeStreamingResult:
     """A stand-in for `RunResultStreaming`, just enough for `Agent.run_streamed` to consume."""
 
     def __init__(self, events: list[Any], last_response_id: str | None = None) -> None:
         self._events = events
         self.last_response_id = last_response_id
+        self.context_wrapper = RunContextWrapper(
+            context=None, usage=Usage(input_tokens=3, output_tokens=4)
+        )
 
     async def stream_events(self) -> Any:
         for event in self._events:
@@ -337,6 +368,8 @@ def test_run_streamed_yields_events_and_updates_history(monkeypatch: pytest.Monk
         {"role": "user", "content": "hi"},
         {"role": "assistant", "content": "ok"},
     ]
+    assert agent.last_usage == Usage(input_tokens=3, output_tokens=4)
+    assert agent.usage == Usage(input_tokens=3, output_tokens=4)
 
 
 def test_run_streamed_defaults_to_every_built_in_hook(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -410,3 +443,6 @@ def test_run_streamed_with_session_threads_previous_response_id() -> None:
     assert second_call["message"] == "again"
     assert second_call["previous_response_id"] == "resp-1"
     assert agent._last_response_id == "resp-2"
+    assert agent.last_usage == Usage(input_tokens=3, output_tokens=4)
+    assert agent.usage.input_tokens == 6
+    assert agent.usage.output_tokens == 8
