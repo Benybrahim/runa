@@ -11,9 +11,7 @@ build and run reliable, stateful agents.
    with [uv](https://docs.astral.sh/uv/):
 
     ```bash
-    git clone https://github.com/Benybrahim/runa.git
-    cd runa
-    make install
+    uv add git+https://github.com/benybrahim/runa.git
     ```
 
 2. At the command prompt, create a new Runa application:
@@ -25,11 +23,19 @@ build and run reliable, stateful agents.
    where "myapp" is the application name.
 
 
-3. Change directory to `myapp`, define an Agent:
+3. Write your agent and run it:
 
-    ```bash
-    cd myapp
-    runa generate agent MyAgent
+    ```python
+    class Assistant(Agent):
+   
+        name = "assistant_agent"
+        instructions = instructions
+        tools = [now]
+        subagents = [Researcher.handoff, Translator.delegate, Summarizer]
+        guardrails = [block_empty.input, block_long.output, contains_pii]
+
+   agent = Assistant()
+   agent.run_sync("What time is it right now?")
     ```
    Run with `--help` or `-h` for options.
 

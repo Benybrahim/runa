@@ -79,17 +79,17 @@ class Summarizer(Agent):
     instructions = "You summarize text concisely."
 
 
-class Assistant(Agent):
+class MyAgent(Agent):
     """A friendly assistant that can delegate to a researcher, translator, or summarizer."""
 
-    name = "Assistant"
-    # A single-arg `(context) -> str` callable; Agent adapts it to the SDK's 2-arg shape at init.
-    instructions = instructions  # pyright: ignore[reportAssignmentType]
+    name = "assistant_agent"
+    instructions = instructions
     tools = [now]
     subagents = [Researcher.handoff, Translator.delegate, Summarizer]
     guardrails = [block_empty.input, block_long.output, contains_pii]
 
 
 agent = Assistant()
-run = agent.run_sync("What time is it right now?", context=Context(user_name="Ada"))
+run = agent.run_sync("What time is it right now?")
+#, context=Context(user_name="Ada"))
 print(run.output)
