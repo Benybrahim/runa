@@ -7,7 +7,13 @@ from typing import Any, cast
 import pytest
 from agents import FunctionTool, RunContextWrapper
 from agents.exceptions import MaxTurnsExceeded, RunErrorDetails
+from agents.testing.model import ScriptedModel
 from agents.usage import Usage
+from openai.types.responses import (
+    ResponseFunctionToolCall,
+    ResponseOutputMessage,
+    ResponseOutputText,
+)
 
 from runa import Agent
 from runa.agent import Subagent
@@ -18,6 +24,7 @@ from runa.hooks import (
     MetricsRunHooks,
     TracingRunHooks,
 )
+from runa.tool import tool
 
 
 def _handoff_names(agent: Agent) -> list[str]:
@@ -380,8 +387,8 @@ def test_run_sync_catches_agents_exception_as_error_run(monkeypatch: pytest.Monk
     assert agent.history == []
 
 
-def test_run_sync_trace_empty_with_fully_custom_hooks(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Overriding `hooks` with something that isn't audited yields an empty `Run.trace`."""
+def test_run_sync_trace_populated_regardless_of_hooks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`Run.trace` is captured via the SDK's own tracing, independent of a custom `hooks=`."""
 
     def fake_run_sync(*args: Any, **kwargs: Any) -> _FakeResult:
         return _FakeResult()
@@ -390,7 +397,80 @@ def test_run_sync_trace_empty_with_fully_custom_hooks(monkeypatch: pytest.Monkey
 
     run = Researcher().run_sync("hi", hooks=LoggingRunHooks())
 
-    assert run.trace == []
+    assert run.trace.name == "Researcher"
+
+
+def _final_message(text: str) -> ResponseOutputMessage:
+    return ResponseOutputMessage(
+        id="msg_1",
+        role="assistant",
+        status="completed",
+        type="message",
+        content=[ResponseOutputText(text=text, type="output_text", annotations=[])],
+    )
+
+
+def test_run_sync_trace_has_agent_and_tool_spans() -> None:
+    """A real run's `Run.trace` has an `"agent"` root span and a `"tool"` span for a called tool."""
+
+    @tool
+    def now() -> str:
+        """Return a fixed time."""
+        return "2024-01-01T00:00:00"
+
+    tool_call = ResponseFunctionToolCall(
+        call_id="call_1", name="now", arguments="{}", type="function_call"
+    )
+
+    class TimeAgent(Agent):
+        name = "TimeAgent"
+        instructions = "Answer with the time."
+        tools = [now]
+        model = ScriptedModel(
+            steps=[[tool_call], [_final_message("the time is 2024")]], emit_traces=True
+        )
+
+    run = TimeAgent().run_sync("what time is it?")
+
+    assert run.status == "completed"
+    types_by_name = {span.name: span.type for span in run.trace.spans}
+    assert types_by_name["TimeAgent"] == "agent"
+    assert types_by_name["now"] == "tool"
+    assert all(span.status == "ok" for span in run.trace.spans)
+
+
+def test_run_sync_trace_records_a_tool_error_span() -> None:
+    """A tool that raises doesn't stop the run, but its span in `Run.trace` records the error.
+
+    The SDK feeds the tool's error back to the model as a `function_call_output` and continues
+    the turn loop rather than aborting the run, so a second scripted step supplies that follow-up
+    response; what this test cares about is that the failed tool's own span is still recorded
+    with `status="error"`.
+    """
+
+    @tool
+    def boom() -> str:
+        """Raise unconditionally."""
+        raise ValueError("boom")
+
+    tool_call = ResponseFunctionToolCall(
+        call_id="call_1", name="boom", arguments="{}", type="function_call"
+    )
+
+    class BoomAgent(Agent):
+        name = "BoomAgent"
+        instructions = "Call the tool."
+        tools = [boom]
+        model = ScriptedModel(
+            steps=[[tool_call], [_final_message("the tool failed")]], emit_traces=True
+        )
+
+    run = BoomAgent().run_sync("go")
+
+    tool_spans = [span for span in run.trace.spans if span.type == "tool"]
+    assert len(tool_spans) == 1
+    assert tool_spans[0].status == "error"
+    assert tool_spans[0].error is not None
 
 
 class _FakeStreamingResult:

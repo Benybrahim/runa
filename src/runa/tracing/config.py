@@ -1,0 +1,181 @@
+"""tracing/config.py: the privacy policy every captured span/trace goes through, plus `observe()`.
+
+One small, global, mutable policy — not a policy engine. `capture_inputs`/`capture_outputs` gate
+whether input/output are kept at all; `redact`/`redactor` scrub what's kept; the `max_*_bytes`
+limits truncate what's left. `RunaTraceProcessor` (`tracing/processor.py`) is the only caller.
+"""
+
+import json
+import logging
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Any, Protocol
+
+from runa.tracing._trace import Trace
+
+logger = logging.getLogger("runa")
+
+_REDACTED = "[REDACTED]"
+
+
+class TraceExporter(Protocol):
+    """Exports a finished `Trace` somewhere: SQLite, the console, or a caller's own backend.
+
+    `export` is synchronous because it's called from `on_trace_end`, a synchronous callback the
+    underlying Agents SDK invokes as part of finishing a trace (see `TracingProcessor` in
+    `agents.tracing`) — there is no event loop available to await from there.
+    """
+
+    def export(self, trace: Trace) -> None:
+        """Export `trace`. Exceptions are caught by the caller; tracing must never fail open."""
+        ...
+
+
+class SQLiteExporter:
+    """The default exporter: persists every finished trace to `runa.db` (`tracing/storage.py`)."""
+
+    def export(self, trace: Trace) -> None:
+        """Persist `trace` to the default `runa.db`."""
+        from runa.tracing.storage import save_trace
+
+        save_trace(trace)
+
+
+class ConsoleExporter:
+    """Prints every finished trace's human-readable tree (`Trace.__str__`) to stdout."""
+
+    def export(self, trace: Trace) -> None:
+        """Print `trace`."""
+        print(trace)  # noqa: T201 -- this exporter's entire job is printing
+
+
+@dataclass
+class _Config:
+    capture_inputs: bool = True
+    capture_outputs: bool = True
+    redact: list[str] | None = None
+    redactor: Callable[[Any], Any] | None = None
+    max_input_bytes: int = 32_000
+    max_output_bytes: int = 32_000
+    max_tool_result_bytes: int = 32_000
+    exporters: list[TraceExporter] = field(default_factory=lambda: [SQLiteExporter()])
+
+
+_config = _Config()
+
+
+def _redact_dict(value: dict[str, Any], redact: list[str]) -> dict[str, Any]:
+    return {k: (_REDACTED if k in redact else v) for k, v in value.items()}
+
+
+def _truncate(text: str, max_bytes: int) -> str:
+    encoded = text.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return text
+    return encoded[:max_bytes].decode("utf-8", errors="ignore") + "... [truncated]"
+
+
+def apply_policy(value: Any, *, max_bytes: int) -> Any:
+    """Apply the active redact/size policy to one span's `input`/`output`/tool result.
+
+    Callers check `capture_inputs()`/`capture_outputs()` themselves before calling this — this
+    function only redacts and truncates a value that's already been decided worth keeping.
+    """
+    if value is None:
+        return None
+    if _config.redactor is not None:
+        value = _config.redactor(value)
+    if _config.redact and isinstance(value, dict):
+        value = _redact_dict(value, _config.redact)
+    if isinstance(value, dict | list):
+        try:
+            value = json.loads(_truncate(json.dumps(value, default=str), max_bytes))
+        except TypeError, ValueError:
+            value = _truncate(str(value), max_bytes)
+    elif isinstance(value, str):
+        value = _truncate(value, max_bytes)
+    return value
+
+
+def capture_inputs() -> bool:
+    """Return whether span/trace input should be captured under the active policy."""
+    return _config.capture_inputs
+
+
+def capture_outputs() -> bool:
+    """Return whether span/trace output should be captured under the active policy."""
+    return _config.capture_outputs
+
+
+def input_limit() -> int:
+    """Return the active `max_input_bytes` limit."""
+    return _config.max_input_bytes
+
+
+def output_limit() -> int:
+    """Return the active `max_output_bytes` limit."""
+    return _config.max_output_bytes
+
+
+def tool_result_limit() -> int:
+    """Return the active `max_tool_result_bytes` limit."""
+    return _config.max_tool_result_bytes
+
+
+def exporters() -> list[TraceExporter]:
+    """Return the active list of `TraceExporter`s a finished trace is sent to."""
+    return _config.exporters
+
+
+class observe:
+    """Configure the tracing privacy policy: usable as a plain call or as a `with` block.
+
+    A bare `observe(capture_inputs=False)` call applies the setting immediately and leaves it in
+    place. `with observe(capture_inputs=False):` applies it for the duration of the block and
+    restores whatever was active before on exit. Both forms are supported per the design's
+    "should be supported, but should not be required" guidance for the context-manager form.
+    """
+
+    def __init__(
+        self,
+        *,
+        capture_inputs: bool | None = None,
+        capture_outputs: bool | None = None,
+        redact: list[str] | None = None,
+        redactor: Callable[[Any], Any] | None = None,
+        max_input_bytes: int | None = None,
+        max_output_bytes: int | None = None,
+        max_tool_result_bytes: int | None = None,
+        exporter: TraceExporter | list[TraceExporter] | None = None,
+    ) -> None:
+        """Apply the given overrides to the global tracing policy immediately."""
+        global _config
+        self._previous = _config
+        updates: dict[str, Any] = {
+            k: v
+            for k, v in {
+                "capture_inputs": capture_inputs,
+                "capture_outputs": capture_outputs,
+                "redact": redact,
+                "redactor": redactor,
+                "max_input_bytes": max_input_bytes,
+                "max_output_bytes": max_output_bytes,
+                "max_tool_result_bytes": max_tool_result_bytes,
+            }.items()
+            if v is not None
+        }
+        if exporter is not None:
+            updates["exporters"] = exporter if isinstance(exporter, list) else [exporter]
+        _config = _Config(**{**self._previous.__dict__, **updates})
+
+    def __enter__(self) -> observe:
+        """Return self; the policy was already applied in `__init__`."""
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        """Restore whatever tracing policy was active before this `observe(...)` was created."""
+        global _config
+        _config = self._previous
+
+
+__all__ = ["ConsoleExporter", "SQLiteExporter", "TraceExporter", "observe"]

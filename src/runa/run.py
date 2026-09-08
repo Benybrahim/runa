@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from agents.usage import Usage
 
-from runa.hooks import AuditEvent
+from runa.tracing import Trace
 
 Status = Literal["completed", "error"]
 
@@ -15,9 +15,9 @@ class Run:
     """The outcome of a single `Agent.run()`/`run_sync()` call.
 
     `output` is the agent's final output, `None` when `status` is `"error"`. `trace` is the
-    ordered `AuditEvent` log collected for this call — empty if a fully custom `hooks` (one
-    with no `AuditRunHooks` in it) was passed to `run`/`run_sync`, since overriding the default
-    hooks opts out of the built-in trace the same way it already opts out of logging/metrics.
+    hierarchical `Trace` (agent/LLM/tool/handoff/guardrail spans) captured for this call — see
+    `runa.tracing`; tracing is automatic and needs no configuration, so `trace` always reflects
+    what actually happened, never an empty stand-in, except when tracing itself is disabled.
     `usage` is this call's token usage, same value as `Agent.last_usage` after the call.
 
     `status` is `"error"` when an `AgentsException` (a guardrail tripwire, `MaxTurnsExceeded`,
@@ -26,7 +26,7 @@ class Run:
     """
 
     output: Any
-    trace: list[AuditEvent]
+    trace: Trace
     usage: Usage
     status: Status = "completed"
     error: str | None = None

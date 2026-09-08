@@ -27,6 +27,7 @@ from runa.mcp import MCPServer, MCPServerStdio, MCPServerStreamableHttp
 from runa.run import Run
 from runa.session import AsyncSQLiteSession, RedisSession, SQLAlchemySession, SQLiteSession
 from runa.tool import tool
+from runa.tracing import ConsoleExporter, Span, SQLiteExporter, Trace, TraceExporter, observe
 
 __all__ = [
     "DEFAULT_THRESHOLDS",
@@ -38,6 +39,7 @@ __all__ = [
     "CaseReport",
     "CompositeAgentHooks",
     "CompositeRunHooks",
+    "ConsoleExporter",
     "Dataset",
     "EvaluationResult",
     "LoggingAgentHooks",
@@ -51,11 +53,16 @@ __all__ = [
     "Run",
     "RunHooks",
     "SQLAlchemySession",
+    "SQLiteExporter",
     "SQLiteSession",
+    "Span",
     "Status",
+    "Trace",
+    "TraceExporter",
     "TracingRunHooks",
     "approval",
     "guardrail",
+    "observe",
     "tool",
     "websocket_session",
 ]

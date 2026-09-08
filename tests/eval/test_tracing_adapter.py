@@ -4,7 +4,7 @@ import asyncio
 from typing import Any
 
 import pytest
-from openai.types.responses import ResponseFunctionToolCall
+from agents import tracing as agents_tracing
 
 from runa.agent import Agent
 from runa.eval.case import Case
@@ -18,22 +18,6 @@ class _TestAgent(Agent):
 
 
 _AGENT = _TestAgent()
-
-
-def _tool_call_item(name: str, call_id: str, arguments: str = "{}") -> Any:
-    from agents.items import ToolCallItem
-
-    raw = ResponseFunctionToolCall(
-        call_id=call_id, name=name, arguments=arguments, type="function_call"
-    )
-    return ToolCallItem(agent=_AGENT, raw_item=raw)
-
-
-def _tool_call_output_item(call_id: str, output: str) -> Any:
-    from agents.items import ToolCallOutputItem
-
-    raw = {"call_id": call_id, "output": output, "type": "function_call_output"}
-    return ToolCallOutputItem(agent=_AGENT, raw_item=raw, output=output)
 
 
 def test_run_agent_for_eval_captures_final_output(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -58,16 +42,29 @@ def test_run_agent_for_eval_captures_final_output(monkeypatch: pytest.MonkeyPatc
 def test_run_agent_for_eval_pairs_tool_calls_with_their_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A `ToolCallItem` is paired with the `ToolCallOutputItem` sharing its `call_id`."""
+    """A tool's `function_span` becomes a `ToolCallRecord`, read from the shared `Trace`.
+
+    `fake_run` opens the same real SDK trace/span primitives `Runner.run()` would, using the
+    `trace_id` `run_agent_for_eval`'s `capture_trace` generated (passed in via `run_config`), so
+    `RunaTraceProcessor` populates `AgentRun.trace` for real instead of a parallel fake shape.
+    """
 
     class _FakeResult:
         final_output = "done"
-        new_items = [
-            _tool_call_item("cancel_order", "call_1", arguments='{"order_id": "123"}'),
-            _tool_call_output_item("call_1", "cancelled"),
-        ]
 
-    async def fake_run(agent: Any, input: Any, **kwargs: Any) -> Any:
+    async def fake_run(agent: Any, input: Any, *, run_config: Any, **kwargs: Any) -> Any:
+        with (
+            agents_tracing.trace(
+                run_config.workflow_name,
+                trace_id=run_config.trace_id,
+                group_id=run_config.group_id,
+                metadata=run_config.trace_metadata,
+            ),
+            agents_tracing.function_span(
+                "cancel_order", input='{"order_id": "123"}', output="cancelled"
+            ),
+        ):
+            pass
         return _FakeResult()
 
     monkeypatch.setattr("runa.eval.tracing.adapter.Runner.run", staticmethod(fake_run))
@@ -77,6 +74,7 @@ def test_run_agent_for_eval_pairs_tool_calls_with_their_output(
     assert len(run.tool_calls) == 1
     assert run.tool_calls[0].name == "cancel_order"
     assert run.tool_calls[0].output == "cancelled"
+    assert any(span.type == "tool" for span in run.trace.spans)
 
 
 def test_run_agent_for_eval_captures_a_run_exception_as_an_error(

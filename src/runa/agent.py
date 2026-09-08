@@ -16,7 +16,6 @@ from agents.usage import Usage
 
 from runa.guardrail import flatten_agent_guardrails
 from runa.hooks import (
-    AuditEvent,
     AuditRunHooks,
     CompositeRunHooks,
     LoggingRunHooks,
@@ -24,6 +23,7 @@ from runa.hooks import (
     TracingRunHooks,
 )
 from runa.run import Run
+from runa.tracing.runner import capture_trace
 
 if TYPE_CHECKING:
     from runa.eval.case import Case
@@ -41,22 +41,6 @@ def _default_hooks() -> RunHooks[Any]:
     return CompositeRunHooks(
         LoggingRunHooks(), MetricsRunHooks(), TracingRunHooks(), AuditRunHooks()
     )
-
-
-def _extract_trace(run_hooks: RunHooks[Any]) -> list[AuditEvent]:
-    """Pull the `AuditEvent` trail out of `run_hooks`, if it (or a hook it composes) is audited.
-
-    Returns `[]` when `run_hooks` is a fully custom `RunHooks` with no `AuditRunHooks` in it —
-    overriding the default hooks opts out of the built-in trace, same as it already opts out of
-    logging/metrics/timing.
-    """
-    if isinstance(run_hooks, AuditRunHooks):
-        return run_hooks.events
-    if isinstance(run_hooks, CompositeRunHooks):
-        for hook in run_hooks.hooks:
-            if isinstance(hook, AuditRunHooks):
-                return hook.events
-    return []
 
 
 def _usage_from_exception(exc: AgentsException) -> Usage:
@@ -203,32 +187,38 @@ class Agent(BaseAgent):
             else [*self.history, {"role": "user", "content": message}]
         )
         run_hooks = hooks or _default_hooks()
-        try:
-            result = await Runner.run(
-                self,
-                turn_input,
-                context=context,
-                hooks=run_hooks,
-                run_config=_RUN_CONFIG,
-                session=session,
-            )
-        except AgentsException as exc:
-            self.last_usage = _usage_from_exception(exc)
+        error: AgentsException | None = None
+        result = None
+        with capture_trace(
+            workflow_name=type(self).__name__, group_id=getattr(session, "session_id", None)
+        ) as cap:
+            try:
+                result = await Runner.run(
+                    self,
+                    turn_input,
+                    context=context,
+                    hooks=run_hooks,
+                    run_config=replace(_RUN_CONFIG, **cap.run_config_fields),
+                    session=session,
+                )
+            except AgentsException as exc:
+                error = exc
+        if error is not None or result is None:
+            assert error is not None
+            self.last_usage = _usage_from_exception(error)
             self.usage.add(self.last_usage)
             return Run(
                 output=None,
-                trace=_extract_trace(run_hooks),
+                trace=cap.trace,
                 usage=self.last_usage,
                 status="error",
-                error=str(exc),
+                error=str(error),
             )
         self.last_usage = result.context_wrapper.usage
         self.usage.add(self.last_usage)
         if session is None:
             self.history = result.to_input_list()
-        return Run(
-            output=result.final_output, trace=_extract_trace(run_hooks), usage=self.last_usage
-        )
+        return Run(output=result.final_output, trace=cap.trace, usage=self.last_usage)
 
     async def evaluate(
         self,
@@ -337,32 +327,38 @@ class Agent(BaseAgent):
             else [*self.history, {"role": "user", "content": message}]
         )
         run_hooks = hooks or _default_hooks()
-        try:
-            result = Runner.run_sync(
-                self,
-                turn_input,
-                context=context,
-                hooks=run_hooks,
-                run_config=_RUN_CONFIG,
-                session=session,
-            )
-        except AgentsException as exc:
-            self.last_usage = _usage_from_exception(exc)
+        error: AgentsException | None = None
+        result = None
+        with capture_trace(
+            workflow_name=type(self).__name__, group_id=getattr(session, "session_id", None)
+        ) as cap:
+            try:
+                result = Runner.run_sync(
+                    self,
+                    turn_input,
+                    context=context,
+                    hooks=run_hooks,
+                    run_config=replace(_RUN_CONFIG, **cap.run_config_fields),
+                    session=session,
+                )
+            except AgentsException as exc:
+                error = exc
+        if error is not None or result is None:
+            assert error is not None
+            self.last_usage = _usage_from_exception(error)
             self.usage.add(self.last_usage)
             return Run(
                 output=None,
-                trace=_extract_trace(run_hooks),
+                trace=cap.trace,
                 usage=self.last_usage,
                 status="error",
-                error=str(exc),
+                error=str(error),
             )
         self.last_usage = result.context_wrapper.usage
         self.usage.add(self.last_usage)
         if session is None:
             self.history = result.to_input_list()
-        return Run(
-            output=result.final_output, trace=_extract_trace(run_hooks), usage=self.last_usage
-        )
+        return Run(output=result.final_output, trace=cap.trace, usage=self.last_usage)
 
 
 @dataclass(frozen=True)

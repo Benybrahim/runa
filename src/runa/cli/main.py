@@ -35,6 +35,7 @@ from runa.cli.runs import (
     show_session,
 )
 from runa.cli.test import run_project_tests
+from runa.cli.traces import TraceNotFound, list_errors_cli, list_traces_cli, show_trace
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -97,6 +98,15 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     runs_cancel_parser.add_argument("session_id")
 
+    traces_parser = subparsers.add_parser("traces", help="Inspect this app's traces in runa.db")
+    traces_subparsers = traces_parser.add_subparsers(dest="traces_action", required=True)
+
+    traces_subparsers.add_parser("list", help="List the most recent traces")
+    traces_subparsers.add_parser("errors", help="List the most recent traces that errored")
+
+    traces_show_parser = traces_subparsers.add_parser("show", help="Show a trace's span tree")
+    traces_show_parser.add_argument("trace_id")
+
     return parser
 
 
@@ -129,6 +139,7 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
         EvaluationAlreadyExists,
         NotARunaProject,
         InvalidEvalModule,
+        TraceNotFound,
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -210,6 +221,15 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
         failed = sum(1 for result in results if not result.passed)
         print(f"\n{len(results) - failed}/{len(results)} passed")
         return 1 if failed else 0
+
+    if args.command == "traces":
+        if args.traces_action == "list":
+            print(list_traces_cli(root=cwd))
+        elif args.traces_action == "show":
+            print(show_trace(args.trace_id, root=cwd))
+        else:
+            print(list_errors_cli(root=cwd))
+        return 0
 
     if args.action == "list":
         print(list_sessions(root=cwd))
