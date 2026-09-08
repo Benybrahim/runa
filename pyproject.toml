@@ -7,8 +7,6 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.14"
 dependencies = [
-    "anthropic>=0.40.0",
-    "openai>=1.0.0",
     "openai-agents[litellm,viz]>=0.22.0",
 ]
 
