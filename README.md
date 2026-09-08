@@ -1,61 +1,72 @@
-# Welcome to Runa
+# Runa
 
 ## What's Runa?
+Runa is an opinionated Python framework for agentic AI.
 
-Runa is an agent application framework that includes everything needed to
-build and run reliable, stateful agents.
+## Features
 
-## Quick Start
+- **Tools from function signatures.** `@tool` reads a function's type
+  hints and docstring; there's no schema to write by hand.
+- **Guardrails as predicates.** `@guardrail` turns a function into a guardrail for inputs/output, agents and tools alike.
+- **Subagents in one line.** `.handoff` transfers a conversation to
+  another agent; `.delegate` calls it like a tool.
+- **Any provider, one string.** `claude-*`, `gpt-*`, `gemini-*`,
+  `llama-*`, `deepseek-*`, `qwen-*`, the model name picks the provider.
+- **Persistence with zero setup.** `SQLiteSession` remembers a
+  conversation across processes; `runa chat` uses it automatically.
+- **Tracing you never asked for.** Every run is a span tree in `runa.db`,
+  inspectable with `runa traces`.
+- **Tests and evals as first-class citizens.** `runa test` for plain
+  assertions, `runa eval` for judged, dataset-driven grading.
 
-1. Runa hasn't made a tagged release yet. Install it straight from the repo
-   with [uv](https://docs.astral.sh/uv/):
+## Getting Started
 
-    ```bash
-    # Set up your virtual environment
-    uv venv --python 3.12
-    source .venv/bin/activate
-   
-    # Install dependencies
-    uv add git+https://github.com/benybrahim/runa.git
-    ```
+1. Install [uv](https://docs.astral.sh/uv/), then Runa:
 
-2. At the command prompt, create a new Runa application:
+   ```bash
+   uv venv --python 3.14
+   source .venv/bin/activate
+   uv add git+https://github.com/benybrahim/runa.git
+   ```
 
-    ```bash
-    runa new myapp
-    ```
+2. Scaffold a new application:
 
-   where "myapp" is the application name.
+   ```bash
+   runa new myapp
+   ```
 
-
-3. Write your agent and run it:
-
-    ```python
-    class Assistant(Agent):
-   
-        name = "assistant_agent"
-        instructions = instructions
-        tools = [now]
-        subagents = [Researcher.handoff, Translator.delegate, Summarizer]
-        guardrails = [block_empty.input, block_long.output, contains_pii]
-
-   agent = Assistant()
-   agent.run_sync("What time is it right now?")
-    ```
-   Run with `--help` or `-h` for options.
+   where `myapp` is the application name.
 
 
-4. Chat with the agent:
+3. Change directory to `myapp`, generate an agent, and talk to it:
 
-    ```bash
-    runa chat my_agent
-    ```
+   ```bash
+   cd myapp
+   runa generate agent Assistant
+   runa chat assistant
+   ```
 
-5. Follow the guides to start developing your application. You may find
-   the following resources handy:
-    * [Getting Started with Runa](docs/getting_started.md)
-    * [Runa Guides](docs/guides.md)
+   Run any subcommand with `--help` for options.
 
+
+4. Fill in the API key for whichever model you use in `.env`, and you're
+   running.
+
+
+5. Follow the guides to keep building your application. You may find the following ressources these handy:
+   * [Getting Started with Runa](docs/getting_started.md)
+   * [Runa Guides](docs/guides.md)
+   * [CLI Reference](docs/cli.md)
+
+## Read the Zen of Runa
+
+```bash
+python -c "import runa.this"
+```
+
+## Contributing
+
+We encourage you to contribute to Runa! Check out [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## License
 
