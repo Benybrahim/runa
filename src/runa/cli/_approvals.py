@@ -1,4 +1,4 @@
-"""cli/_approvals.py: the `runa_pending_approvals` table inside an app's `runa.db`.
+"""cli/_approvals.py: the `pending_approvals` table inside an app's `runa.db`.
 
 `SQLiteSession` already persists conversation turns (`agent_sessions`/
 `agent_messages`) in the same file (see `cli/run.py`); this adds the one
@@ -18,7 +18,7 @@ from pathlib import Path
 
 from agents.items import ToolApprovalItem
 
-_TABLE = "runa_pending_approvals"
+_TABLE = "pending_approvals"
 
 
 @dataclass

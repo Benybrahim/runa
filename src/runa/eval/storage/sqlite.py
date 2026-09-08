@@ -1,7 +1,7 @@
-"""eval/storage/sqlite.py: the `runa_eval_runs`/`runa_eval_cases` tables inside `runa.db`.
+"""eval/storage/sqlite.py: the `eval_runs`/`eval_cases` tables inside `runa.db`.
 
-Every `agent.evaluate()` call writes one row to `runa_eval_runs` (one "experiment") and one row
-per case to `runa_eval_cases`, in the same `runa.db` file `SQLiteSession` and the pending-approvals
+Every `agent.evaluate()` call writes one row to `eval_runs` (one "experiment") and one row
+per case to `eval_cases`, in the same `runa.db` file `SQLiteSession` and the pending-approvals
 table already use (see `cli/_approvals.py`), so a local app accumulates one database with no setup.
 """
 
@@ -14,8 +14,8 @@ from pathlib import Path
 
 from runa.eval.report import Report
 
-_RUNS_TABLE = "runa_eval_runs"
-_CASES_TABLE = "runa_eval_cases"
+_RUNS_TABLE = "eval_runs"
+_CASES_TABLE = "eval_cases"
 
 DEFAULT_DB_PATH = Path("runa.db")
 
@@ -51,7 +51,7 @@ def _connect(db_path: Path) -> sqlite3.Connection:
 
 
 def save_report(report: Report, *, db_path: Path = DEFAULT_DB_PATH) -> int:
-    """Persist `report` to `db_path`, returning the new `runa_eval_runs.id`."""
+    """Persist `report` to `db_path`, returning the new `eval_runs.id`."""
     created_at = datetime.now(UTC).isoformat()
     with closing(_connect(db_path)) as conn:
         cursor = conn.execute(

@@ -1,4 +1,4 @@
-"""tracing/storage.py: the `runa_traces`/`runa_spans` tables inside `runa.db`.
+"""tracing/storage.py: the `traces`/`spans` tables inside `runa.db`.
 
 Same file, same connect-and-create-if-missing pattern as `eval/storage/sqlite.py`, so a local app
 accumulates one `runa.db` with no setup regardless of which of eval or tracing wrote to it first.
@@ -12,8 +12,8 @@ from pathlib import Path
 from runa.tracing._span import Span
 from runa.tracing._trace import Trace
 
-_TRACES_TABLE = "runa_traces"
-_SPANS_TABLE = "runa_spans"
+_TRACES_TABLE = "traces"
+_SPANS_TABLE = "spans"
 
 DEFAULT_DB_PATH = Path("runa.db")
 

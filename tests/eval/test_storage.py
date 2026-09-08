@@ -12,7 +12,7 @@ from runa.eval.tracing.adapter import AgentRun
 
 
 def test_save_report_persists_a_run_and_its_cases(tmp_path: Path) -> None:
-    """`save_report` writes one `runa_eval_runs` row and one `runa_eval_cases` row per case."""
+    """`save_report` writes one `eval_runs` row and one `eval_cases` row per case."""
     db_path = tmp_path / "runa.db"
     case_report = CaseReport(
         index=0,
@@ -28,10 +28,10 @@ def test_save_report_persists_a_run_and_its_cases(tmp_path: Path) -> None:
 
     with sqlite3.connect(db_path) as conn:
         run_row = conn.execute(
-            "SELECT agent_name, score, pass_rate FROM runa_eval_runs WHERE id = ?", (run_id,)
+            "SELECT agent_name, score, pass_rate FROM eval_runs WHERE id = ?", (run_id,)
         ).fetchone()
         case_row = conn.execute(
-            "SELECT input, output, passed, results_json FROM runa_eval_cases WHERE run_id = ?",
+            "SELECT input, output, passed, results_json FROM eval_cases WHERE run_id = ?",
             (run_id,),
         ).fetchone()
 
@@ -51,7 +51,7 @@ def test_save_report_handles_an_empty_dataset(tmp_path: Path) -> None:
 
     with sqlite3.connect(db_path) as conn:
         count = conn.execute(
-            "SELECT COUNT(*) FROM runa_eval_cases WHERE run_id = ?", (run_id,)
+            "SELECT COUNT(*) FROM eval_cases WHERE run_id = ?", (run_id,)
         ).fetchone()[0]
 
     assert count == 0
