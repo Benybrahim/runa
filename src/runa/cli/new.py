@@ -33,7 +33,7 @@ load_dotenv()
 if __name__ == "__main__":
     # from app.agents.example_agent import ExampleAgent
     #
-    # print(ExampleAgent().run_sync("..."))
+    # print(ExampleAgent().run_sync("...").output)
     pass
 '''
 

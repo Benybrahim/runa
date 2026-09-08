@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from agents import Agent as BaseAgent
 from agents import RunConfig, RunContextWrapper, RunHooks, Runner, Session, StreamEvent
 from agents import responses_websocket_session as websocket_session
+from agents.exceptions import AgentsException
 from agents.extensions.models.litellm_provider import LitellmProvider
 from agents.items import TResponseInputItem
 from agents.responses_websocket_session import ResponsesWebSocketSession
@@ -15,12 +16,14 @@ from agents.usage import Usage
 
 from runa.guardrail import flatten_agent_guardrails
 from runa.hooks import (
+    AuditEvent,
     AuditRunHooks,
     CompositeRunHooks,
     LoggingRunHooks,
     MetricsRunHooks,
     TracingRunHooks,
 )
+from runa.run import Run
 
 if TYPE_CHECKING:
     from runa.eval.case import Case
@@ -38,6 +41,27 @@ def _default_hooks() -> RunHooks[Any]:
     return CompositeRunHooks(
         LoggingRunHooks(), MetricsRunHooks(), TracingRunHooks(), AuditRunHooks()
     )
+
+
+def _extract_trace(run_hooks: RunHooks[Any]) -> list[AuditEvent]:
+    """Pull the `AuditEvent` trail out of `run_hooks`, if it (or a hook it composes) is audited.
+
+    Returns `[]` when `run_hooks` is a fully custom `RunHooks` with no `AuditRunHooks` in it —
+    overriding the default hooks opts out of the built-in trace, same as it already opts out of
+    logging/metrics/timing.
+    """
+    if isinstance(run_hooks, AuditRunHooks):
+        return run_hooks.events
+    if isinstance(run_hooks, CompositeRunHooks):
+        for hook in run_hooks.hooks:
+            if isinstance(hook, AuditRunHooks):
+                return hook.events
+    return []
+
+
+def _usage_from_exception(exc: AgentsException) -> Usage:
+    """Recover whatever token usage a run accrued before an `AgentsException` stopped it."""
+    return exc.run_data.context_wrapper.usage if exc.run_data else Usage()
 
 
 def _adapt_instructions(instructions: Any) -> Any:
@@ -153,7 +177,7 @@ class Agent(BaseAgent):
         context: Any = None,
         hooks: RunHooks[Any] | None = None,
         session: Session | None = None,
-    ) -> str:
+    ) -> Run:
         """Run a turn asynchronously, appending it to the conversation history.
 
         `context` is available to a single-argument `instructions` callable (and to tools,
@@ -165,27 +189,46 @@ class Agent(BaseAgent):
         of on `self.history`; the session supplies prior turns automatically, so only the new
         `message` is sent as input, and `self.history` is left untouched.
 
+        Returns a `Run` exposing `.output`, `.trace`, `.usage`, `.status`, and `.error`. A
+        guardrail tripwire, `MaxTurnsExceeded`, or another `AgentsException` is caught and
+        reported as `status="error"` instead of propagating; `self.history` is left unchanged
+        when that happens, since the turn never completed.
+
         Token usage for this call is recorded to `self.last_usage` and accumulated into
-        `self.usage`, regardless of `session` or `hooks`.
+        `self.usage`, regardless of `session`, `hooks`, or whether the run errored.
         """
         turn_input = (
             message
             if session is not None
             else [*self.history, {"role": "user", "content": message}]
         )
-        result = await Runner.run(
-            self,
-            turn_input,
-            context=context,
-            hooks=hooks or _default_hooks(),
-            run_config=_RUN_CONFIG,
-            session=session,
-        )
+        run_hooks = hooks or _default_hooks()
+        try:
+            result = await Runner.run(
+                self,
+                turn_input,
+                context=context,
+                hooks=run_hooks,
+                run_config=_RUN_CONFIG,
+                session=session,
+            )
+        except AgentsException as exc:
+            self.last_usage = _usage_from_exception(exc)
+            self.usage.add(self.last_usage)
+            return Run(
+                output=None,
+                trace=_extract_trace(run_hooks),
+                usage=self.last_usage,
+                status="error",
+                error=str(exc),
+            )
         self.last_usage = result.context_wrapper.usage
         self.usage.add(self.last_usage)
         if session is None:
             self.history = result.to_input_list()
-        return result.final_output
+        return Run(
+            output=result.final_output, trace=_extract_trace(run_hooks), usage=self.last_usage
+        )
 
     async def evaluate(
         self,
@@ -268,7 +311,7 @@ class Agent(BaseAgent):
         context: Any = None,
         hooks: RunHooks[Any] | None = None,
         session: Session | None = None,
-    ) -> str:
+    ) -> Run:
         """Run a turn synchronously, appending it to the conversation history.
 
         `context` is available to a single-argument `instructions` callable (and to tools,
@@ -280,27 +323,46 @@ class Agent(BaseAgent):
         of on `self.history`; the session supplies prior turns automatically, so only the new
         `message` is sent as input, and `self.history` is left untouched.
 
+        Returns a `Run` exposing `.output`, `.trace`, `.usage`, `.status`, and `.error`. A
+        guardrail tripwire, `MaxTurnsExceeded`, or another `AgentsException` is caught and
+        reported as `status="error"` instead of propagating; `self.history` is left unchanged
+        when that happens, since the turn never completed.
+
         Token usage for this call is recorded to `self.last_usage` and accumulated into
-        `self.usage`, regardless of `session` or `hooks`.
+        `self.usage`, regardless of `session`, `hooks`, or whether the run errored.
         """
         turn_input = (
             message
             if session is not None
             else [*self.history, {"role": "user", "content": message}]
         )
-        result = Runner.run_sync(
-            self,
-            turn_input,
-            context=context,
-            hooks=hooks or _default_hooks(),
-            run_config=_RUN_CONFIG,
-            session=session,
-        )
+        run_hooks = hooks or _default_hooks()
+        try:
+            result = Runner.run_sync(
+                self,
+                turn_input,
+                context=context,
+                hooks=run_hooks,
+                run_config=_RUN_CONFIG,
+                session=session,
+            )
+        except AgentsException as exc:
+            self.last_usage = _usage_from_exception(exc)
+            self.usage.add(self.last_usage)
+            return Run(
+                output=None,
+                trace=_extract_trace(run_hooks),
+                usage=self.last_usage,
+                status="error",
+                error=str(exc),
+            )
         self.last_usage = result.context_wrapper.usage
         self.usage.add(self.last_usage)
         if session is None:
             self.history = result.to_input_list()
-        return result.final_output
+        return Run(
+            output=result.final_output, trace=_extract_trace(run_hooks), usage=self.last_usage
+        )
 
 
 @dataclass(frozen=True)
@@ -319,4 +381,4 @@ class Subagent:
         return replace(self, tool_name=tool_name, tool_description=tool_description)
 
 
-__all__ = ["Agent", "Subagent", "websocket_session"]
+__all__ = ["Agent", "Run", "Subagent", "websocket_session"]

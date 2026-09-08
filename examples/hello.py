@@ -91,4 +91,5 @@ class Assistant(Agent):
 
 
 agent = Assistant()
-print(agent.run_sync("What time is it right now?", context=Context(user_name="Ada")))
+run = agent.run_sync("What time is it right now?", context=Context(user_name="Ada"))
+print(run.output)

@@ -24,6 +24,7 @@ from runa.hooks import (
     TracingRunHooks,
 )
 from runa.mcp import MCPServer, MCPServerStdio, MCPServerStreamableHttp
+from runa.run import Run
 from runa.session import AsyncSQLiteSession, RedisSession, SQLAlchemySession, SQLiteSession
 from runa.tool import tool
 
@@ -47,6 +48,7 @@ __all__ = [
     "MetricsRunHooks",
     "RedisSession",
     "Report",
+    "Run",
     "RunHooks",
     "SQLAlchemySession",
     "SQLiteSession",

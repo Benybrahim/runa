@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import pytest
 from agents import FunctionTool, RunContextWrapper
+from agents.exceptions import MaxTurnsExceeded, RunErrorDetails
 from agents.usage import Usage
 
 from runa import Agent
@@ -327,6 +328,69 @@ def test_run_sync_records_and_accumulates_usage(monkeypatch: pytest.MonkeyPatch)
     assert agent.last_usage == expected_call_usage
     assert agent.usage.input_tokens == 2
     assert agent.usage.output_tokens == 4
+
+
+def test_run_sync_returns_a_completed_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`run_sync` returns a `Run` with the final output, status, and this call's usage."""
+
+    def fake_run_sync(*args: Any, **kwargs: Any) -> _FakeResult:
+        return _FakeResult()
+
+    monkeypatch.setattr("runa.agent.Runner.run_sync", staticmethod(fake_run_sync))
+
+    run = Researcher().run_sync("hi")
+
+    assert run.output == "ok"
+    assert run.status == "completed"
+    assert run.error is None
+    assert run.usage == Usage(input_tokens=1, output_tokens=2)
+
+
+def test_run_sync_catches_agents_exception_as_error_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An `AgentsException` (guardrail tripwire, `MaxTurnsExceeded`, ...) is captured, not raised.
+
+    `self.history` is left unchanged, since the turn never completed.
+    """
+    exc = MaxTurnsExceeded("too many turns")
+    exc.run_data = RunErrorDetails(
+        input="hi",
+        new_items=[],
+        raw_responses=[],
+        last_agent=cast(Any, None),
+        context_wrapper=RunContextWrapper(
+            context=None, usage=Usage(input_tokens=5, output_tokens=6)
+        ),
+        input_guardrail_results=[],
+        output_guardrail_results=[],
+    )
+
+    def fake_run_sync(*args: Any, **kwargs: Any) -> _FakeResult:
+        raise exc
+
+    monkeypatch.setattr("runa.agent.Runner.run_sync", staticmethod(fake_run_sync))
+
+    agent = Researcher()
+    run = agent.run_sync("hi")
+
+    assert run.output is None
+    assert run.status == "error"
+    assert run.error == "too many turns"
+    assert run.usage == Usage(input_tokens=5, output_tokens=6)
+    assert agent.last_usage == Usage(input_tokens=5, output_tokens=6)
+    assert agent.history == []
+
+
+def test_run_sync_trace_empty_with_fully_custom_hooks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Overriding `hooks` with something that isn't audited yields an empty `Run.trace`."""
+
+    def fake_run_sync(*args: Any, **kwargs: Any) -> _FakeResult:
+        return _FakeResult()
+
+    monkeypatch.setattr("runa.agent.Runner.run_sync", staticmethod(fake_run_sync))
+
+    run = Researcher().run_sync("hi", hooks=LoggingRunHooks())
+
+    assert run.trace == []
 
 
 class _FakeStreamingResult:
