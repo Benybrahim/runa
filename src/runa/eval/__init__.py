@@ -1,8 +1,8 @@
 """`runa.eval`: `Case`/`Dataset` in, a `Report` out — see `Agent.evaluate()`.
 
-Deterministic checks, DeepEval-backed semantic metrics, and SQLite storage
-are all implementation details behind `evaluate_agent()`; see
-`eval/evaluation/`, `eval/integrations/deepeval.py`, and `eval/storage/`.
+Deterministic checks, judge-model-backed semantic metrics, and SQLite
+storage are all implementation details behind `evaluate_agent()`; see
+`eval/evaluation/`, `eval/judge.py`, and `eval/storage/`.
 """
 
 from runa.eval.case import Case

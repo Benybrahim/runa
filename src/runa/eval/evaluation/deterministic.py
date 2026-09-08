@@ -25,13 +25,13 @@ def check_expected_tool_called(case: Case, run: AgentRun) -> EvaluationResult | 
     called = {tool_call.name for tool_call in run.tool_calls}
     if case.expected_tool in called:
         return EvaluationResult(
-            metric="expected_tool_called",
+            metric="tool_correctness",
             status=Status.PASS,
             reason=f"called {case.expected_tool!r}",
             score=1.0,
         )
     return EvaluationResult(
-        metric="expected_tool_called",
+        metric="tool_correctness",
         status=Status.FAIL,
         reason=f"expected {case.expected_tool!r} to be called, got {sorted(called)}",
         score=0.0,

@@ -9,7 +9,6 @@ requires-python = ">=3.14"
 dependencies = [
     "aiosqlite>=0.20.0",
     "anthropic>=0.40.0",
-    "deepeval>=4.2.2",
     "openai>=1.0.0",
     "openai-agents[litellm,redis,sqlalchemy]>=0.22.0",
 ]

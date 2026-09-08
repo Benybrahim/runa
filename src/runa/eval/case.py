@@ -14,9 +14,9 @@ from typing import Any
 class Case:
     """One eval case: an input, plus optional evidence of what a good run looks like.
 
-    `expected` enables answer-correctness grading; `expected_tool` enables the
-    deterministic "was it called" check and tool-correctness grading;
-    `context` (retrieval passages the agent should be grounded in) enables
+    `expected` enables answer-correctness grading; `expected_tool` enables
+    the deterministic "was it called" (tool-correctness) check; `context`
+    (retrieval passages the agent should be grounded in) enables
     faithfulness grading. Any combination is valid, including none of them,
     in which case only task completion and answer relevance run.
     """
