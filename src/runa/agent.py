@@ -26,6 +26,8 @@ from runa.run import Run
 from runa.tracing.runner import capture_trace
 
 if TYPE_CHECKING:
+    from graphviz import Source
+
     from runa.eval.case import Case
     from runa.eval.report import Report
 
@@ -154,6 +156,17 @@ class Agent(BaseAgent):
         self._last_response_id: str | None = None
         self.usage = Usage()
         self.last_usage = Usage()
+
+    @property
+    def graph(self) -> Source:
+        """Render this agent, and its tools/handoffs, as a Graphviz diagram.
+
+        Displays inline in Jupyter; call `.render(filename)` to save it, or `.source` for the
+        raw DOT text. Actually rendering an image needs the system Graphviz `dot` binary.
+        """
+        from agents.extensions.visualization import draw_graph
+
+        return draw_graph(self)
 
     async def run(
         self,
