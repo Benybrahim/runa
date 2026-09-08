@@ -446,3 +446,27 @@ def test_run_streamed_with_session_threads_previous_response_id() -> None:
     assert agent.last_usage == Usage(input_tokens=3, output_tokens=4)
     assert agent.usage.input_tokens == 6
     assert agent.usage.output_tokens == 8
+
+
+def test_evaluate_delegates_to_evaluate_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`Agent.evaluate()` forwards straight to `runa.eval.evaluate.evaluate_agent`."""
+    from runa.eval.case import Case
+
+    captured: dict[str, Any] = {}
+
+    async def fake_evaluate_agent(agent: Any, dataset: Any, **kwargs: Any) -> str:
+        captured["agent"] = agent
+        captured["dataset"] = dataset
+        captured["kwargs"] = kwargs
+        return "a report"
+
+    monkeypatch.setattr("runa.eval.evaluate.evaluate_agent", fake_evaluate_agent)
+
+    agent = Researcher()
+    dataset = [Case(input="hi")]
+    report = asyncio.run(agent.evaluate(dataset, judge="gpt-5.4", threshold=0.8))
+
+    assert report == "a report"
+    assert captured["agent"] is agent
+    assert captured["dataset"] is dataset
+    assert captured["kwargs"] == {"judge": "gpt-5.4", "threshold": 0.8, "thresholds": None}

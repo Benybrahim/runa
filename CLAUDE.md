@@ -14,12 +14,11 @@ Runa is an opinionated Python framework for agentic AI.
 ## Zen of Python
 
 - `import this`
-- Less is better than more.
+- Less is more.
 - Important things come first.
 - Let Ruff keep code simple.
 - Let types speak for themselves.
 - Let docstrings explain what types cannot.
 - Code that does not pass Test is not done.
-- Test behavior, not implementation. Prefer real objects; mock the boundaries.
 - Python 3.14, managed with `uv`.
 - Give oneliner commit message: `feat`, `fix`, `docs`, `refactor`, `test`

@@ -1,9 +1,9 @@
 """Class-based Agent built on the OpenAI Agents SDK."""
 
 import inspect
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable
 from dataclasses import MISSING, dataclass, fields, replace
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from agents import Agent as BaseAgent
 from agents import RunConfig, RunContextWrapper, RunHooks, Runner, Session, StreamEvent
@@ -21,6 +21,10 @@ from runa.hooks import (
     MetricsRunHooks,
     TracingRunHooks,
 )
+
+if TYPE_CHECKING:
+    from runa.eval.case import Case
+    from runa.eval.report import Report
 
 _RUN_CONFIG = RunConfig(model_provider=LitellmProvider())
 
@@ -182,6 +186,27 @@ class Agent(BaseAgent):
         if session is None:
             self.history = result.to_input_list()
         return result.final_output
+
+    async def evaluate(
+        self,
+        dataset: Iterable["Case"],  # noqa: UP037 -- Case is TYPE_CHECKING-only, must stay quoted
+        *,
+        judge: str | None = None,
+        threshold: float | None = None,
+        thresholds: dict[str, float] | None = None,
+    ) -> "Report":  # noqa: UP037 -- Report is TYPE_CHECKING-only, must stay quoted
+        """Run every case in `dataset` through this agent and grade it: see `runa.eval`.
+
+        Deterministic checks and DeepEval-backed semantic metrics (task completion, answer
+        correctness/relevance, faithfulness, tool correctness) are chosen automatically per case
+        based on what evidence it supplies; no metric configuration is required. `judge` overrides
+        the model semantic metrics grade with, defaulting to this agent's own `model`.
+        """
+        from runa.eval.evaluate import evaluate_agent
+
+        return await evaluate_agent(
+            self, dataset, judge=judge, threshold=threshold, thresholds=thresholds
+        )
 
     async def run_streamed(
         self,

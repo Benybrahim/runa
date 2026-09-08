@@ -2,6 +2,15 @@
 
 from runa.agent import Agent, websocket_session
 from runa.approval import approval
+from runa.eval import (
+    DEFAULT_THRESHOLDS,
+    Case,
+    CaseReport,
+    Dataset,
+    EvaluationResult,
+    Report,
+    Status,
+)
 from runa.guardrail import guardrail
 from runa.hooks import (
     AgentHooks,
@@ -19,12 +28,17 @@ from runa.session import AsyncSQLiteSession, RedisSession, SQLAlchemySession, SQ
 from runa.tool import tool
 
 __all__ = [
+    "DEFAULT_THRESHOLDS",
     "Agent",
     "AgentHooks",
     "AsyncSQLiteSession",
     "AuditRunHooks",
+    "Case",
+    "CaseReport",
     "CompositeAgentHooks",
     "CompositeRunHooks",
+    "Dataset",
+    "EvaluationResult",
     "LoggingAgentHooks",
     "LoggingRunHooks",
     "MCPServer",
@@ -32,9 +46,11 @@ __all__ = [
     "MCPServerStreamableHttp",
     "MetricsRunHooks",
     "RedisSession",
+    "Report",
     "RunHooks",
     "SQLAlchemySession",
     "SQLiteSession",
+    "Status",
     "TracingRunHooks",
     "approval",
     "guardrail",
