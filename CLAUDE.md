@@ -22,6 +22,7 @@ Runa is an opinionated Python framework for agentic AI.
 - Code that does not pass Test is not done.
 - Python 3.14, managed with `uv`.
 - Give oneliner commit message: `feat`, `fix`, `docs`, `refactor`, `test`
+- Lint rules: `E`, `F`, `I`, `B`, `SIM`, `UP`, `D`
 
 ## Development principles
 

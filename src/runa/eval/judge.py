@@ -1,6 +1,6 @@
 """eval/judge.py: the judge model `eval/evaluation/semantic.py`'s metrics grade with.
 
-`ask()` runs a prompt through the same `LitellmProvider` every `runa.Agent` uses (see
+`ask()` runs a prompt through the same `runa._models.ModelProvider` every `runa.Agent` uses (see
 `runa.agent`), so semantic metrics grade with whatever model an app already talks to instead of
 requiring a separate client or API key. `extract_json()` pulls a JSON object out of a judge's
 reply, tolerating the odd trailing comma a model sometimes emits.

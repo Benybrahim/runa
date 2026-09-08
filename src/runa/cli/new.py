@@ -21,8 +21,9 @@ _MAIN_TEMPLATE = '''"""main.py: the application entry point.
 Loads `.env` so every `runa` command (and this file, run directly) picks up
 whichever API key(s) the agents below need, without exporting anything into
 the shell. There's no separate configuration step beyond that: a model is a
-per-`Agent` class attribute (see `app/agents/`), resolved through LiteLLM,
-so nothing here wires up a model or provider globally.
+per-`Agent` class attribute (see `app/agents/`), and Runa resolves it to the
+right provider (OpenAI, Anthropic, Google, Meta, DeepSeek, or Alibaba) from
+its name, so nothing here wires up a model or provider globally.
 """
 
 from dotenv import load_dotenv
@@ -39,6 +40,8 @@ if __name__ == "__main__":
 
 _ENV_TEMPLATE = """# Loaded by main.py via load_dotenv(). Fill in the API key for whichever
 # model(s) your agents use (see app/agents/), then never commit this file.
+# OPENAI_API_KEY (gpt-*) / ANTHROPIC_API_KEY (claude-*) / GEMINI_API_KEY (gemini-*)
+# LLAMA_API_KEY (llama-*) / DEEPSEEK_API_KEY (deepseek-*) / DASHSCOPE_API_KEY (qwen-*)
 OPENAI_API_KEY=
 """
 

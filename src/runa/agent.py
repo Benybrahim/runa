@@ -9,11 +9,11 @@ from agents import Agent as BaseAgent
 from agents import RunConfig, RunContextWrapper, RunHooks, Runner, Session, StreamEvent
 from agents import responses_websocket_session as websocket_session
 from agents.exceptions import AgentsException
-from agents.extensions.models.litellm_provider import LitellmProvider
 from agents.items import TResponseInputItem
 from agents.responses_websocket_session import ResponsesWebSocketSession
 from agents.usage import Usage
 
+from runa._models import ModelProvider
 from runa.guardrail import flatten_agent_guardrails
 from runa.logging import LoggingRunHooks
 from runa.run import Run
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from runa.eval.case import Case
     from runa.eval.report import Report
 
-_RUN_CONFIG = RunConfig(model_provider=LitellmProvider())
+_RUN_CONFIG = RunConfig(model_provider=ModelProvider())
 
 
 def _default_hooks() -> RunHooks[Any]:
