@@ -143,7 +143,7 @@ def test_run_agent_repl_continue_resumes_the_most_recent_session(
 ) -> None:
     """`continue_last=True` reuses the Agent's most recently updated session."""
     project_dir = _scaffold_with_agent(tmp_path)
-    db_path = project_dir / "runa.db"
+    db_path = project_dir / "db" / "runa.db"
     asyncio.run(
         SQLiteSession("Support-old", db_path=db_path).add_items([{"role": "user", "content": "hi"}])
     )
@@ -205,7 +205,7 @@ def test_run_agent_repl_resume_without_an_id_prompts_a_picker(
 ) -> None:
     """`resume=""` lists past sessions, newest first, and resumes the operator's pick."""
     project_dir = _scaffold_with_agent(tmp_path)
-    db_path = project_dir / "runa.db"
+    db_path = project_dir / "db" / "runa.db"
     asyncio.run(
         SQLiteSession("Support-a", db_path=db_path).add_items([{"role": "user", "content": "hi"}])
     )

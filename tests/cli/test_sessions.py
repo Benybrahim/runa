@@ -25,7 +25,7 @@ def test_list_sessions_reports_none_when_runa_db_is_empty(tmp_path: Path) -> Non
 def test_list_sessions_lists_a_session_with_history(tmp_path: Path) -> None:
     """A session with history appears in the listing."""
     project_dir = scaffold_project("demo", root=tmp_path)
-    _add_history(project_dir / "runa.db", "SupportAgent")
+    _add_history(project_dir / "db" / "runa.db", "SupportAgent")
 
     assert "SupportAgent" in list_sessions(root=project_dir)
 
@@ -36,7 +36,7 @@ def test_list_sessions_for_agent_matches_prefixed_and_exact_ids(tmp_path: Path) 
     It ignores sessions belonging to a different agent.
     """
     project_dir = scaffold_project("demo", root=tmp_path)
-    db_path = project_dir / "runa.db"
+    db_path = project_dir / "db" / "runa.db"
     _add_history(db_path, "Support-20260101-000000-aaaa")
     _add_history(db_path, "Support")
     _add_history(db_path, "OtherAgent-20260101-000000-bbbb")
@@ -65,7 +65,7 @@ def test_show_session_raises_for_an_unknown_session(tmp_path: Path) -> None:
 def test_show_session_renders_history(tmp_path: Path) -> None:
     """`show_session` renders the session's messages."""
     project_dir = scaffold_project("demo", root=tmp_path)
-    _add_history(project_dir / "runa.db", "SupportAgent")
+    _add_history(project_dir / "db" / "runa.db", "SupportAgent")
 
     output = show_session("SupportAgent", root=project_dir)
 

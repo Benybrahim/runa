@@ -142,7 +142,7 @@ def test_missing_main_py_reports_a_clean_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Running a command against a directory with no `main.py` prints one clean line."""
-    (tmp_path / "app" / "tests").mkdir(parents=True)
+    (tmp_path / "tests").mkdir(parents=True)
 
     exit_code = main(["test"], cwd=tmp_path)
 
@@ -167,7 +167,7 @@ def test_test_reports_a_failing_test_with_exit_code_one(
 ) -> None:
     """`runa test` exits 1 and reports the failure when a `test_*` function fails."""
     project_dir = scaffold_project("demo", root=tmp_path)
-    (project_dir / "app" / "tests" / "test_smoke.py").write_text(
+    (project_dir / "tests" / "test_smoke.py").write_text(
         "def test_bad():\n    assert False, 'nope'\n"
     )
 

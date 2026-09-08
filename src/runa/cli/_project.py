@@ -14,11 +14,23 @@ from pathlib import Path
 
 
 class NotARunaProject(Exception):
-    """Raised when a command needs an `app/` subdirectory `root` doesn't have.
+    """Raised when a command needs a project subdirectory `root` doesn't have.
 
     Shared across `generate.py`, `run.py`, `eval.py`, and `test.py` so `cli/main.py` can catch
     it once, regardless of which command's directory check failed.
     """
+
+
+def resolve_db_path(root: Path) -> Path:
+    """The project's `db/runa.db`, creating `db/` first if it isn't there yet.
+
+    Centralizes the convention `cli/new.py` scaffolds, so `chat.py`, `sessions.py`, and
+    `traces.py` all agree on where a project's SQLite data lives, and it still works if `db/`
+    was never committed (it's gitignored) or was deleted.
+    """
+    db_dir = root / "db"
+    db_dir.mkdir(parents=True, exist_ok=True)
+    return db_dir / "runa.db"
 
 
 class AppLoadError(Exception):
@@ -32,15 +44,20 @@ class AppLoadError(Exception):
     """
 
 
+_PROJECT_MODULE_NAMES = ("main", "app", "tests")
+
+
 def _reset_project_modules() -> None:
-    """Drop cached `main`/`app` modules from a previous project's import.
+    """Drop cached `main`/`app`/`tests` modules from a previous project's import.
 
     Each call may target a different project root, but Python caches imports by name in
     `sys.modules`; without this, a later call in the same process (e.g. across tests) would
-    silently reuse a previous project's `main`/`app` instead of the one at `root`.
+    silently reuse a previous project's `main`/`app`/`tests` instead of the one at `root`.
     """
     for name in list(sys.modules):
-        if name == "main" or name == "app" or name.startswith("app."):
+        if name in _PROJECT_MODULE_NAMES or name.startswith(
+            tuple(f"{prefix}." for prefix in _PROJECT_MODULE_NAMES)
+        ):
             del sys.modules[name]
 
 

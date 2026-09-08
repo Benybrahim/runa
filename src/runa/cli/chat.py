@@ -6,7 +6,7 @@ prompting), while `Agent.run_sync()` only returns the final output string.
 
 Each invocation starts a fresh `SQLiteSession` by default, so a chat doesn't
 silently keep piling onto the same conversation. `--continue`/`--resume`
-pick up a past one instead, keyed by session id over the app's `runa.db`
+pick up a past one instead, keyed by session id over the app's `db/runa.db`
 (the same file `runa chat --list`/`--show` reads, see `cli/sessions.py`).
 """
 
@@ -20,7 +20,7 @@ from uuid import uuid4
 from agents import Runner
 
 from runa.agent import _RUN_CONFIG, Agent, _default_hooks
-from runa.cli._project import NotARunaProject, loaded_app
+from runa.cli._project import NotARunaProject, loaded_app, resolve_db_path
 from runa.cli.sessions import list_sessions_for_agent
 from runa.session import SQLiteSession
 
@@ -127,11 +127,11 @@ def run_agent_repl(
     """Chat with the named Agent in a loop, over one session.
 
     The app is loaded and the Agent instantiated once for the whole session, so turns share
-    the in-process object instead of round-tripping through `runa.db` on every call. A pending
+    the in-process object instead of round-tripping through `db/runa.db` on every call. A pending
     approval is resolved right here by prompting the operator, since there's someone to ask.
     """
     agents_dir = _require_agents_dir(root)
-    db_path = root / "runa.db"
+    db_path = resolve_db_path(root)
 
     with loaded_app(root):
         agent_cls = find_agent_class(agent_name, agents_dir=agents_dir)

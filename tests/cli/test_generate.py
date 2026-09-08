@@ -8,9 +8,11 @@ from runa.cli._project import NotARunaProject
 from runa.cli.generate import (
     AgentAlreadyExists,
     EvaluationAlreadyExists,
+    PromptAlreadyExists,
     ToolAlreadyExists,
     generate_agent,
     generate_evaluation,
+    generate_prompt,
     generate_tool,
 )
 from runa.cli.new import scaffold_project
@@ -71,6 +73,31 @@ def test_generate_tool_raises_if_the_file_already_exists(tmp_path: Path) -> None
 
     with pytest.raises(ToolAlreadyExists):
         generate_tool("search", root=project_dir)
+
+
+def test_generate_prompt_writes_a_markdown_file(tmp_path: Path) -> None:
+    """`generate_prompt` writes a `.md` file under `app/prompts/`, snake_cased like a tool."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    prompt_file = generate_prompt("MyAgent", root=project_dir)
+
+    assert prompt_file == project_dir / "app" / "prompts" / "my_agent.md"
+    assert "my_agent" in prompt_file.read_text()
+
+
+def test_generate_prompt_raises_if_the_file_already_exists(tmp_path: Path) -> None:
+    """`generate_prompt` refuses to overwrite an existing prompt file."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+    generate_prompt("MyAgent", root=project_dir)
+
+    with pytest.raises(PromptAlreadyExists):
+        generate_prompt("MyAgent", root=project_dir)
+
+
+def test_generate_prompt_raises_outside_a_runa_project(tmp_path: Path) -> None:
+    """`generate_prompt` refuses to run where `app/prompts/` doesn't exist."""
+    with pytest.raises(NotARunaProject):
+        generate_prompt("MyAgent", root=tmp_path)
 
 
 def test_generate_evaluation_writes_a_module_declaring_agent_and_dataset(tmp_path: Path) -> None:

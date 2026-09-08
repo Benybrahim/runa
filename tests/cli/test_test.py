@@ -10,11 +10,11 @@ from runa.cli.test import run_project_tests
 
 
 def _write_test_module(project_dir: Path, filename: str, source: str) -> None:
-    (project_dir / "app" / "tests" / filename).write_text(source)
+    (project_dir / "tests" / filename).write_text(source)
 
 
 def test_run_project_tests_raises_outside_a_runa_project(tmp_path: Path) -> None:
-    """`run_project_tests` refuses to run where `app/tests/` doesn't exist."""
+    """`run_project_tests` refuses to run where `tests/` doesn't exist."""
     with pytest.raises(NotARunaProject):
         run_project_tests(tmp_path)
 

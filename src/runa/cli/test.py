@@ -1,8 +1,8 @@
-"""cli/test.py: `runa test`, run app/tests/ test functions.
+"""cli/test.py: `runa test`, run tests/ test functions.
 
 Complements `runa eval` (cli/eval.py): tests verify invariants with plain
 `assert` statements against a result, evals measure behavior with
-`expect(result).to_...()`. Import every `app/tests/` module and run its
+`expect(result).to_...()`. Import every `tests/` module and run its
 `test_*` functions, catching `AssertionError` instead of crashing so a full
 report comes back in one pass.
 
@@ -30,8 +30,8 @@ class TestResult:
 
 
 def run_project_tests(root: Path) -> list[TestResult]:
-    """Import every `app/tests/` module and run its `test_*` functions."""
-    tests_dir = root / "app" / "tests"
+    """Import every `tests/` module and run its `test_*` functions."""
+    tests_dir = root / "tests"
     if not tests_dir.is_dir():
         raise NotARunaProject(
             f"{tests_dir} does not exist, run this from inside a Runa "
@@ -43,7 +43,7 @@ def run_project_tests(root: Path) -> list[TestResult]:
         for test_file in sorted(tests_dir.glob("*.py")):
             if test_file.stem == "__init__":
                 continue
-            module = importlib.import_module(f"app.tests.{test_file.stem}")
+            module = importlib.import_module(f"tests.{test_file.stem}")
             for attr_name, attr in inspect.getmembers(module, inspect.isfunction):
                 if not attr_name.startswith("test_"):
                     continue

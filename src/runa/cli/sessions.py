@@ -1,7 +1,7 @@
-"""cli/sessions.py: `runa chat --list`/`--show` over runa.db.
+"""cli/sessions.py: `runa chat --list`/`--show` over db/runa.db.
 
 Session history (`agent_sessions`/`agent_messages`, written by `SQLiteSession`, see
-`cli/chat.py`) lives in `runa.db`; this module only reads it.
+`cli/chat.py`) lives in `db/runa.db`; this module only reads it.
 """
 
 import json
@@ -10,13 +10,11 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
+from runa.cli._project import resolve_db_path
+
 
 class SessionNotFound(Exception):
-    """Raised when `show_session` names a session id `runa.db` has no history for."""
-
-
-def _db_path(root: Path) -> Path:
-    return root / "runa.db"
+    """Raised when `show_session` names a session id `db/runa.db` has no history for."""
 
 
 def _format_item(item: dict[str, Any]) -> str:
@@ -33,8 +31,8 @@ def _format_item(item: dict[str, Any]) -> str:
 
 
 def list_sessions(*, root: Path) -> str:
-    """List every session id `runa.db` has conversation history for."""
-    db_path = _db_path(root)
+    """List every session id `db/runa.db` has conversation history for."""
+    db_path = resolve_db_path(root)
     with closing(sqlite3.connect(db_path)) as conn:
         conn.row_factory = sqlite3.Row
         try:
@@ -56,7 +54,7 @@ def list_sessions_for_agent(agent_name: str, *, root: Path) -> list[tuple[str, s
     default) or starts with `f"{agent_name}-"` (`cli/chat.py`'s current scheme), so
     `--continue`/`--resume` find history under either.
     """
-    db_path = _db_path(root)
+    db_path = resolve_db_path(root)
     escaped = agent_name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     with closing(sqlite3.connect(db_path)) as conn:
         conn.row_factory = sqlite3.Row
@@ -74,7 +72,7 @@ def list_sessions_for_agent(agent_name: str, *, root: Path) -> list[tuple[str, s
 
 def show_session(session_id: str, *, root: Path) -> str:
     """Render a session's message history."""
-    db_path = _db_path(root)
+    db_path = resolve_db_path(root)
     with closing(sqlite3.connect(db_path)) as conn:
         conn.row_factory = sqlite3.Row
         try:

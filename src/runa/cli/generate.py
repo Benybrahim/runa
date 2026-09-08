@@ -36,6 +36,11 @@ def {func_name}() -> str:
     raise NotImplementedError
 '''
 
+_PROMPT_TEMPLATE = """# {name}
+
+TODO: write the prompt {name} uses.
+"""
+
 _EVALUATION_TEMPLATE = """from runa import Agent, Case
 
 # TODO: replace with the agent you actually want to evaluate, e.g.:
@@ -65,6 +70,10 @@ class AgentAlreadyExists(Exception):
 
 class ToolAlreadyExists(Exception):
     """Raised when the target tool file already exists."""
+
+
+class PromptAlreadyExists(Exception):
+    """Raised when the target prompt file already exists."""
 
 
 class EvaluationAlreadyExists(Exception):
@@ -116,6 +125,23 @@ def generate_tool(name: str, *, root: Path) -> Path:
 
     tool_file.write_text(_TOOL_TEMPLATE.format(func_name=func_name))
     return tool_file
+
+
+def generate_prompt(name: str, *, root: Path) -> Path:
+    """Write a new prompt file into `root/app/prompts/`.
+
+    Plain markdown, not Python: a prompt is text an agent's `instructions` can load, kept out
+    of source the same way a query lives outside application code.
+    """
+    prompts_dir = _require_dir(root, "app", "prompts")
+
+    file_stem = _snake_case(name)
+    prompt_file = prompts_dir / f"{file_stem}.md"
+    if prompt_file.exists():
+        raise PromptAlreadyExists(f"{prompt_file} already exists")
+
+    prompt_file.write_text(_PROMPT_TEMPLATE.format(name=file_stem))
+    return prompt_file
 
 
 def generate_evaluation(name: str, *, root: Path) -> Path:

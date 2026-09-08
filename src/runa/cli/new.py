@@ -1,13 +1,14 @@
 """cli/new.py: scaffold a new Runa application.
 
-Establishes the conventional `app/` layout so a fresh project has somewhere
-obvious to put agents, tools, resources, eval cases, and tests without any
-configuration.
+Establishes the conventional project layout so a fresh project has somewhere obvious to put
+agents, tools, prompts, and eval cases (under `app/`), plus tests, shared config, and the
+SQLite database (at the project root) without any configuration.
 """
 
 from pathlib import Path
 
-_SUBDIRS = ("agents", "tools", "resources", "evaluations", "tests")
+_APP_SUBDIRS = ("agents", "tools", "prompts", "evaluations")
+_ROOT_PACKAGE_SUBDIRS = ("tests", "config")
 
 _PYPROJECT_TEMPLATE = """[project]
 name = "{name}"
@@ -47,7 +48,7 @@ OPENAI_API_KEY=
 
 _GITIGNORE_TEMPLATE = """__pycache__/
 *.pyc
-runa.db
+db/runa.db
 .env
 """
 
@@ -61,15 +62,17 @@ A Runa application.
 - `.env`: your model's API key, gitignored; fill it in before running
 - `app/agents/`: Agent subclasses
 - `app/tools/`: `@tool`-decorated functions
-- `app/resources/`: shared resources (clients, config)
+- `app/prompts/`: prompt text, kept out of Python source
 - `app/evaluations/`: eval cases, run with `runa eval`
-- `app/tests/`: deterministic tests, run with `runa test`
-- `runa.db`: conversation history, see `runa chat --list`/`--show`; don't commit it
+- `tests/`: deterministic tests, run with `runa test`
+- `config/`: shared config (clients, settings)
+- `db/runa.db`: conversation history and traces, see `runa chat --list`/`--show`; don't commit it
 
 Generate scaffolding with:
 
     runa generate agent MyAgent
     runa generate tool MyTool
+    runa generate prompt MyAgent
     runa generate evaluation MyAgent
 """
 
@@ -79,17 +82,24 @@ class ProjectAlreadyExists(Exception):
 
 
 def scaffold_project(name: str, *, root: Path) -> Path:
-    """Create `root/name` with the conventional Runa `app/` layout."""
+    """Create `root/name` with the conventional Runa project layout."""
     project_dir = root / name
     if project_dir.exists():
         raise ProjectAlreadyExists(f"{project_dir} already exists")
 
     app_dir = project_dir / "app"
-    for subdir in _SUBDIRS:
+    for subdir in _APP_SUBDIRS:
         package_dir = app_dir / subdir
         package_dir.mkdir(parents=True)
         (package_dir / "__init__.py").write_text("")
     (app_dir / "__init__.py").write_text("")
+
+    for subdir in _ROOT_PACKAGE_SUBDIRS:
+        package_dir = project_dir / subdir
+        package_dir.mkdir(parents=True)
+        (package_dir / "__init__.py").write_text("")
+
+    (project_dir / "db").mkdir()
 
     (project_dir / "pyproject.toml").write_text(_PYPROJECT_TEMPLATE.format(name=name))
     (project_dir / "README.md").write_text(_README_TEMPLATE.format(name=name))

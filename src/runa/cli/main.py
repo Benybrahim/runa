@@ -17,9 +17,11 @@ from runa.cli.eval import InvalidEvalModule, run_project_evals
 from runa.cli.generate import (
     AgentAlreadyExists,
     EvaluationAlreadyExists,
+    PromptAlreadyExists,
     ToolAlreadyExists,
     generate_agent,
     generate_evaluation,
+    generate_prompt,
     generate_tool,
 )
 from runa.cli.new import ProjectAlreadyExists, scaffold_project
@@ -43,6 +45,9 @@ def _build_parser() -> argparse.ArgumentParser:
     generate_subparsers = generate_parser.add_subparsers(dest="kind", required=True)
     generate_subparsers.add_parser("agent", help="Generate a new Agent").add_argument("name")
     generate_subparsers.add_parser("tool", help="Generate a new @tool function").add_argument(
+        "name"
+    )
+    generate_subparsers.add_parser("prompt", help="Generate a new app/prompts/ file").add_argument(
         "name"
     )
     generate_subparsers.add_parser(
@@ -88,7 +93,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     subparsers.add_parser("eval", help="Run this app's app/evaluations/ cases")
-    subparsers.add_parser("test", help="Run this app's app/tests/ test functions")
+    subparsers.add_parser("test", help="Run this app's tests/ test functions")
 
     traces_parser = subparsers.add_parser("traces", help="Inspect this app's traces in runa.db")
     traces_subparsers = traces_parser.add_subparsers(dest="traces_action", required=True)
@@ -127,6 +132,7 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
         AgentAlreadyExists,
         AgentNotFound,
         ToolAlreadyExists,
+        PromptAlreadyExists,
         EvaluationAlreadyExists,
         NotARunaProject,
         InvalidEvalModule,
@@ -177,6 +183,12 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
             f"  from app.tools.{tool_file.stem} import {tool_file.stem}\n"
             f"  tools = [{tool_file.stem}]"
         )
+        return 0
+
+    if args.command == "generate" and args.kind == "prompt":
+        prompt_file = generate_prompt(args.name, root=cwd)
+        print(f"created {prompt_file}")
+        print("\nnext: write the prompt, then load it from an Agent's `instructions`")
         return 0
 
     if args.command == "generate" and args.kind == "evaluation":

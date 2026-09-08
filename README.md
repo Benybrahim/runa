@@ -11,6 +11,11 @@ build and run reliable, stateful agents.
    with [uv](https://docs.astral.sh/uv/):
 
     ```bash
+    # Set up your virtual environment
+    uv venv --python 3.12
+    source .venv/bin/activate
+   
+    # Install dependencies
     uv add git+https://github.com/benybrahim/runa.git
     ```
 
