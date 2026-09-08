@@ -23,7 +23,7 @@ from runa.cli.generate import (
     generate_tool,
 )
 from runa.cli.new import ProjectAlreadyExists, scaffold_project
-from runa.cli.run import AgentNotFound, run_agent
+from runa.cli.run import AgentNotFound, run_agent, run_agent_repl
 from runa.cli.runs import (
     PendingApprovalNotFound,
     RunNotFound,
@@ -63,6 +63,14 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("name", help="e.g. Support, or SupportAgent")
     run_parser.add_argument("input")
     run_parser.add_argument(
+        "--session",
+        default=None,
+        help="conversation id to persist to/resume in runa.db; defaults to the Agent's class name",
+    )
+
+    chat_parser = subparsers.add_parser("chat", help="Chat with an Agent in a loop")
+    chat_parser.add_argument("name", help="e.g. Support, or SupportAgent")
+    chat_parser.add_argument(
         "--session",
         default=None,
         help="conversation id to persist to/resume in runa.db; defaults to the Agent's class name",
@@ -161,7 +169,7 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
             f"  cd {project_dir.name}\n"
             "  put your OPENAI_API_KEY in .env   # or whichever model your agents use\n"
             "  runa generate agent MyAgent\n"
-            "  runa run MyAgent '...'"
+            "  runa run MyAgent '...'   # or: runa chat MyAgent"
         )
         return 0
 
@@ -201,6 +209,10 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
 
     if args.command == "run":
         print(run_agent(args.name, args.input, root=cwd, session_id=args.session))
+        return 0
+
+    if args.command == "chat":
+        run_agent_repl(args.name, root=cwd, session_id=args.session)
         return 0
 
     if args.command == "eval":

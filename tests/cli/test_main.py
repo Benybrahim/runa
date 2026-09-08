@@ -59,6 +59,22 @@ def test_run_reports_agent_not_found_as_a_clean_error(
     assert "no Agent named 'Nope'" in capsys.readouterr().err
 
 
+def test_chat_dispatches_to_run_agent_repl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`runa chat Support` calls `run_agent_repl` rather than the single-shot `run_agent`."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+    calls: list[tuple[str, Path]] = []
+
+    def fake_repl(name: str, *, root: Path, session_id: str | None = None) -> None:
+        calls.append((name, root))
+
+    monkeypatch.setattr("runa.cli.main.run_agent_repl", fake_repl)
+
+    exit_code = main(["chat", "Support"], cwd=project_dir)
+
+    assert exit_code == 0
+    assert calls == [("Support", project_dir)]
+
+
 def test_missing_main_py_reports_a_clean_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

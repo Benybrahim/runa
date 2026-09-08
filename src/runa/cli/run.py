@@ -1,4 +1,4 @@
-"""cli/run.py: `runa run`, invoke an Agent from argv.
+"""cli/run.py: `runa run` and `runa chat`, invoke an Agent from argv.
 
 Calls `Runner.run_sync()` directly rather than `Agent.run_sync()`: the CLI
 needs the full `RunResult` (to detect `interruptions` and persist them, see
@@ -94,3 +94,53 @@ def run_agent(name: str, input: str, *, root: Path, session_id: str | None = Non
         return "\n".join(lines)
 
     return str(result.final_output)
+
+
+def run_agent_repl(name: str, *, root: Path, session_id: str | None = None) -> None:
+    """Chat with the named Agent in a loop, over one persistent session.
+
+    Unlike `run_agent()`, the app is loaded and the Agent instantiated once for the whole
+    session, so turns share the in-process object instead of round-tripping through `runa.db`
+    on every call. A pending approval is resolved right here by prompting the operator, rather
+    than parking it for a separate `runa runs approve`/`deny` invocation.
+    """
+    agents_dir = _require_agents_dir(root)
+    db_path = root / "runa.db"
+
+    with loaded_app(root):
+        agent_cls = find_agent_class(name, agents_dir=agents_dir)
+        agent = agent_cls()
+        resolved_session_id = session_id or agent_cls.__name__
+        session = SQLiteSession(resolved_session_id, db_path=db_path)
+
+        print(f"chatting with {agent_cls.__name__} (session {resolved_session_id!r})")
+        print("type 'exit' or Ctrl-D to quit\n")
+
+        while True:
+            try:
+                user_input = input("> ").strip()
+            except EOFError, KeyboardInterrupt:
+                print()
+                return
+            if not user_input:
+                continue
+            if user_input in {"exit", "quit"}:
+                return
+
+            result = Runner.run_sync(
+                agent, user_input, hooks=_default_hooks(), run_config=_RUN_CONFIG, session=session
+            )
+
+            while result.interruptions:
+                state = result.to_state()
+                for item in result.interruptions:
+                    answer = input(f"approve {item.name}({item.arguments})? [y/N] ").strip().lower()
+                    if answer in {"y", "yes"}:
+                        state.approve(item)
+                    else:
+                        state.reject(item)
+                result = Runner.run_sync(
+                    agent, state, hooks=_default_hooks(), run_config=_RUN_CONFIG, session=session
+                )
+
+            print(result.final_output)

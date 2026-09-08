@@ -1,4 +1,4 @@
-"""Tests for `runa.cli.run`: `find_agent_class`/`run_agent`."""
+"""Tests for `runa.cli.run`: `find_agent_class`/`run_agent`/`run_agent_repl`."""
 
 import json
 from dataclasses import dataclass, field
@@ -13,7 +13,7 @@ from runa.agent import Agent
 from runa.cli import _approvals
 from runa.cli._project import NotARunaProject, loaded_app
 from runa.cli.new import scaffold_project
-from runa.cli.run import AgentNotFound, find_agent_class, run_agent
+from runa.cli.run import AgentNotFound, find_agent_class, run_agent, run_agent_repl
 
 
 def _write_agent(project_dir: Path, filename: str, source: str) -> None:
@@ -176,3 +176,147 @@ def test_run_agent_saves_a_pending_approval_when_interrupted(
     assert pending is not None
     assert pending.tool_name == "delete_file"
     assert json.loads(pending.state_json) == {"fake": "state"}
+
+
+def _feed_input(monkeypatch: pytest.MonkeyPatch, lines: list[str]) -> None:
+    """Make `input()` return each of `lines` in turn, then raise `EOFError`."""
+    remaining = iter(lines)
+
+    def fake_input(prompt: str = "") -> str:
+        try:
+            return next(remaining)
+        except StopIteration:
+            raise EOFError from None
+
+    monkeypatch.setattr("builtins.input", fake_input)
+
+
+def test_run_agent_repl_sends_each_line_and_prints_the_reply(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Each REPL line becomes a turn, and its final output is printed before the next prompt."""
+    project_dir = _scaffold_with_agent(tmp_path)
+    _feed_input(monkeypatch, ["hi", "how are you"])
+    replies = iter(["hello!", "doing fine"])
+
+    def fake_run_sync(agent: Any, message: Any, **kwargs: Any) -> _FakeResult:
+        return _FakeResult(final_output=next(replies))
+
+    monkeypatch.setattr("runa.cli.run.Runner.run_sync", staticmethod(fake_run_sync))
+
+    run_agent_repl("Support", root=project_dir)
+
+    out = capsys.readouterr().out
+    assert "hello!" in out
+    assert "doing fine" in out
+
+
+def test_run_agent_repl_exits_on_the_exit_command(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Typing `exit` ends the loop without calling the Runner."""
+    project_dir = _scaffold_with_agent(tmp_path)
+    _feed_input(monkeypatch, ["exit"])
+    calls: list[Any] = []
+
+    def fake_run_sync(agent: Any, message: Any, **kwargs: Any) -> _FakeResult:
+        calls.append(message)
+        return _FakeResult()
+
+    monkeypatch.setattr("runa.cli.run.Runner.run_sync", staticmethod(fake_run_sync))
+
+    run_agent_repl("Support", root=project_dir)
+
+    assert calls == []
+
+
+@dataclass
+class _FakeApprovalState:
+    """A stand-in for `RunState`, recording `approve`/`reject` calls."""
+
+    approved: list[Any] = field(default_factory=list)
+    rejected: list[Any] = field(default_factory=list)
+
+    def approve(self, item: Any) -> None:
+        """Record `item` as approved, mirroring `RunState.approve()`."""
+        self.approved.append(item)
+
+    def reject(self, item: Any) -> None:
+        """Record `item` as rejected, mirroring `RunState.reject()`."""
+        self.rejected.append(item)
+
+
+def test_run_agent_repl_approves_a_pending_tool_call_when_the_operator_says_yes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Answering `y` to the approval prompt resumes the run with the item approved."""
+    project_dir = _scaffold_with_agent(tmp_path)
+    agent = Agent(name="SupportAgent")
+    interruption = ToolApprovalItem(
+        agent=agent,
+        raw_item=ResponseFunctionToolCall(
+            call_id="call_1", name="delete_file", arguments="{}", type="function_call"
+        ),
+    )
+    _feed_input(monkeypatch, ["delete it", "y"])
+    state = _FakeApprovalState()
+
+    @dataclass
+    class _InterruptedResult:
+        final_output: Any = None
+        interruptions: list[Any] = field(default_factory=list)
+
+        def to_state(self) -> _FakeApprovalState:
+            return state
+
+    results = iter(
+        [_InterruptedResult(interruptions=[interruption]), _InterruptedResult(final_output="done")]
+    )
+
+    def fake_run_sync(agent: Any, message: Any, **kwargs: Any) -> Any:
+        return next(results)
+
+    monkeypatch.setattr("runa.cli.run.Runner.run_sync", staticmethod(fake_run_sync))
+
+    run_agent_repl("Support", root=project_dir)
+
+    assert state.approved == [interruption]
+    assert state.rejected == []
+
+
+def test_run_agent_repl_rejects_a_pending_tool_call_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Any answer other than `y` rejects the tool call rather than approving it."""
+    project_dir = _scaffold_with_agent(tmp_path)
+    agent = Agent(name="SupportAgent")
+    interruption = ToolApprovalItem(
+        agent=agent,
+        raw_item=ResponseFunctionToolCall(
+            call_id="call_1", name="delete_file", arguments="{}", type="function_call"
+        ),
+    )
+    _feed_input(monkeypatch, ["delete it", "n"])
+    state = _FakeApprovalState()
+
+    @dataclass
+    class _InterruptedResult:
+        final_output: Any = None
+        interruptions: list[Any] = field(default_factory=list)
+
+        def to_state(self) -> _FakeApprovalState:
+            return state
+
+    results = iter(
+        [_InterruptedResult(interruptions=[interruption]), _InterruptedResult(final_output="done")]
+    )
+
+    def fake_run_sync(agent: Any, message: Any, **kwargs: Any) -> Any:
+        return next(results)
+
+    monkeypatch.setattr("runa.cli.run.Runner.run_sync", staticmethod(fake_run_sync))
+
+    run_agent_repl("Support", root=project_dir)
+
+    assert state.rejected == [interruption]
+    assert state.approved == []
