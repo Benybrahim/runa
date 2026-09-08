@@ -19,9 +19,6 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.4",
     "pyright>=1.1.400",
-    # Not a runtime dependency of runa itself — only of the `main.py` `cli new` scaffolds
-    # for a generated project's own venv. The CLI tests import a scaffolded app in-process,
-    # so it needs to be importable here too.
     "python-dotenv>=1.2.3",
 ]
 
