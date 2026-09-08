@@ -98,13 +98,21 @@ class Agent(BaseAgent):
     model = "gpt-5.4-nano"
 
     def __init__(self, **kwargs: Any) -> None:
-        """Build kwargs from class attributes and wire up any subagents and guardrails."""
+        """Build kwargs from class attributes and wire up any subagents and guardrails.
+
+        `mcp=[...]` (as a constructor kwarg, or a `mcp` class attribute) is sugar for
+        `mcp_servers=[...]`; both are merged into `mcp_servers` if given together.
+        """
         for f in fields(BaseAgent):
             value = getattr(type(self), f.name, MISSING)
             if value is not MISSING:
                 kwargs.setdefault(f.name, value)
         handoffs = list(kwargs.get("handoffs", []))
         tools = list(kwargs.get("tools", []))
+        mcp_servers = [
+            *kwargs.get("mcp_servers", []),
+            *(kwargs.pop("mcp", None) or getattr(type(self), "mcp", [])),
+        ]
         for sub in _flatten_subagents(getattr(type(self), "subagents", [])):
             if isinstance(sub, Subagent):
                 agent = sub.agent()
@@ -118,6 +126,7 @@ class Agent(BaseAgent):
                 tools.append(agent.as_tool(None, None))
         kwargs["handoffs"] = handoffs
         kwargs["tools"] = tools
+        kwargs["mcp_servers"] = mcp_servers
         if "instructions" in kwargs:
             kwargs["instructions"] = _adapt_instructions(kwargs["instructions"])
         new_input_guardrails, new_output_guardrails = flatten_agent_guardrails(
