@@ -9,49 +9,42 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
+from runa._sqlite import DEFAULT_DB_PATH
+from runa._sqlite import connect as _connect_db
 from runa.tracing._span import Span
 from runa.tracing._trace import Trace
 
 _TRACES_TABLE = "traces"
 _SPANS_TABLE = "spans"
 
-DEFAULT_DB_PATH = Path("runa.db")
+_DDL = f"""
+CREATE TABLE IF NOT EXISTS {_TRACES_TABLE} (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    start_time REAL NOT NULL,
+    end_time REAL,
+    status TEXT NOT NULL,
+    metadata_json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS {_SPANS_TABLE} (
+    id TEXT PRIMARY KEY,
+    trace_id TEXT NOT NULL REFERENCES {_TRACES_TABLE}(id),
+    parent_id TEXT,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    start_time REAL NOT NULL,
+    end_time REAL,
+    status TEXT NOT NULL,
+    attributes_json TEXT NOT NULL,
+    input TEXT,
+    output TEXT,
+    error TEXT
+);
+"""
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        f"""
-        CREATE TABLE IF NOT EXISTS {_TRACES_TABLE} (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            start_time REAL NOT NULL,
-            end_time REAL,
-            status TEXT NOT NULL,
-            metadata_json TEXT NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        f"""
-        CREATE TABLE IF NOT EXISTS {_SPANS_TABLE} (
-            id TEXT PRIMARY KEY,
-            trace_id TEXT NOT NULL REFERENCES {_TRACES_TABLE}(id),
-            parent_id TEXT,
-            name TEXT NOT NULL,
-            type TEXT NOT NULL,
-            start_time REAL NOT NULL,
-            end_time REAL,
-            status TEXT NOT NULL,
-            attributes_json TEXT NOT NULL,
-            input TEXT,
-            output TEXT,
-            error TEXT
-        )
-        """
-    )
-    conn.commit()
-    return conn
+    return _connect_db(db_path, _DDL)
 
 
 def save_trace(trace: Trace, *, db_path: Path = DEFAULT_DB_PATH) -> None:

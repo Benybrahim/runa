@@ -47,6 +47,8 @@ select = [
     "UP",  # pyupgrade
     "D",   # docstring
 ]
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.format]
 quote-style = "double"

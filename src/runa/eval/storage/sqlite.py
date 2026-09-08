@@ -12,42 +12,35 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
+from runa._sqlite import DEFAULT_DB_PATH
+from runa._sqlite import connect as _connect_db
 from runa.eval.report import Report
 
 _RUNS_TABLE = "eval_runs"
 _CASES_TABLE = "eval_cases"
 
-DEFAULT_DB_PATH = Path("runa.db")
+_DDL = f"""
+CREATE TABLE IF NOT EXISTS {_RUNS_TABLE} (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    score REAL NOT NULL,
+    pass_rate REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS {_CASES_TABLE} (
+    run_id INTEGER NOT NULL REFERENCES {_RUNS_TABLE}(id),
+    case_index INTEGER NOT NULL,
+    input TEXT NOT NULL,
+    output TEXT,
+    passed INTEGER NOT NULL,
+    results_json TEXT NOT NULL,
+    PRIMARY KEY (run_id, case_index)
+);
+"""
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        f"""
-        CREATE TABLE IF NOT EXISTS {_RUNS_TABLE} (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            agent_name TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            score REAL NOT NULL,
-            pass_rate REAL NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        f"""
-        CREATE TABLE IF NOT EXISTS {_CASES_TABLE} (
-            run_id INTEGER NOT NULL REFERENCES {_RUNS_TABLE}(id),
-            case_index INTEGER NOT NULL,
-            input TEXT NOT NULL,
-            output TEXT,
-            passed INTEGER NOT NULL,
-            results_json TEXT NOT NULL,
-            PRIMARY KEY (run_id, case_index)
-        )
-        """
-    )
-    conn.commit()
-    return conn
+    return _connect_db(db_path, _DDL)
 
 
 def save_report(report: Report, *, db_path: Path = DEFAULT_DB_PATH) -> int:

@@ -18,7 +18,22 @@ from pathlib import Path
 
 from agents.items import ToolApprovalItem
 
+from runa._sqlite import connect as _connect_db
+
 _TABLE = "pending_approvals"
+
+_DDL = f"""
+CREATE TABLE IF NOT EXISTS {_TABLE} (
+    session_id TEXT NOT NULL,
+    tool_call_id TEXT NOT NULL,
+    agent_class_name TEXT NOT NULL,
+    tool_name TEXT NOT NULL,
+    arguments TEXT NOT NULL,
+    state_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (session_id, tool_call_id)
+);
+"""
 
 
 @dataclass
@@ -35,23 +50,8 @@ class PendingApproval:
 
 
 def _connect(db_path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
+    conn = _connect_db(db_path, _DDL)
     conn.row_factory = sqlite3.Row
-    conn.execute(
-        f"""
-        CREATE TABLE IF NOT EXISTS {_TABLE} (
-            session_id TEXT NOT NULL,
-            tool_call_id TEXT NOT NULL,
-            agent_class_name TEXT NOT NULL,
-            tool_name TEXT NOT NULL,
-            arguments TEXT NOT NULL,
-            state_json TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            PRIMARY KEY (session_id, tool_call_id)
-        )
-        """
-    )
-    conn.commit()
     return conn
 
 
