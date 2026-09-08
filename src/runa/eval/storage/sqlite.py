@@ -1,8 +1,8 @@
 """eval/storage/sqlite.py: the `eval_runs`/`eval_cases` tables inside `runa.db`.
 
 Every `agent.evaluate()` call writes one row to `eval_runs` (one "experiment") and one row
-per case to `eval_cases`, in the same `runa.db` file `SQLiteSession` and the pending-approvals
-table already use (see `cli/_approvals.py`), so a local app accumulates one database with no setup.
+per case to `eval_cases`, in the same `runa.db` file `SQLiteSession` already uses, so a
+local app accumulates one database with no setup.
 """
 
 import json

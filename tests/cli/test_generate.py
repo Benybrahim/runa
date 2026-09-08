@@ -25,7 +25,7 @@ def test_generate_agent_writes_a_runa_agent_subclass(tmp_path: Path) -> None:
     assert agent_file == project_dir / "app" / "agents" / "support_agent.py"
     content = agent_file.read_text()
     assert "class SupportAgent(Agent):" in content
-    assert 'name = "SupportAgent"' in content
+    assert 'name = "support_agent"' in content
 
 
 def test_generate_agent_does_not_double_append_agent_suffix(tmp_path: Path) -> None:

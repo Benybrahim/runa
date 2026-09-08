@@ -1,8 +1,8 @@
 """_sqlite.py: shared connect-and-create-if-missing plumbing for `runa.db`.
 
-`tracing/storage.py`, `eval/storage/sqlite.py`, and `cli/_approvals.py` each own a different
-set of tables in the same file; this only opens the connection and applies each caller's DDL,
-so the file gets created lazily regardless of which module writes to it first.
+`tracing/storage.py` and `eval/storage/sqlite.py` each own a different set of tables in the
+same file; this only opens the connection and applies each caller's DDL, so the file gets
+created lazily regardless of which module writes to it first.
 """
 
 import sqlite3

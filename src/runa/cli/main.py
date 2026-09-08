@@ -1,11 +1,10 @@
 """cli/main.py: the `runa` command-line entry point.
 
 `new` and `generate` are scaffolding: they write files following the app/
-convention and never touch the runtime. `run`, `eval`, `test`, and `runs`
-do touch it, but only by calling existing library functions
-(`Runner.run_sync()`/`Runner.run()`, `agent.evaluate()`, `run_project_tests()`)
-against the app in `cwd`; no logic lives here that doesn't already exist
-elsewhere.
+convention and never touch the runtime. `chat`, `eval`, and `test` do
+touch it, but only by calling existing library functions
+(`Runner.run_sync()`, `agent.evaluate()`, `run_project_tests()`) against
+the app in `cwd`; no logic lives here that doesn't already exist elsewhere.
 """
 
 import argparse
@@ -13,6 +12,7 @@ import sys
 from pathlib import Path
 
 from runa.cli._project import AppLoadError, NotARunaProject
+from runa.cli.chat import AgentNotFound, run_agent_repl
 from runa.cli.eval import InvalidEvalModule, run_project_evals
 from runa.cli.generate import (
     AgentAlreadyExists,
@@ -23,17 +23,7 @@ from runa.cli.generate import (
     generate_tool,
 )
 from runa.cli.new import ProjectAlreadyExists, scaffold_project
-from runa.cli.run import AgentNotFound, run_agent, run_agent_repl
-from runa.cli.runs import (
-    PendingApprovalNotFound,
-    RunNotFound,
-    approve_run,
-    cancel_pending,
-    deny_run,
-    list_pending_runs,
-    list_sessions,
-    show_session,
-)
+from runa.cli.sessions import SessionNotFound, list_sessions, show_session
 from runa.cli.test import run_project_tests
 from runa.cli.traces import TraceNotFound, list_errors_cli, list_traces_cli, show_trace
 
@@ -59,52 +49,46 @@ def _build_parser() -> argparse.ArgumentParser:
         "evaluation", help="Generate a new app/evaluations/ case module"
     ).add_argument("name")
 
-    run_parser = subparsers.add_parser("run", help="Run an Agent against an input")
-    run_parser.add_argument("name", help="e.g. Support, or SupportAgent")
-    run_parser.add_argument("input")
-    run_parser.add_argument(
-        "--session",
-        default=None,
-        help="conversation id to persist to/resume in runa.db; defaults to the Agent's class name",
-    )
-
-    chat_parser = subparsers.add_parser("chat", help="Chat with an Agent in a loop")
-    chat_parser.add_argument("name", help="e.g. Support, or SupportAgent")
+    chat_parser = subparsers.add_parser("chat", help="Chat with an Agent, or inspect past sessions")
     chat_parser.add_argument(
+        "agent_name",
+        nargs="?",
+        default=None,
+        help="the Agent's declared `name`, e.g. support_agent",
+    )
+    session_group = chat_parser.add_mutually_exclusive_group()
+    session_group.add_argument(
         "--session",
         default=None,
-        help="conversation id to persist to/resume in runa.db; defaults to the Agent's class name",
+        help="pin an exact conversation id to persist to/resume in runa.db",
+    )
+    session_group.add_argument(
+        "--continue",
+        "-c",
+        dest="continue_",
+        action="store_true",
+        help="resume this Agent's most recent session instead of starting a new one",
+    )
+    session_group.add_argument(
+        "--resume",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="SESSION_ID",
+        help="resume SESSION_ID, or without one, pick from a list of past sessions",
+    )
+    chat_parser.add_argument(
+        "--list", action="store_true", help="List every session in runa.db instead of chatting"
+    )
+    chat_parser.add_argument(
+        "--show",
+        metavar="SESSION_ID",
+        default=None,
+        help="Show one session's history instead of chatting",
     )
 
     subparsers.add_parser("eval", help="Run this app's app/evaluations/ cases")
     subparsers.add_parser("test", help="Run this app's app/tests/ test functions")
-
-    runs_parser = subparsers.add_parser("runs", help="Inspect this app's sessions in runa.db")
-    runs_subparsers = runs_parser.add_subparsers(dest="action", required=True)
-
-    runs_subparsers.add_parser("list", help="List every session")
-    runs_subparsers.add_parser("pending", help="List tool calls awaiting approval")
-
-    runs_show_parser = runs_subparsers.add_parser("show", help="Show a session's history")
-    runs_show_parser.add_argument("session_id")
-
-    runs_approve_parser = runs_subparsers.add_parser(
-        "approve", help="Approve a pending tool call and resume its run"
-    )
-    runs_approve_parser.add_argument("session_id")
-    runs_approve_parser.add_argument("tool_call_id")
-
-    runs_deny_parser = runs_subparsers.add_parser(
-        "deny", help="Deny a pending tool call and resume its run"
-    )
-    runs_deny_parser.add_argument("session_id")
-    runs_deny_parser.add_argument("tool_call_id")
-    runs_deny_parser.add_argument("--reason", default="")
-
-    runs_cancel_parser = runs_subparsers.add_parser(
-        "cancel", help="Abandon a session's pending approval(s) without resuming"
-    )
-    runs_cancel_parser.add_argument("session_id")
 
     traces_parser = subparsers.add_parser("traces", help="Inspect this app's traces in runa.db")
     traces_subparsers = traces_parser.add_subparsers(dest="traces_action", required=True)
@@ -138,8 +122,7 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
         print(f"error: no main.py found in {cwd}, is this a Runa app?", file=sys.stderr)
         return 1
     except (
-        RunNotFound,
-        PendingApprovalNotFound,
+        SessionNotFound,
         ProjectAlreadyExists,
         AgentAlreadyExists,
         AgentNotFound,
@@ -169,7 +152,7 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
             f"  cd {project_dir.name}\n"
             "  put your OPENAI_API_KEY in .env   # or whichever model your agents use\n"
             "  runa generate agent MyAgent\n"
-            "  runa run MyAgent '...'   # or: runa chat MyAgent"
+            "  runa chat my_agent"
         )
         return 0
 
@@ -178,10 +161,9 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
         print(f"created {agent_file}")
         class_name = args.name if args.name.endswith("Agent") else f"{args.name}Agent"
         print(
-            "\nnext: declare its tools and instructions, then run it, "
-            "either from the CLI:\n"
-            f"  runa run {args.name} '...'\n"
-            "or from your own code:\n"
+            "\nnext: declare its tools and instructions, then chat with it:\n"
+            f"  runa chat {agent_file.stem}\n"
+            "or call it from your own code:\n"
             f"  from app.agents.{agent_file.stem} import {class_name}\n"
             f"  {class_name}().run_sync('...')"
         )
@@ -207,12 +189,23 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
         )
         return 0
 
-    if args.command == "run":
-        print(run_agent(args.name, args.input, root=cwd, session_id=args.session))
-        return 0
-
     if args.command == "chat":
-        run_agent_repl(args.name, root=cwd, session_id=args.session)
+        if args.list:
+            print(list_sessions(root=cwd))
+            return 0
+        if args.show is not None:
+            print(show_session(args.show, root=cwd))
+            return 0
+        if args.agent_name is None:
+            print("error: runa chat needs an Agent name, or --list/--show", file=sys.stderr)
+            return 1
+        run_agent_repl(
+            args.agent_name,
+            root=cwd,
+            session_id=args.session,
+            continue_last=args.continue_,
+            resume=args.resume,
+        )
         return 0
 
     if args.command == "eval":
@@ -234,34 +227,10 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
         print(f"\n{len(results) - failed}/{len(results)} passed")
         return 1 if failed else 0
 
-    if args.command == "traces":
-        if args.traces_action == "list":
-            print(list_traces_cli(root=cwd))
-        elif args.traces_action == "show":
-            print(show_trace(args.trace_id, root=cwd))
-        else:
-            print(list_errors_cli(root=cwd))
-        return 0
-
-    if args.action == "list":
-        print(list_sessions(root=cwd))
-        return 0
-
-    if args.action == "show":
-        print(show_session(args.session_id, root=cwd))
-        return 0
-
-    if args.action == "pending":
-        print(list_pending_runs(root=cwd))
-        return 0
-
-    if args.action == "approve":
-        print(approve_run(args.session_id, args.tool_call_id, root=cwd))
-        return 0
-
-    if args.action == "deny":
-        print(deny_run(args.session_id, args.tool_call_id, root=cwd, reason=args.reason))
-        return 0
-
-    print(cancel_pending(args.session_id, root=cwd))
+    if args.traces_action == "list":
+        print(list_traces_cli(root=cwd))
+    elif args.traces_action == "show":
+        print(show_trace(args.trace_id, root=cwd))
+    else:
+        print(list_errors_cli(root=cwd))
     return 0

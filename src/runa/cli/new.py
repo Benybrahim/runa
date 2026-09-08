@@ -61,8 +61,7 @@ A Runa application.
 - `app/resources/`: shared resources (clients, config)
 - `app/evaluations/`: eval cases, run with `runa eval`
 - `app/tests/`: deterministic tests, run with `runa test`
-- `runa.db`: conversation history and pending approvals, see `runa run`/`runa runs`;
-  don't commit it
+- `runa.db`: conversation history, see `runa chat --list`/`--show`; don't commit it
 
 Generate scaffolding with:
 

@@ -3,11 +3,7 @@
 from pathlib import Path
 
 import pytest
-from agents.items import ToolApprovalItem
-from openai.types.responses import ResponseFunctionToolCall
 
-from runa.agent import Agent
-from runa.cli._approvals import save_pending
 from runa.cli.main import main
 from runa.cli.new import scaffold_project
 
@@ -47,32 +43,99 @@ def test_generate_agent_dispatches_to_generate_agent(
     assert (project_dir / "app" / "agents" / "support_agent.py").is_file()
 
 
-def test_run_reports_agent_not_found_as_a_clean_error(
+def test_chat_reports_agent_not_found_as_a_clean_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`runa run` on an unknown Agent name prints one clean line and exits 1, not a traceback."""
+    """`runa chat` on an unknown Agent name prints one clean line and exits 1, not a traceback."""
     project_dir = scaffold_project("demo", root=tmp_path)
 
-    exit_code = main(["run", "Nope", "hi"], cwd=project_dir)
+    exit_code = main(["chat", "Nope"], cwd=project_dir)
 
     assert exit_code == 1
     assert "no Agent named 'Nope'" in capsys.readouterr().err
 
 
 def test_chat_dispatches_to_run_agent_repl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """`runa chat Support` calls `run_agent_repl` rather than the single-shot `run_agent`."""
+    """`runa chat Support` calls `run_agent_repl`, asking for a fresh session by default."""
     project_dir = scaffold_project("demo", root=tmp_path)
-    calls: list[tuple[str, Path]] = []
+    calls: list[tuple[str, Path, str | None, bool, str | None]] = []
 
-    def fake_repl(name: str, *, root: Path, session_id: str | None = None) -> None:
-        calls.append((name, root))
+    def fake_repl(
+        name: str,
+        *,
+        root: Path,
+        session_id: str | None = None,
+        continue_last: bool = False,
+        resume: str | None = None,
+    ) -> None:
+        calls.append((name, root, session_id, continue_last, resume))
 
     monkeypatch.setattr("runa.cli.main.run_agent_repl", fake_repl)
 
     exit_code = main(["chat", "Support"], cwd=project_dir)
 
     assert exit_code == 0
-    assert calls == [("Support", project_dir)]
+    assert calls == [("Support", project_dir, None, False, None)]
+
+
+def test_chat_continue_flag_dispatches_continue_last(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`runa chat Support --continue` (and its `-c` alias) asks to resume the last session."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+    calls: list[bool] = []
+
+    def fake_repl(
+        name: str,
+        *,
+        root: Path,
+        session_id: str | None = None,
+        continue_last: bool = False,
+        resume: str | None = None,
+    ) -> None:
+        calls.append(continue_last)
+
+    monkeypatch.setattr("runa.cli.main.run_agent_repl", fake_repl)
+
+    assert main(["chat", "Support", "--continue"], cwd=project_dir) == 0
+    assert main(["chat", "Support", "-c"], cwd=project_dir) == 0
+    assert calls == [True, True]
+
+
+def test_chat_resume_flag_dispatches_the_given_or_empty_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--resume ID` passes the id through; bare `--resume` passes `""` to trigger a picker."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+    calls: list[str | None] = []
+
+    def fake_repl(
+        name: str,
+        *,
+        root: Path,
+        session_id: str | None = None,
+        continue_last: bool = False,
+        resume: str | None = None,
+    ) -> None:
+        calls.append(resume)
+
+    monkeypatch.setattr("runa.cli.main.run_agent_repl", fake_repl)
+
+    assert main(["chat", "Support", "--resume", "Support-old"], cwd=project_dir) == 0
+    assert main(["chat", "Support", "--resume"], cwd=project_dir) == 0
+    assert calls == ["Support-old", ""]
+
+
+def test_chat_with_no_name_or_flags_reports_a_clean_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`runa chat` with no Agent name and no `--list`/`--show` prints a clean error."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    exit_code = main(["chat"], cwd=project_dir)
+
+    assert exit_code == 1
+    assert "needs an Agent name" in capsys.readouterr().err
 
 
 def test_missing_main_py_reports_a_clean_error(
@@ -116,49 +179,23 @@ def test_test_reports_a_failing_test_with_exit_code_one(
     assert "0/1 passed" in out
 
 
-def test_runs_list_reports_no_sessions(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """`runa runs list` against a fresh project reports no sessions."""
+def test_chat_list_reports_no_sessions(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """`runa chat --list` against a fresh project reports no sessions."""
     project_dir = scaffold_project("demo", root=tmp_path)
 
-    exit_code = main(["runs", "list"], cwd=project_dir)
+    exit_code = main(["chat", "--list"], cwd=project_dir)
 
     assert exit_code == 0
     assert "no sessions found" in capsys.readouterr().out
 
 
-def test_runs_pending_reports_a_saved_pending_approval(
+def test_chat_show_reports_unknown_session_as_a_clean_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`runa runs pending` surfaces a row saved directly through `cli/_approvals.py`."""
-    project_dir = scaffold_project("demo", root=tmp_path)
-    agent = Agent(name="SupportAgent")
-    interruption = ToolApprovalItem(
-        agent=agent,
-        raw_item=ResponseFunctionToolCall(
-            call_id="call_1", name="delete_file", arguments="{}", type="function_call"
-        ),
-    )
-    save_pending(
-        project_dir / "runa.db",
-        session_id="SupportAgent",
-        agent_class_name="SupportAgent",
-        interruptions=[interruption],
-        state_json="{}",
-    )
-
-    exit_code = main(["runs", "pending"], cwd=project_dir)
-
-    assert exit_code == 0
-    assert "delete_file" in capsys.readouterr().out
-
-
-def test_runs_cancel_reports_no_pending_approval_as_a_clean_error(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """`runa runs cancel` on a session with nothing pending prints a clean error."""
+    """`runa chat --show` on an unknown session id prints a clean error."""
     project_dir = scaffold_project("demo", root=tmp_path)
 
-    exit_code = main(["runs", "cancel", "SupportAgent"], cwd=project_dir)
+    exit_code = main(["chat", "--show", "nope"], cwd=project_dir)
 
     assert exit_code == 1
-    assert "no pending approval" in capsys.readouterr().err
+    assert "no session found" in capsys.readouterr().err

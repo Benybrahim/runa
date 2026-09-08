@@ -34,10 +34,10 @@ build and run reliable, stateful agents.
    Run with `--help` or `-h` for options.
 
 
-4. Run the agent:
+4. Chat with the agent:
 
     ```bash
-    runa run MyAgent "..."
+    runa chat my_agent
     ```
 
 5. Follow the guides to start developing your application. You may find

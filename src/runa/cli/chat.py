@@ -1,0 +1,178 @@
+"""cli/chat.py: `runa chat`, talk to an Agent in a loop from argv.
+
+Calls `Runner.run_sync()` directly rather than `Agent.run_sync()`: the REPL
+needs the full `RunResult` (to detect `interruptions` and resolve them by
+prompting), while `Agent.run_sync()` only returns the final output string.
+
+Each invocation starts a fresh `SQLiteSession` by default, so a chat doesn't
+silently keep piling onto the same conversation. `--continue`/`--resume`
+pick up a past one instead, keyed by session id over the app's `runa.db`
+(the same file `runa chat --list`/`--show` reads, see `cli/sessions.py`).
+"""
+
+import importlib
+import inspect
+from collections.abc import Iterator
+from datetime import datetime
+from pathlib import Path
+from uuid import uuid4
+
+from agents import Runner
+
+from runa.agent import _RUN_CONFIG, Agent, _default_hooks
+from runa.cli._project import NotARunaProject, loaded_app
+from runa.cli.sessions import list_sessions_for_agent
+from runa.session import SQLiteSession
+
+
+class AgentNotFound(Exception):
+    """Raised when no Agent under `app/agents/` declares the given `name`."""
+
+
+def _require_agents_dir(root: Path) -> Path:
+    agents_dir = root / "app" / "agents"
+    if not agents_dir.is_dir():
+        raise NotARunaProject(
+            f"{agents_dir} does not exist, run this from inside a Runa "
+            "project created with `runa new`"
+        )
+    return agents_dir
+
+
+def _iter_agent_classes(agents_dir: Path) -> Iterator[type[Agent]]:
+    for agent_file in sorted(agents_dir.glob("*.py")):
+        if agent_file.stem == "__init__":
+            continue
+        module = importlib.import_module(f"app.agents.{agent_file.stem}")
+        for _, obj in inspect.getmembers(module, inspect.isclass):
+            if issubclass(obj, Agent) and obj is not Agent and obj.__module__ == module.__name__:
+                yield obj
+
+
+def find_agent_class(agent_name: str, *, agents_dir: Path) -> type[Agent]:
+    """Find the Agent subclass under `agents_dir` whose declared `name` is `agent_name`.
+
+    Matches the `name` class attribute (e.g. `class SupportAgent(Agent): name = "Support"`),
+    not the Python class name — `name` is the identity the SDK itself uses for traces,
+    instructions, and handoffs, so it's what an operator should type too.
+    """
+    for agent_cls in _iter_agent_classes(agents_dir):
+        if getattr(agent_cls, "name", None) == agent_name:
+            return agent_cls
+    raise AgentNotFound(f"no Agent named {agent_name!r} found under {agents_dir}")
+
+
+def _new_session_id(agent_name: str) -> str:
+    """A fresh id for a new chat: sortable by start time, unique enough for interactive use."""
+    return f"{agent_name}-{datetime.now():%Y%m%d-%H%M%S}-{uuid4().hex[:4]}"
+
+
+def _pick_session(agent_name: str, *, root: Path) -> str:
+    """Prompt the operator to choose one of `agent_name`'s past sessions, newest first.
+
+    Falls back to starting a new session when there's no history to pick from.
+    """
+    sessions = list_sessions_for_agent(agent_name, root=root)
+    if not sessions:
+        print(f"no previous session for {agent_name!r}, starting a new one")
+        return _new_session_id(agent_name)
+
+    print(f"previous sessions for {agent_name}:")
+    for index, (session_id, updated_at) in enumerate(sessions, start=1):
+        print(f"  {index}. {session_id}  ({updated_at})")
+    choice = input(f"resume which? [1-{len(sessions)}, default 1] ").strip()
+    try:
+        index = int(choice) if choice else 1
+    except ValueError:
+        index = 1
+    index = min(max(index, 1), len(sessions))
+    return sessions[index - 1][0]
+
+
+def _resolve_session_id(
+    agent_name: str,
+    *,
+    root: Path,
+    session_id: str | None,
+    continue_last: bool,
+    resume: str | None,
+) -> str:
+    """Pick the session id for this chat.
+
+    An explicit `--session` wins, then `--continue` (the most recent past session), then
+    `--resume` (a given id, or a picker over past ones when none is given), and otherwise a
+    fresh session every time.
+    """
+    if session_id is not None:
+        return session_id
+    if continue_last:
+        sessions = list_sessions_for_agent(agent_name, root=root)
+        if sessions:
+            return sessions[0][0]
+        print(f"no previous session for {agent_name!r}, starting a new one")
+        return _new_session_id(agent_name)
+    if resume is not None:
+        return resume or _pick_session(agent_name, root=root)
+    return _new_session_id(agent_name)
+
+
+def run_agent_repl(
+    agent_name: str,
+    *,
+    root: Path,
+    session_id: str | None = None,
+    continue_last: bool = False,
+    resume: str | None = None,
+) -> None:
+    """Chat with the named Agent in a loop, over one session.
+
+    The app is loaded and the Agent instantiated once for the whole session, so turns share
+    the in-process object instead of round-tripping through `runa.db` on every call. A pending
+    approval is resolved right here by prompting the operator, since there's someone to ask.
+    """
+    agents_dir = _require_agents_dir(root)
+    db_path = root / "runa.db"
+
+    with loaded_app(root):
+        agent_cls = find_agent_class(agent_name, agents_dir=agents_dir)
+        agent = agent_cls()
+        resolved_session_id = _resolve_session_id(
+            agent.name,
+            root=root,
+            session_id=session_id,
+            continue_last=continue_last,
+            resume=resume,
+        )
+        session = SQLiteSession(resolved_session_id, db_path=db_path)
+
+        print(f"chatting with {agent.name} (session {resolved_session_id!r})")
+        print("type 'exit' or Ctrl-D to quit\n")
+
+        while True:
+            try:
+                user_input = input("> ").strip()
+            except EOFError, KeyboardInterrupt:
+                print()
+                return
+            if not user_input:
+                continue
+            if user_input in {"exit", "quit"}:
+                return
+
+            result = Runner.run_sync(
+                agent, user_input, hooks=_default_hooks(), run_config=_RUN_CONFIG, session=session
+            )
+
+            while result.interruptions:
+                state = result.to_state()
+                for item in result.interruptions:
+                    answer = input(f"approve {item.name}({item.arguments})? [y/N] ").strip().lower()
+                    if answer in {"y", "yes"}:
+                        state.approve(item)
+                    else:
+                        state.reject(item)
+                result = Runner.run_sync(
+                    agent, state, hooks=_default_hooks(), run_config=_RUN_CONFIG, session=session
+                )
+
+            print(result.final_output)

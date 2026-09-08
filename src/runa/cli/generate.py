@@ -21,7 +21,7 @@ _AGENT_TEMPLATE = '''from runa import Agent
 
 
 class {class_name}(Agent):
-    name = "{class_name}"
+    name = "{name}"
     instructions = """
     TODO: describe what {class_name} does.
     """
@@ -86,15 +86,22 @@ def _require_dir(root: Path, *parts: str) -> Path:
 
 
 def generate_agent(name: str, *, root: Path) -> Path:
-    """Write a new Agent subclass into `root/app/agents/`."""
+    """Write a new Agent subclass into `root/app/agents/`.
+
+    `name` becomes the Python class name (suffixed with `Agent` if it isn't already). The
+    class's declared `name` attribute — the identity `runa chat` looks up, and the SDK uses
+    for traces/instructions/handoffs — is that class name's snake_case form (e.g.
+    `support_agent`), matching the file it's written to.
+    """
     agents_dir = _require_dir(root, "app", "agents")
 
     class_name = name if name.endswith("Agent") else f"{name}Agent"
-    agent_file = agents_dir / f"{_snake_case(class_name)}.py"
+    snake_name = _snake_case(class_name)
+    agent_file = agents_dir / f"{snake_name}.py"
     if agent_file.exists():
         raise AgentAlreadyExists(f"{agent_file} already exists")
 
-    agent_file.write_text(_AGENT_TEMPLATE.format(class_name=class_name))
+    agent_file.write_text(_AGENT_TEMPLATE.format(class_name=class_name, name=snake_name))
     return agent_file
 
 
