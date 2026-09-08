@@ -17,13 +17,7 @@ from openai.types.responses import (
 
 from runa import Agent
 from runa.agent import Subagent
-from runa.hooks import (
-    AuditRunHooks,
-    CompositeRunHooks,
-    LoggingRunHooks,
-    MetricsRunHooks,
-    TracingRunHooks,
-)
+from runa.logging import LoggingRunHooks
 from runa.tool import tool
 
 
@@ -285,8 +279,8 @@ class _FakeResult:
         return []
 
 
-def test_run_sync_defaults_to_every_built_in_hook(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`run_sync` passes a `CompositeRunHooks` combining every built-in hook when none is given."""
+def test_run_sync_defaults_to_logging_run_hooks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`run_sync` passes a `LoggingRunHooks` when none is given."""
     captured: dict[str, Any] = {}
 
     def fake_run_sync(*args: Any, hooks: Any, **kwargs: Any) -> _FakeResult:
@@ -297,10 +291,7 @@ def test_run_sync_defaults_to_every_built_in_hook(monkeypatch: pytest.MonkeyPatc
 
     Researcher().run_sync("hi")
 
-    hooks = captured["hooks"]
-    assert isinstance(hooks, CompositeRunHooks)
-    hook_types = {type(h) for h in hooks.hooks}
-    assert hook_types == {LoggingRunHooks, MetricsRunHooks, TracingRunHooks, AuditRunHooks}
+    assert isinstance(captured["hooks"], LoggingRunHooks)
 
 
 def test_run_sync_explicit_hooks_override_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -516,8 +507,8 @@ def test_run_streamed_yields_events_and_updates_history(monkeypatch: pytest.Monk
     assert agent.usage == Usage(input_tokens=3, output_tokens=4)
 
 
-def test_run_streamed_defaults_to_every_built_in_hook(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`run_streamed` defaults to a `CompositeRunHooks` combining every built-in hook."""
+def test_run_streamed_defaults_to_logging_run_hooks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`run_streamed` defaults to a `LoggingRunHooks` when none is given."""
     captured: dict[str, Any] = {}
 
     def fake_run_streamed(*args: Any, hooks: Any, **kwargs: Any) -> _FakeStreamingResult:
@@ -532,10 +523,7 @@ def test_run_streamed_defaults_to_every_built_in_hook(monkeypatch: pytest.Monkey
 
     asyncio.run(_consume())
 
-    hooks = captured["hooks"]
-    assert isinstance(hooks, CompositeRunHooks)
-    hook_types = {type(h) for h in hooks.hooks}
-    assert hook_types == {LoggingRunHooks, MetricsRunHooks, TracingRunHooks, AuditRunHooks}
+    assert isinstance(captured["hooks"], LoggingRunHooks)
 
 
 def test_run_streamed_explicit_hooks_override_the_default(monkeypatch: pytest.MonkeyPatch) -> None:

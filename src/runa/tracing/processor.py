@@ -8,7 +8,6 @@ to those existing events and normalizes them into `runa.tracing`'s own `Trace`/`
 "Agents SDK trace -> Observability adapter -> Normalized Trace" pattern the design calls for.
 """
 
-import logging
 import threading
 import time
 from collections import OrderedDict
@@ -29,11 +28,10 @@ from agents.tracing.span_data import (
     SpanData,
 )
 
+from runa.logging import logger
 from runa.tracing import config
 from runa.tracing._span import Span, SpanType
 from runa.tracing._trace import Trace
-
-logger = logging.getLogger("runa")
 
 _TYPE_MAP: dict[str, SpanType] = {
     "agent": "agent",

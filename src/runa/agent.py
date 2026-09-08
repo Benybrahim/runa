@@ -15,13 +15,7 @@ from agents.responses_websocket_session import ResponsesWebSocketSession
 from agents.usage import Usage
 
 from runa.guardrail import flatten_agent_guardrails
-from runa.hooks import (
-    AuditRunHooks,
-    CompositeRunHooks,
-    LoggingRunHooks,
-    MetricsRunHooks,
-    TracingRunHooks,
-)
+from runa.logging import LoggingRunHooks
 from runa.run import Run
 from runa.tracing.runner import capture_trace
 
@@ -35,14 +29,8 @@ _RUN_CONFIG = RunConfig(model_provider=LitellmProvider())
 
 
 def _default_hooks() -> RunHooks[Any]:
-    """Build a fresh composite of every built-in `RunHooks`.
-
-    `MetricsRunHooks`, `TracingRunHooks`, and `AuditRunHooks` accumulate per-run state, so a
-    new instance is built for each call instead of sharing one across runs.
-    """
-    return CompositeRunHooks(
-        LoggingRunHooks(), MetricsRunHooks(), TracingRunHooks(), AuditRunHooks()
-    )
+    """Build the default `hooks` for a run: `LoggingRunHooks`."""
+    return LoggingRunHooks()
 
 
 def _usage_from_exception(exc: AgentsException) -> Usage:
@@ -180,7 +168,7 @@ class Agent(BaseAgent):
         `context` is available to a single-argument `instructions` callable (and to tools,
         guardrails, etc.) as-is; it is never sent to the model. `hooks` receives lifecycle
         callbacks (`on_agent_start`, `on_tool_end`, etc.) from the underlying SDK's `Runner`;
-        it defaults to every built-in `RunHooks` (logging, metrics, tracing, audit) combined.
+        it defaults to `LoggingRunHooks`.
 
         Pass a `session` (e.g. `SQLiteSession`) to persist conversation history there instead
         of on `self.history`; the session supplies prior turns automatically, so only the new
@@ -320,7 +308,7 @@ class Agent(BaseAgent):
         `context` is available to a single-argument `instructions` callable (and to tools,
         guardrails, etc.) as-is; it is never sent to the model. `hooks` receives lifecycle
         callbacks (`on_agent_start`, `on_tool_end`, etc.) from the underlying SDK's `Runner`;
-        it defaults to every built-in `RunHooks` (logging, metrics, tracing, audit) combined.
+        it defaults to `LoggingRunHooks`.
 
         Pass a `session` (e.g. `SQLiteSession`) to persist conversation history there instead
         of on `self.history`; the session supplies prior turns automatically, so only the new

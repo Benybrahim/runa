@@ -6,14 +6,11 @@ limits truncate what's left. `RunaTraceProcessor` (`tracing/processor.py`) is th
 """
 
 import json
-import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from runa.tracing._trace import Trace
-
-logger = logging.getLogger("runa")
 
 _REDACTED = "[REDACTED]"
 
