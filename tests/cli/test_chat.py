@@ -3,12 +3,11 @@
 import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
-from agents.items import ToolApprovalItem
-from openai.types.responses import ResponseFunctionToolCall
 
+from runa._runner import Interruption
 from runa.agent import Agent
 from runa.cli._project import NotARunaProject, loaded_app
 from runa.cli.chat import AgentNotFound, find_agent_class, run_agent_repl
@@ -288,11 +287,8 @@ def test_run_agent_repl_approves_a_pending_tool_call_when_the_operator_says_yes(
     """Answering `y` to the approval prompt resumes the run with the item approved."""
     project_dir = _scaffold_with_agent(tmp_path)
     agent = Agent(name="SupportAgent")
-    interruption = ToolApprovalItem(
-        agent=agent,
-        raw_item=ResponseFunctionToolCall(
-            call_id="call_1", name="delete_file", arguments="{}", type="function_call"
-        ),
+    interruption = Interruption(
+        name="delete_file", arguments="{}", call_id="call_1", tool=cast(Any, None), agent=agent
     )
     _feed_input(monkeypatch, ["delete it", "y"])
     state = _FakeApprovalState()
@@ -326,11 +322,8 @@ def test_run_agent_repl_rejects_a_pending_tool_call_by_default(
     """Any answer other than `y` rejects the tool call rather than approving it."""
     project_dir = _scaffold_with_agent(tmp_path)
     agent = Agent(name="SupportAgent")
-    interruption = ToolApprovalItem(
-        agent=agent,
-        raw_item=ResponseFunctionToolCall(
-            call_id="call_1", name="delete_file", arguments="{}", type="function_call"
-        ),
+    interruption = Interruption(
+        name="delete_file", arguments="{}", call_id="call_1", tool=cast(Any, None), agent=agent
     )
     _feed_input(monkeypatch, ["delete it", "n"])
     state = _FakeApprovalState()

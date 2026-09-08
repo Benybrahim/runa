@@ -1,24 +1,22 @@
-"""session.py: the `agent_sessions`/`agent_messages` tables inside `runa.db`.
+"""session.py: `SessionABC`, and the `agent_sessions`/`agent_messages` tables inside `runa.db`.
 
 Same file, same connect-and-create-if-missing pattern as `tracing/storage.py` and
-`eval/storage/sqlite.py`. Table and column names match the SDK's own `SQLiteSession`, since
-`cli/runs.py` reads them directly with raw SQL.
+`eval/storage/sqlite.py`. `cli/sessions.py` reads these tables directly with raw SQL.
 
-A thin synchronous wrapper, unlike the SDK's `SQLiteSession`: Runa is a single-process,
-CLI-first framework, so this skips the thread-local connections, WAL mode, and cross-process
-file locking the SDK uses to stay safe under concurrent access.
+A thin synchronous wrapper: Runa is a single-process, CLI-first framework, so this skips the
+thread-local connections, WAL mode, and cross-process file locking a multi-process-safe session
+store would need.
 """
 
 import json
 import sqlite3
+from abc import ABC, abstractmethod
 from contextlib import closing
 from pathlib import Path
 
-from agents.items import TResponseInputItem
-from agents.memory.session import SessionABC
-
 from runa._sqlite import DEFAULT_DB_PATH
 from runa._sqlite import connect as _connect_db
+from runa._types import TResponseInputItem
 
 _SESSIONS_TABLE = "agent_sessions"
 _MESSAGES_TABLE = "agent_messages"
@@ -37,6 +35,28 @@ CREATE TABLE IF NOT EXISTS {_MESSAGES_TABLE} (
 );
 CREATE INDEX IF NOT EXISTS idx_{_MESSAGES_TABLE}_session_id ON {_MESSAGES_TABLE} (session_id, id);
 """
+
+
+class SessionABC(ABC):
+    """What `_runner.py` needs to persist and replay conversation history across turns."""
+
+    session_id: str
+
+    @abstractmethod
+    async def get_items(self, limit: int | None = None) -> list[TResponseInputItem]:
+        """Return this session's items, oldest first, capped at the latest `limit` if given."""
+
+    @abstractmethod
+    async def add_items(self, items: list[TResponseInputItem]) -> None:
+        """Append `items` to this session's history."""
+
+    @abstractmethod
+    async def pop_item(self) -> TResponseInputItem | None:
+        """Remove and return this session's most recent item, or `None` if it has none."""
+
+    @abstractmethod
+    async def clear_session(self) -> None:
+        """Delete this session and all of its items."""
 
 
 class SQLiteSession(SessionABC):
@@ -112,4 +132,4 @@ class SQLiteSession(SessionABC):
             conn.commit()
 
 
-__all__ = ["SQLiteSession"]
+__all__ = ["SQLiteSession", "SessionABC"]

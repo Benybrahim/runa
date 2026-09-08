@@ -11,10 +11,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from agents import Agent as BaseAgent
-from agents import Runner
-
-from runa.agent import _RUN_CONFIG
+from runa._runner import RunConfig, Runner
+from runa.agent import _MODEL_PROVIDER, Agent
 
 _TRAILING_COMMA = re.compile(r",\s*([\]}])")
 
@@ -38,9 +36,11 @@ class Judge:
     model: str
 
     async def ask(self, prompt: str) -> str:
-        """Send `prompt` to `self.model` through a bare, tool-less SDK `Agent`."""
-        judge_agent = BaseAgent(name="Judge", model=self.model, tools=[])
-        result = await Runner.run(judge_agent, prompt, run_config=_RUN_CONFIG)
+        """Send `prompt` to `self.model` through a bare, tool-less `Agent`."""
+        judge_agent = Agent(name="Judge", model=self.model, tools=[])
+        result = await Runner.run(
+            judge_agent, prompt, run_config=RunConfig(model_provider=_MODEL_PROVIDER)
+        )
         return result.final_output
 
 

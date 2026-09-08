@@ -4,9 +4,9 @@ import asyncio
 from typing import Any, cast
 
 import pytest
-from agents import RunContextWrapper
 
 from runa import approval, tool
+from runa._types import RunContextWrapper
 
 
 def _run(predicate: Any, params: dict[str, Any], call_id: str = "call_1") -> bool:

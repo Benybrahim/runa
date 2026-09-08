@@ -10,6 +10,7 @@ from runa.agent import Agent
 from runa.eval.case import Case
 from runa.eval.evaluate import evaluate_agent
 from runa.eval.evaluation.core import EvaluationResult, Status
+from runa.tracing import Trace
 
 
 class _TestAgent(Agent):
@@ -26,6 +27,7 @@ _AGENT = _TestAgent()
 class _FakeResult:
     final_output: Any = "ok"
     new_items: list[Any] = field(default_factory=list)
+    trace: Trace = field(default_factory=lambda: Trace(id="t", name="t", start_time=0.0, spans=[]))
 
 
 def _patch_run_and_storage(monkeypatch: pytest.MonkeyPatch, outputs: dict[str, Any]) -> None:
@@ -49,7 +51,7 @@ def test_evaluate_agent_runs_every_case_in_a_mixed_dataset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A dataset mixing a passing, a failing, and an erroring case evaluates every one."""
-    from agents.exceptions import MaxTurnsExceeded
+    from runa.exceptions import MaxTurnsExceeded
 
     _patch_run_and_storage(
         monkeypatch,
@@ -76,7 +78,7 @@ def test_evaluate_agent_skips_semantic_metrics_after_a_deterministic_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A case whose run errors never reaches semantic evaluation (no wasted judge calls)."""
-    from agents.exceptions import MaxTurnsExceeded
+    from runa.exceptions import MaxTurnsExceeded
 
     _patch_run_and_storage(monkeypatch, {"bad": MaxTurnsExceeded("boom")})
 

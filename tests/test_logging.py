@@ -4,12 +4,10 @@ import asyncio
 import logging
 
 import pytest
-from agents import AgentHooks, RunContextWrapper, RunHooks
-from agents.items import ModelResponse
-from agents.run_context import AgentHookContext
-from agents.usage import Usage
 
 from runa import Agent, LoggingAgentHooks, LoggingRunHooks
+from runa._types import ModelResponse, RunContextWrapper, Usage
+from runa.logging import AgentHooks, RunHooks
 from runa.tool import tool as tool_decorator
 
 
@@ -42,11 +40,10 @@ _response = ModelResponse(
 
 async def _run_all_run_hooks(hooks: RunHooks[None]) -> None:
     context: RunContextWrapper[None] = RunContextWrapper(context=None)
-    agent_context: AgentHookContext[None] = AgentHookContext(context=None)
     researcher, translator = Researcher(), Translator()
 
-    await hooks.on_agent_start(agent_context, researcher)
-    await hooks.on_agent_end(agent_context, researcher, "final output")
+    await hooks.on_agent_start(context, researcher)
+    await hooks.on_agent_end(context, researcher, "final output")
     await hooks.on_handoff(context, researcher, translator)
     await hooks.on_tool_start(context, researcher, search)
     await hooks.on_tool_end(context, researcher, search, "tool result")
@@ -56,11 +53,10 @@ async def _run_all_run_hooks(hooks: RunHooks[None]) -> None:
 
 async def _run_all_agent_hooks(hooks: AgentHooks[None]) -> None:
     context: RunContextWrapper[None] = RunContextWrapper(context=None)
-    agent_context: AgentHookContext[None] = AgentHookContext(context=None)
     researcher, translator = Researcher(), Translator()
 
-    await hooks.on_start(agent_context, researcher)
-    await hooks.on_end(agent_context, researcher, "final output")
+    await hooks.on_start(context, researcher)
+    await hooks.on_end(context, researcher, "final output")
     await hooks.on_handoff(context, researcher, translator)
     await hooks.on_tool_start(context, researcher, search)
     await hooks.on_tool_end(context, researcher, search, "tool result")

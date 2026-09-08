@@ -89,7 +89,7 @@ class MyAgent(Agent):
     guardrails = [block_empty.input, block_long.output, contains_pii]
 
 
-agent = Assistant()
+agent = MyAgent()
 run = agent.run_sync("What time is it right now?")
-#, context=Context(user_name="Ada"))
+# , context=Context(user_name="Ada"))
 print(run.output)

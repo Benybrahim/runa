@@ -4,11 +4,14 @@ import asyncio
 from typing import Any
 
 import pytest
-from agents import tracing as agents_tracing
 
+from runa._runner import RunResult
+from runa._types import RunContextWrapper, Usage
 from runa.agent import Agent
 from runa.eval.case import Case
 from runa.eval.tracing.adapter import run_agent_for_eval
+from runa.exceptions import MaxTurnsExceeded, RunErrorDetails
+from runa.tracing import Span, Trace
 
 
 class _TestAgent(Agent):
@@ -20,15 +23,22 @@ class _TestAgent(Agent):
 _AGENT = _TestAgent()
 
 
+def _result(final_output: Any, trace: Trace) -> RunResult:
+    return RunResult(
+        final_output=final_output,
+        context_wrapper=RunContextWrapper(context=None),
+        trace=trace,
+        _original_input=[],
+        _generated_items=[],
+    )
+
+
 def test_run_agent_for_eval_captures_final_output(monkeypatch: pytest.MonkeyPatch) -> None:
     """A successful run's `final_output` and latency are captured, with no error."""
+    trace = Trace(id="t1", name="UnderTest", start_time=0.0, end_time=0.0, spans=[])
 
-    class _FakeResult:
-        final_output = "the answer"
-        new_items: list[Any] = []
-
-    async def fake_run(agent: Any, input: Any, **kwargs: Any) -> Any:
-        return _FakeResult()
+    async def fake_run(agent: Any, input: Any, **kwargs: Any) -> RunResult:
+        return _result("the answer", trace)
 
     monkeypatch.setattr("runa.eval.tracing.adapter.Runner.run", staticmethod(fake_run))
 
@@ -42,30 +52,22 @@ def test_run_agent_for_eval_captures_final_output(monkeypatch: pytest.MonkeyPatc
 def test_run_agent_for_eval_pairs_tool_calls_with_their_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A tool's `function_span` becomes a `ToolCallRecord`, read from the shared `Trace`.
+    """A `"tool"` span in `RunResult.trace` becomes a `ToolCallRecord`, read straight off it."""
+    tool_span = Span(
+        id="s1",
+        trace_id="t1",
+        parent_id=None,
+        name="cancel_order",
+        type="tool",
+        start_time=0.0,
+        end_time=0.0,
+        input='{"order_id": "123"}',
+        output="cancelled",
+    )
+    trace = Trace(id="t1", name="UnderTest", start_time=0.0, end_time=0.0, spans=[tool_span])
 
-    `fake_run` opens the same real SDK trace/span primitives `Runner.run()` would, using the
-    `trace_id` `run_agent_for_eval`'s `capture_trace` generated (passed in via `run_config`), so
-    `RunaTraceProcessor` populates `AgentRun.trace` for real instead of a parallel fake shape.
-    """
-
-    class _FakeResult:
-        final_output = "done"
-
-    async def fake_run(agent: Any, input: Any, *, run_config: Any, **kwargs: Any) -> Any:
-        with (
-            agents_tracing.trace(
-                run_config.workflow_name,
-                trace_id=run_config.trace_id,
-                group_id=run_config.group_id,
-                metadata=run_config.trace_metadata,
-            ),
-            agents_tracing.function_span(
-                "cancel_order", input='{"order_id": "123"}', output="cancelled"
-            ),
-        ):
-            pass
-        return _FakeResult()
+    async def fake_run(agent: Any, input: Any, **kwargs: Any) -> RunResult:
+        return _result("done", trace)
 
     monkeypatch.setattr("runa.eval.tracing.adapter.Runner.run", staticmethod(fake_run))
 
@@ -80,11 +82,20 @@ def test_run_agent_for_eval_pairs_tool_calls_with_their_output(
 def test_run_agent_for_eval_captures_a_run_exception_as_an_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A run that raises an `AgentsException` (trace extraction failure) is captured, not raised."""
-    from agents.exceptions import MaxTurnsExceeded
+    """A run that raises a `RunaError` (guardrail tripwire, `MaxTurnsExceeded`, ...) is captured."""
 
-    async def fake_run(agent: Any, input: Any, **kwargs: Any) -> Any:
-        raise MaxTurnsExceeded("too many turns")
+    async def fake_run(agent: Any, input: Any, **kwargs: Any) -> RunResult:
+        exc = MaxTurnsExceeded("too many turns")
+        exc.run_data = RunErrorDetails(
+            input="hi",
+            new_items=[],
+            raw_responses=[],
+            last_agent=_AGENT,
+            context_wrapper=RunContextWrapper(context=None, usage=Usage()),
+            input_guardrail_results=[],
+            output_guardrail_results=[],
+        )
+        raise exc
 
     monkeypatch.setattr("runa.eval.tracing.adapter.Runner.run", staticmethod(fake_run))
 

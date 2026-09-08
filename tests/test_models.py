@@ -1,26 +1,28 @@
-"""Tests for `runa._models`: the six-provider router that replaces litellm."""
+"""Tests for `runa._models`: the two-backend router that replaces `openai-agents`/`openai`."""
 
 import asyncio
+import json
 from collections.abc import AsyncIterator
 from types import SimpleNamespace
 from typing import Any
 
+import httpx2 as httpx
 import pytest
-from agents import OpenAIChatCompletionsModel
-from agents.exceptions import UserError
-from openai.types.chat import ChatCompletionMessageFunctionToolCall
 
 from runa._models import (
     AnthropicModel,
     ModelProvider,
+    OpenAICompatibleModel,
+    _anthropic_deltas,
     _check_plain_text_output,
-    _chunks_from_anthropic_stream,
     _to_anthropic_messages,
     _to_anthropic_tool,
     _to_anthropic_tool_choice,
-    _to_chat_completion_message,
+    _to_chat_message,
     _to_usage,
 )
+from runa._types import ModelSettings
+from runa.exceptions import UserError
 
 
 @pytest.fixture(autouse=True)
@@ -37,21 +39,21 @@ def _clear_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(env, raising=False)
 
 
-def test_routes_gpt_to_openai_directly(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A `gpt-*` model gets the SDK's own OpenAIChatCompletionsModel, no base_url override."""
+def test_routes_gpt_to_openai_compatible_directly(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A `gpt-*` model gets `OpenAICompatibleModel` pointed at OpenAI's own endpoint."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     model = ModelProvider().get_model("gpt-5.4-nano")
 
-    assert isinstance(model, OpenAIChatCompletionsModel)
+    assert isinstance(model, OpenAICompatibleModel)
     assert str(model._client.base_url) == "https://api.openai.com/v1/"
 
 
 def test_unrecognized_name_defaults_to_openai(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A model name with none of the six prefixes still resolves through OpenAI, like before."""
+    """A model name with none of the five prefixes still resolves through OpenAI, like before."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     model = ModelProvider().get_model("o3-mini")
 
-    assert isinstance(model, OpenAIChatCompletionsModel)
+    assert isinstance(model, OpenAICompatibleModel)
 
 
 @pytest.mark.parametrize(
@@ -74,11 +76,11 @@ def test_unrecognized_name_defaults_to_openai(monkeypatch: pytest.MonkeyPatch) -
 def test_routes_each_openai_compatible_provider(
     monkeypatch: pytest.MonkeyPatch, model_name: str, env: str, base_url: str
 ) -> None:
-    """Gemini/Llama/DeepSeek/Qwen each get an OpenAIChatCompletionsModel at their own base_url."""
+    """Gemini/Llama/DeepSeek/Qwen each get an `OpenAICompatibleModel` at their own base_url."""
     monkeypatch.setenv(env, "key")
     model = ModelProvider().get_model(model_name)
 
-    assert isinstance(model, OpenAIChatCompletionsModel)
+    assert isinstance(model, OpenAICompatibleModel)
     assert str(model._client.base_url) == base_url
 
 
@@ -104,9 +106,130 @@ def test_reuses_one_client_per_provider(monkeypatch: pytest.MonkeyPatch) -> None
     first = provider.get_model("deepseek-chat")
     second = provider.get_model("deepseek-coder")
 
-    assert isinstance(first, OpenAIChatCompletionsModel)
-    assert isinstance(second, OpenAIChatCompletionsModel)
+    assert isinstance(first, OpenAICompatibleModel)
+    assert isinstance(second, OpenAICompatibleModel)
     assert first._client is second._client
+
+
+class _Tool:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.description = "Get the weather."
+        self.params_json_schema = {"type": "object", "properties": {"city": {"type": "string"}}}
+
+
+def _mock_client(handler: Any) -> httpx.AsyncClient:
+    return httpx.AsyncClient(
+        base_url="https://example.test/v1/", transport=httpx.MockTransport(handler)
+    )
+
+
+def test_openai_compatible_get_response_parses_text_and_tool_calls() -> None:
+    """A chat-completions response's message becomes one chat-completions-shaped output item."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        assert body["model"] == "gpt-5.4-nano"
+        assert body["tools"][0]["function"]["name"] == "weather"
+        return httpx.Response(
+            200,
+            json={
+                "id": "resp_1",
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": "Checking.",
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "type": "function",
+                                    "function": {"name": "weather", "arguments": '{"city": "NYC"}'},
+                                }
+                            ],
+                        }
+                    }
+                ],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            },
+        )
+
+    model = OpenAICompatibleModel("gpt-5.4-nano", _mock_client(handler))
+
+    async def call() -> Any:
+        return await model.get_response(
+            None, [{"role": "user", "content": "hi"}], ModelSettings(), [_Tool("weather")], None, []
+        )
+
+    response = asyncio.run(call())
+
+    assert response.output == [
+        {
+            "role": "assistant",
+            "content": "Checking.",
+            "tool_calls": [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {"name": "weather", "arguments": '{"city": "NYC"}'},
+                }
+            ],
+        }
+    ]
+    assert response.usage.input_tokens == 10
+    assert response.usage.output_tokens == 5
+    assert response.response_id == "resp_1"
+
+
+def test_openai_compatible_get_response_raises_on_error_status() -> None:
+    """A non-2xx response is surfaced as a `ModelBehaviorError` instead of a raw HTTP error."""
+    from runa.exceptions import ModelBehaviorError
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": "bad request"})
+
+    model = OpenAICompatibleModel("gpt-5.4-nano", _mock_client(handler))
+
+    async def call() -> Any:
+        return await model.get_response(
+            None, [{"role": "user", "content": "hi"}], ModelSettings(), [], None, []
+        )
+
+    with pytest.raises(ModelBehaviorError, match="400"):
+        asyncio.run(call())
+
+
+def test_openai_compatible_stream_response_yields_text_and_tool_call_deltas() -> None:
+    """SSE chunks become `StreamDelta`s carrying text, tool-call fragments, and final usage."""
+    sse_body = (
+        b'data: {"choices": [{"delta": {"content": "Hi"}}]}\n\n'
+        b'data: {"choices": [{"delta": {"tool_calls": '
+        b'[{"index": 0, "id": "call_1", "function": {"name": "weather", "arguments": ""}}]}}]}\n\n'
+        b'data: {"choices": [], "usage": {"prompt_tokens": 3, "completion_tokens": 2, '
+        b'"total_tokens": 5}}\n\n'
+        b"data: [DONE]\n\n"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=sse_body)
+
+    model = OpenAICompatibleModel("gpt-5.4-nano", _mock_client(handler))
+
+    async def collect() -> list[Any]:
+        return [
+            d
+            async for d in model.stream_response(
+                None, [{"role": "user", "content": "hi"}], ModelSettings(), [], None, []
+            )
+        ]
+
+    deltas = asyncio.run(collect())
+
+    assert deltas[0].text == "Hi"
+    assert deltas[1].tool_call_id == "call_1"
+    assert deltas[1].tool_call_name == "weather"
+    assert deltas[2].usage is not None
+    assert deltas[2].usage.input_tokens == 3
 
 
 def test_split_system_and_merges_consecutive_tool_results() -> None:
@@ -156,7 +279,7 @@ def test_assistant_turn_carries_text_and_tool_use_blocks() -> None:
 
 
 def test_to_anthropic_tool_translates_the_function_schema() -> None:
-    """An OpenAI-shaped function-tool dict maps to Anthropic's name/description/input_schema."""
+    """A chat-completions-shaped function-tool dict maps to Anthropic's own shape."""
     tool = {
         "type": "function",
         "function": {
@@ -174,56 +297,43 @@ def test_to_anthropic_tool_translates_the_function_schema() -> None:
 
 
 @pytest.mark.parametrize(
-    ("converted", "expected"),
+    ("tool_choice", "expected"),
     [
         ("auto", {"type": "auto"}),
         ("required", {"type": "any"}),
         ("none", {"type": "none"}),
-        (
-            {"type": "function", "function": {"name": "weather"}},
-            {"type": "tool", "name": "weather"},
-        ),
+        ("weather", {"type": "tool", "name": "weather"}),
         (None, None),
     ],
 )
-def test_to_anthropic_tool_choice(converted: Any, expected: dict[str, Any] | None) -> None:
-    """Each chat-completions-shaped tool_choice value maps to Anthropic's own shape."""
-    assert _to_anthropic_tool_choice(converted) == expected
+def test_to_anthropic_tool_choice(tool_choice: Any, expected: dict[str, Any] | None) -> None:
+    """Each `ToolChoice` value maps to Anthropic's own `tool_choice` shape."""
+    assert _to_anthropic_tool_choice(tool_choice) == expected
 
 
-def test_to_chat_completion_message_collects_text_and_tool_use() -> None:
+def test_to_chat_message_collects_text_and_tool_use() -> None:
     """A Claude response's text and tool_use blocks become message content and tool_calls."""
     message = SimpleNamespace(
         content=[
             SimpleNamespace(type="text", text="Checking the weather."),
             SimpleNamespace(type="tool_use", id="call_1", name="weather", input={"city": "NYC"}),
         ],
-        stop_reason="tool_use",
     )
 
-    result = _to_chat_completion_message(message)
+    result = _to_chat_message(message)
 
-    assert result.content == "Checking the weather."
-    assert result.tool_calls is not None
-    call = result.tool_calls[0]
-    assert isinstance(call, ChatCompletionMessageFunctionToolCall)
-    assert call.id == "call_1"
-    assert call.function.name == "weather"
-    assert call.function.arguments == '{"city": "NYC"}'
-    assert result.refusal is None
-
-
-def test_to_chat_completion_message_synthesizes_a_refusal() -> None:
-    """A `stop_reason="refusal"` with no content still surfaces as an explicit refusal."""
-    message = SimpleNamespace(content=[], stop_reason="refusal")
-
-    result = _to_chat_completion_message(message)
-
-    assert result.refusal is not None
+    assert result["content"] == "Checking the weather."
+    assert result["tool_calls"] == [
+        {
+            "id": "call_1",
+            "type": "function",
+            "function": {"name": "weather", "arguments": '{"city": "NYC"}'},
+        }
+    ]
 
 
 def test_to_usage_converts_anthropic_token_counts() -> None:
-    """Anthropic's usage fields map onto the SDK's `Usage`, cache fields included."""
+    """Anthropic's usage fields map onto Runa's own `Usage`, cache fields included."""
     usage = SimpleNamespace(
         input_tokens=10, output_tokens=5, cache_read_input_tokens=2, cache_creation_input_tokens=1
     )
@@ -237,13 +347,13 @@ def test_to_usage_converts_anthropic_token_counts() -> None:
     assert result.input_tokens_details.cached_tokens == 2
 
 
-def test_check_plain_text_output_allows_none_and_rejects_a_schema() -> None:
-    """A structured output schema on a Claude model raises, since translation isn't implemented."""
+def test_check_plain_text_output_allows_none_and_str_and_rejects_a_schema() -> None:
+    """A structured output type on a Claude model raises, since translation isn't implemented."""
     _check_plain_text_output(None)
+    _check_plain_text_output(str)
 
-    schema = SimpleNamespace(is_plain_text=lambda: False)
     with pytest.raises(UserError):
-        _check_plain_text_output(schema)
+        _check_plain_text_output(dict)
 
 
 async def _stream(events: list[SimpleNamespace]) -> AsyncIterator[SimpleNamespace]:
@@ -251,8 +361,8 @@ async def _stream(events: list[SimpleNamespace]) -> AsyncIterator[SimpleNamespac
         yield event
 
 
-def test_chunks_from_anthropic_stream_carries_text_and_tool_call_deltas() -> None:
-    """Anthropic's SSE events become the OpenAI-shaped chunk deltas the stream handler reads."""
+def test_anthropic_deltas_carries_text_and_tool_call_fragments() -> None:
+    """Anthropic's SSE events become `StreamDelta`s with text, tool-call fragments, and usage."""
     events = [
         SimpleNamespace(
             type="message_start", message=SimpleNamespace(usage=SimpleNamespace(input_tokens=7))
@@ -274,18 +384,15 @@ def test_chunks_from_anthropic_stream_carries_text_and_tool_call_deltas() -> Non
     ]
 
     async def collect() -> list[Any]:
-        return [
-            c async for c in _chunks_from_anthropic_stream(_stream(events), "claude-sonnet-4-6")
-        ]
+        return [d async for d in _anthropic_deltas(_stream(events))]
 
-    chunks = asyncio.run(collect())
+    deltas = asyncio.run(collect())
 
-    assert chunks[0].choices[0].delta.content == "Hi"
-    tool_call_chunk = chunks[1].choices[0].delta.tool_calls[0]
-    assert tool_call_chunk.id == "call_1"
-    assert tool_call_chunk.function.name == "weather"
-    arg_delta = chunks[2].choices[0].delta.tool_calls[0]
-    assert arg_delta.index == tool_call_chunk.index
-    assert arg_delta.function.arguments == '{"city":'
-    assert chunks[3].usage.prompt_tokens == 7
-    assert chunks[3].usage.completion_tokens == 4
+    assert deltas[0].text == "Hi"
+    assert deltas[1].tool_call_id == "call_1"
+    assert deltas[1].tool_call_name == "weather"
+    assert deltas[2].tool_call_index == 1
+    assert deltas[2].tool_call_arguments == '{"city":'
+    assert deltas[3].usage is not None
+    assert deltas[3].usage.input_tokens == 7
+    assert deltas[3].usage.output_tokens == 4

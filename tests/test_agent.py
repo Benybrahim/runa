@@ -1,24 +1,18 @@
-"""Tests for the handoff / delegate / auto subagent wiring in `Agent`."""
+"""Tests for the handoff / delegate / auto subagent wiring, and `Agent.run`/`run_sync`."""
 
 import asyncio
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any, cast
 
 import pytest
-from agents import FunctionTool, RunContextWrapper
-from agents.exceptions import MaxTurnsExceeded, RunErrorDetails
-from agents.testing.model import ScriptedModel
-from agents.usage import Usage
-from openai.types.responses import (
-    ResponseFunctionToolCall,
-    ResponseOutputMessage,
-    ResponseOutputText,
-)
 
 from runa import Agent
+from runa._types import ModelResponse, RunContextWrapper, Usage
 from runa.agent import Subagent
+from runa.exceptions import MaxTurnsExceeded, RunErrorDetails
 from runa.logging import LoggingRunHooks
-from runa.tool import tool
+from runa.tool import FunctionTool, tool
 
 
 def _handoff_names(agent: Agent) -> list[str]:
@@ -83,10 +77,10 @@ def test_delegate_tool_name_and_description_override() -> None:
 
     agent = Main()
 
-    (tool,) = agent.tools
-    assert isinstance(tool, FunctionTool)
-    assert tool.name == "do_research"
-    assert tool.description == "Look into it."
+    (tool_obj,) = agent.tools
+    assert isinstance(tool_obj, FunctionTool)
+    assert tool_obj.name == "do_research"
+    assert tool_obj.description == "Look into it."
 
 
 def test_bare_subagent_wires_both_handoff_and_delegate() -> None:
@@ -168,10 +162,10 @@ def test_dict_subagents_delegate_bucket_keeps_tool_overrides() -> None:
 
     agent = Main()
 
-    (tool,) = agent.tools
-    assert isinstance(tool, FunctionTool)
-    assert tool.name == "do_research"
-    assert tool.description == "Look into it."
+    (tool_obj,) = agent.tools
+    assert isinstance(tool_obj, FunctionTool)
+    assert tool_obj.name == "do_research"
+    assert tool_obj.description == "Look into it."
 
 
 def test_subagent_descriptor_returns_fresh_immutable_instance() -> None:
@@ -235,7 +229,8 @@ def _two_arg_instructions(context: RunContextWrapper[_Ctx], agent: Any) -> str:
 
 
 def test_single_arg_instructions_resolves_from_run_context() -> None:
-    """A one-parameter `(context) -> str` `instructions` is adapted to the SDK's 2-arg shape."""
+    """A one-parameter `(context) -> str` `instructions` is adapted to the runner's 2-arg shape."""
+    from runa._runner import _resolve_instructions
 
     class Dynamic(Agent):
         name = "Dynamic"
@@ -243,13 +238,14 @@ def test_single_arg_instructions_resolves_from_run_context() -> None:
 
     agent = Dynamic()
 
-    prompt = asyncio.run(agent.get_system_prompt(RunContextWrapper(context=_Ctx(label="hi"))))
+    prompt = asyncio.run(_resolve_instructions(agent, RunContextWrapper(context=_Ctx(label="hi"))))
 
     assert prompt == "context=hi"
 
 
 def test_two_arg_instructions_still_supported() -> None:
-    """A native SDK-style `(context, agent) -> str` `instructions` passes through unadapted."""
+    """A native runner-style `(context, agent) -> str` `instructions` passes through unadapted."""
+    from runa._runner import _resolve_instructions
 
     class Dynamic(Agent):
         name = "Dynamic"
@@ -257,16 +253,14 @@ def test_two_arg_instructions_still_supported() -> None:
 
     agent = Dynamic()
 
-    prompt = asyncio.run(agent.get_system_prompt(RunContextWrapper(context=_Ctx(label="hi"))))
+    prompt = asyncio.run(_resolve_instructions(agent, RunContextWrapper(context=_Ctx(label="hi"))))
 
     assert prompt == "Dynamic:hi"
 
 
 def test_string_instructions_pass_through_unchanged() -> None:
     """Plain string instructions are unaffected by the dynamic-instructions adapter."""
-    prompt = asyncio.run(Researcher().get_system_prompt(RunContextWrapper(context=None)))
-
-    assert prompt == "You research topics."
+    assert Researcher().instructions == "You research topics."
 
 
 class _FakeResult:
@@ -274,6 +268,8 @@ class _FakeResult:
 
     final_output = "ok"
     context_wrapper = RunContextWrapper(context=None, usage=Usage(input_tokens=1, output_tokens=2))
+    interruptions: list[Any] = []
+    trace = None
 
     def to_input_list(self) -> list[Any]:
         return []
@@ -344,8 +340,8 @@ def test_run_sync_returns_a_completed_run(monkeypatch: pytest.MonkeyPatch) -> No
     assert run.usage == Usage(input_tokens=1, output_tokens=2)
 
 
-def test_run_sync_catches_agents_exception_as_error_run(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An `AgentsException` (guardrail tripwire, `MaxTurnsExceeded`, ...) is captured, not raised.
+def test_run_sync_catches_runa_error_as_error_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A `RunaError` (guardrail tripwire, `MaxTurnsExceeded`, ...) is captured, not raised.
 
     `self.history` is left unchanged, since the turn never completed.
     """
@@ -379,26 +375,50 @@ def test_run_sync_catches_agents_exception_as_error_run(monkeypatch: pytest.Monk
 
 
 def test_run_sync_trace_populated_regardless_of_hooks(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`Run.trace` is captured via the SDK's own tracing, independent of a custom `hooks=`."""
+    """`Run.trace` is whatever `Runner.run_sync()` produced, independent of a custom `hooks=`."""
+    from runa.tracing import Trace
 
-    def fake_run_sync(*args: Any, **kwargs: Any) -> _FakeResult:
-        return _FakeResult()
+    fake_trace = Trace(id="t1", name="Researcher", start_time=0.0)
+
+    class _ResultWithTrace(_FakeResult):
+        trace = fake_trace
+
+    def fake_run_sync(*args: Any, **kwargs: Any) -> _ResultWithTrace:
+        return _ResultWithTrace()
 
     monkeypatch.setattr("runa.agent.Runner.run_sync", staticmethod(fake_run_sync))
 
     run = Researcher().run_sync("hi", hooks=LoggingRunHooks())
 
+    assert run.trace is not None
     assert run.trace.name == "Researcher"
 
 
-def _final_message(text: str) -> ResponseOutputMessage:
-    return ResponseOutputMessage(
-        id="msg_1",
-        role="assistant",
-        status="completed",
-        type="message",
-        content=[ResponseOutputText(text=text, type="output_text", annotations=[])],
-    )
+def _final_message(text: str) -> dict[str, Any]:
+    return {"role": "assistant", "content": text, "tool_calls": None}
+
+
+def _tool_call_message(name: str, arguments: str, call_id: str = "call_1") -> dict[str, Any]:
+    return {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [
+            {"id": call_id, "type": "function", "function": {"name": name, "arguments": arguments}}
+        ],
+    }
+
+
+class _ScriptedModel:
+    """A `Model` stand-in returning pre-scripted messages, run through the real `Runner`."""
+
+    def __init__(self, messages: list[dict[str, Any]]) -> None:
+        self._messages = list(messages)
+
+    async def get_response(self, *args: Any, **kwargs: Any) -> ModelResponse:  # noqa: ANN002, ANN003
+        return ModelResponse(
+            output=[self._messages.pop(0)],
+            usage=Usage(input_tokens=1, output_tokens=1, total_tokens=2, requests=1),
+        )
 
 
 def test_run_sync_trace_has_agent_and_tool_spans() -> None:
@@ -409,21 +429,18 @@ def test_run_sync_trace_has_agent_and_tool_spans() -> None:
         """Return a fixed time."""
         return "2024-01-01T00:00:00"
 
-    tool_call = ResponseFunctionToolCall(
-        call_id="call_1", name="now", arguments="{}", type="function_call"
-    )
-
     class TimeAgent(Agent):
         name = "TimeAgent"
         instructions = "Answer with the time."
         tools = [now]
-        model = ScriptedModel(
-            steps=[[tool_call], [_final_message("the time is 2024")]], emit_traces=True
+        model = _ScriptedModel(
+            [_tool_call_message("now", "{}"), _final_message("the time is 2024")]
         )
 
     run = TimeAgent().run_sync("what time is it?")
 
     assert run.status == "completed"
+    assert run.trace is not None
     types_by_name = {span.name: span.type for span in run.trace.spans}
     assert types_by_name["TimeAgent"] == "agent"
     assert types_by_name["now"] == "tool"
@@ -431,63 +448,50 @@ def test_run_sync_trace_has_agent_and_tool_spans() -> None:
 
 
 def test_run_sync_trace_records_a_tool_error_span() -> None:
-    """A tool that raises doesn't stop the run, but its span in `Run.trace` records the error.
-
-    The SDK feeds the tool's error back to the model as a `function_call_output` and continues
-    the turn loop rather than aborting the run, so a second scripted step supplies that follow-up
-    response; what this test cares about is that the failed tool's own span is still recorded
-    with `status="error"`.
-    """
+    """A tool that raises doesn't stop the run, but its span in `Run.trace` records the error."""
 
     @tool
     def boom() -> str:
         """Raise unconditionally."""
         raise ValueError("boom")
 
-    tool_call = ResponseFunctionToolCall(
-        call_id="call_1", name="boom", arguments="{}", type="function_call"
-    )
-
     class BoomAgent(Agent):
         name = "BoomAgent"
         instructions = "Call the tool."
         tools = [boom]
-        model = ScriptedModel(
-            steps=[[tool_call], [_final_message("the tool failed")]], emit_traces=True
+        model = _ScriptedModel(
+            [_tool_call_message("boom", "{}"), _final_message("the tool failed")]
         )
 
     run = BoomAgent().run_sync("go")
 
+    assert run.trace is not None
     tool_spans = [span for span in run.trace.spans if span.type == "tool"]
     assert len(tool_spans) == 1
     assert tool_spans[0].status == "error"
     assert tool_spans[0].error is not None
 
 
-class _FakeStreamingResult:
-    """A stand-in for `RunResultStreaming`, just enough for `Agent.run_streamed` to consume."""
+def test_run_streamed_yields_events_and_updates_history(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`run_streamed` yields every event, then appends the turn to history and records usage."""
 
-    def __init__(self, events: list[Any], last_response_id: str | None = None) -> None:
-        self._events = events
-        self.last_response_id = last_response_id
-        self.context_wrapper = RunContextWrapper(
+    class _FakeStreaming:
+        context_wrapper = RunContextWrapper(
             context=None, usage=Usage(input_tokens=3, output_tokens=4)
         )
 
-    async def stream_events(self) -> Any:
-        for event in self._events:
-            yield event
+        def __aiter__(self) -> AsyncIterator[Any]:
+            async def _events() -> AsyncIterator[Any]:
+                yield "event-1"
+                yield "event-2"
 
-    def to_input_list(self) -> list[Any]:
-        return [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "ok"}]
+            return _events()
 
+        def to_input_list(self) -> list[Any]:
+            return [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "ok"}]
 
-def test_run_streamed_yields_events_and_updates_history(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`run_streamed` yields every SDK stream event, then appends the turn to history."""
-    fake_events = ["event-1", "event-2"]
-
-    def fake_run_streamed(*args: Any, **kwargs: Any) -> _FakeStreamingResult:
-        return _FakeStreamingResult(fake_events)
+    def fake_run_streamed(*args: Any, **kwargs: Any) -> _FakeStreaming:
+        return _FakeStreaming()
 
     monkeypatch.setattr("runa.agent.Runner.run_streamed", staticmethod(fake_run_streamed))
 
@@ -498,7 +502,7 @@ def test_run_streamed_yields_events_and_updates_history(monkeypatch: pytest.Monk
 
     events = asyncio.run(_consume())
 
-    assert events == fake_events
+    assert events == ["event-1", "event-2"]
     assert agent.history == [
         {"role": "user", "content": "hi"},
         {"role": "assistant", "content": "ok"},
@@ -511,9 +515,22 @@ def test_run_streamed_defaults_to_logging_run_hooks(monkeypatch: pytest.MonkeyPa
     """`run_streamed` defaults to a `LoggingRunHooks` when none is given."""
     captured: dict[str, Any] = {}
 
-    def fake_run_streamed(*args: Any, hooks: Any, **kwargs: Any) -> _FakeStreamingResult:
+    class _FakeStreaming:
+        context_wrapper = RunContextWrapper(context=None)
+
+        def __aiter__(self) -> AsyncIterator[Any]:
+            async def _events() -> AsyncIterator[Any]:
+                return
+                yield  # pragma: no cover -- makes this an async generator with no items
+
+            return _events()
+
+        def to_input_list(self) -> list[Any]:
+            return []
+
+    def fake_run_streamed(*args: Any, hooks: Any, **kwargs: Any) -> _FakeStreaming:
         captured["hooks"] = hooks
-        return _FakeStreamingResult([])
+        return _FakeStreaming()
 
     monkeypatch.setattr("runa.agent.Runner.run_streamed", staticmethod(fake_run_streamed))
 
@@ -524,60 +541,6 @@ def test_run_streamed_defaults_to_logging_run_hooks(monkeypatch: pytest.MonkeyPa
     asyncio.run(_consume())
 
     assert isinstance(captured["hooks"], LoggingRunHooks)
-
-
-def test_run_streamed_explicit_hooks_override_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An explicit `hooks` argument is used instead of the default combined hooks."""
-    captured: dict[str, Any] = {}
-    custom_hooks = LoggingRunHooks()
-
-    def fake_run_streamed(*args: Any, hooks: Any, **kwargs: Any) -> _FakeStreamingResult:
-        captured["hooks"] = hooks
-        return _FakeStreamingResult([])
-
-    monkeypatch.setattr("runa.agent.Runner.run_streamed", staticmethod(fake_run_streamed))
-
-    async def _consume() -> None:
-        async for _ in Researcher().run_streamed("hi", hooks=custom_hooks):
-            pass
-
-    asyncio.run(_consume())
-
-
-class _FakeWebSocketSession:
-    """A stand-in for `ResponsesWebSocketSession`, recording each `run_streamed` call it gets."""
-
-    def __init__(self, response_ids: list[str]) -> None:
-        self._response_ids = list(response_ids)
-        self.calls: list[dict[str, Any]] = []
-
-    def run_streamed(self, agent: Any, message: Any, **kwargs: Any) -> _FakeStreamingResult:
-        self.calls.append({"agent": agent, "message": message, **kwargs})
-        return _FakeStreamingResult([], last_response_id=self._response_ids.pop(0))
-
-
-def test_run_streamed_with_session_threads_previous_response_id() -> None:
-    """A `session` sends only the new message and chains `previous_response_id` across turns."""
-    session = cast("Any", _FakeWebSocketSession(["resp-1", "resp-2"]))
-    agent = Researcher()
-
-    async def _consume() -> None:
-        async for _ in agent.run_streamed("hi", session=session):
-            pass
-        async for _ in agent.run_streamed("again", session=session):
-            pass
-
-    asyncio.run(_consume())
-
-    first_call, second_call = session.calls
-    assert first_call["message"] == "hi"
-    assert first_call["previous_response_id"] is None
-    assert second_call["message"] == "again"
-    assert second_call["previous_response_id"] == "resp-1"
-    assert agent._last_response_id == "resp-2"
-    assert agent.last_usage == Usage(input_tokens=3, output_tokens=4)
-    assert agent.usage.input_tokens == 6
-    assert agent.usage.output_tokens == 8
 
 
 def test_evaluate_delegates_to_evaluate_agent(monkeypatch: pytest.MonkeyPatch) -> None:

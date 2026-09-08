@@ -17,9 +17,8 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-from agents import Runner
-
-from runa.agent import _RUN_CONFIG, Agent, _default_hooks
+from runa._runner import Runner
+from runa.agent import Agent, _default_hooks
 from runa.cli._project import NotARunaProject, loaded_app, resolve_db_path
 from runa.cli.sessions import list_sessions_for_agent
 from runa.session import SQLiteSession
@@ -160,7 +159,11 @@ def run_agent_repl(
                 return
 
             result = Runner.run_sync(
-                agent, user_input, hooks=_default_hooks(), run_config=_RUN_CONFIG, session=session
+                agent,
+                user_input,
+                hooks=_default_hooks(),
+                run_config=agent._run_config(session),
+                session=session,
             )
 
             while result.interruptions:
@@ -172,7 +175,11 @@ def run_agent_repl(
                     else:
                         state.reject(item)
                 result = Runner.run_sync(
-                    agent, state, hooks=_default_hooks(), run_config=_RUN_CONFIG, session=session
+                    agent,
+                    state,
+                    hooks=_default_hooks(),
+                    run_config=agent._run_config(session),
+                    session=session,
                 )
 
             print(result.final_output)

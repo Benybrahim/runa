@@ -3,8 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from agents.usage import Usage
-
+from runa._types import Usage
 from runa.tracing import Trace
 
 Status = Literal["completed", "error"]
@@ -20,13 +19,13 @@ class Run:
     what actually happened, never an empty stand-in, except when tracing itself is disabled.
     `usage` is this call's token usage, same value as `Agent.last_usage` after the call.
 
-    `status` is `"error"` when an `AgentsException` (a guardrail tripwire, `MaxTurnsExceeded`,
-    a model error, ...) stopped the run instead of it reaching a final output; `error` then
-    holds that exception's message. `metadata` is reserved for future per-run detail.
+    `status` is `"error"` when a `RunaError` (a guardrail tripwire, `MaxTurnsExceeded`, a model
+    error, ...) stopped the run instead of it reaching a final output; `error` then holds that
+    exception's message. `metadata` is reserved for future per-run detail.
     """
 
     output: Any
-    trace: Trace
+    trace: Trace | None
     usage: Usage
     status: Status = "completed"
     error: str | None = None

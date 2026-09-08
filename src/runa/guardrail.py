@@ -1,23 +1,101 @@
 """`@guardrail` decorator that turns a plain predicate into an input/output guardrail."""
 
+from __future__ import annotations
+
 import inspect
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from agents import (
-    GuardrailFunctionOutput,
-    InputGuardrail,
-    OutputGuardrail,
-    ToolGuardrailFunctionOutput,
-    ToolInputGuardrail,
-    ToolInputGuardrailData,
-    ToolOutputGuardrail,
-)
-from agents.items import TResponseInputItem
+from runa._types import TResponseInputItem
 
 _Predicate = Callable[[Any], bool | Awaitable[bool]]
+_GuardrailFunction = Callable[[Any, Any, Any], Awaitable["GuardrailFunctionOutput"]]
+_ToolGuardrailFunction = Callable[[Any], Awaitable["ToolGuardrailFunctionOutput"]]
+
+
+@dataclass
+class GuardrailFunctionOutput:
+    """What a guardrail function returns: whatever it wants recorded, plus trip/no-trip."""
+
+    output_info: Any
+    tripwire_triggered: bool
+
+
+@dataclass
+class InputGuardrail[TContext]:
+    """Checks an agent's input before the model ever sees it; trips the run if it should stop."""
+
+    guardrail_function: _GuardrailFunction
+    name: str | None = None
+
+
+@dataclass
+class OutputGuardrail[TContext]:
+    """Checks an agent's final output before a run returns it; trips the run if it should stop."""
+
+    guardrail_function: _GuardrailFunction
+    name: str | None = None
+
+
+@dataclass
+class ToolGuardrailFunctionOutput:
+    """What a tool guardrail function returns: whatever it wants recorded, plus its verdict."""
+
+    output_info: Any
+    behavior: dict[str, Any]
+
+    @classmethod
+    def raise_exception(cls, output_info: Any = None) -> ToolGuardrailFunctionOutput:
+        """Build a verdict that halts the tool call and raises a tripwire exception."""
+        return cls(output_info=output_info, behavior={"type": "raise_exception"})
+
+    @classmethod
+    def allow(cls, output_info: Any = None) -> ToolGuardrailFunctionOutput:
+        """Build a verdict that lets the tool call proceed."""
+        return cls(output_info=output_info, behavior={"type": "allow"})
+
+
+@dataclass
+class ToolInputGuardrailContext:
+    """What a tool input/output guardrail's `data.context` carries: the raw call it's checking."""
+
+    tool_arguments: str
+    tool_name: str = ""
+    call_id: str = ""
+
+
+@dataclass
+class ToolInputGuardrailData:
+    """What a tool guardrail function receives: the call's context, and its output once it ran."""
+
+    context: ToolInputGuardrailContext
+    output: Any = None
+
+
+@dataclass
+class ToolInputGuardrail[TContext]:
+    """Checks a tool call's arguments before the tool runs; trips the call if it should stop."""
+
+    guardrail_function: _ToolGuardrailFunction
+    name: str | None = None
+
+    def get_name(self) -> str:
+        """Return this guardrail's name, defaulting to its wrapped function's name."""
+        return self.name or self.guardrail_function.__name__
+
+
+@dataclass
+class ToolOutputGuardrail[TContext]:
+    """Checks a tool's return value after it runs; trips the call if it should stop."""
+
+    guardrail_function: _ToolGuardrailFunction
+    name: str | None = None
+
+    def get_name(self) -> str:
+        """Return this guardrail's name, defaulting to its wrapped function's name."""
+        return self.name or self.guardrail_function.__name__
 
 
 def _latest_text(value: str | list[TResponseInputItem]) -> str:

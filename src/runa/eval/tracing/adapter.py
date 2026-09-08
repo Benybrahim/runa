@@ -1,20 +1,18 @@
 """eval/tracing/adapter.py: run one `Case` through an `Agent` and normalize the result.
 
-Uses the same `capture_trace` mechanism as `Agent.run`/`run_sync` (`runa/tracing/runner.py`), so
-evaluation and observability read the same `Trace`/`Span` data instead of two parallel
-execution-history models: `AgentRun.tool_calls` is derived straight from `AgentRun.trace.spans`.
+`Runner.run()`'s own `RunResult.trace` is used directly — evaluation and observability read the
+same `Trace`/`Span` data instead of two parallel execution-history models: `AgentRun.tool_calls`
+is derived straight from `AgentRun.trace.spans`.
 """
 
 import time
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 
-from agents import Runner
-from agents.exceptions import AgentsException
-
-from runa.agent import _RUN_CONFIG, Agent
+from runa._runner import RunConfig, Runner
+from runa.agent import _MODEL_PROVIDER, Agent
 from runa.eval.case import Case
+from runa.exceptions import RunaError
 from runa.tracing import Trace
-from runa.tracing.runner import capture_trace
 
 _EMPTY_TRACE = Trace(id="", name="", start_time=0.0, end_time=0.0, spans=[], metadata={})
 
@@ -48,30 +46,26 @@ async def run_agent_for_eval(agent: Agent, case: Case) -> AgentRun:
     bad case doesn't stop the rest of a dataset from evaluating.
     """
     start = time.monotonic()
-    error: AgentsException | None = None
-    result = None
-    with capture_trace(workflow_name=type(agent).__name__) as cap:
-        try:
-            result = await Runner.run(
-                agent, case.input, run_config=replace(_RUN_CONFIG, **cap.run_config_fields)
-            )
-        except AgentsException as exc:
-            error = exc
-    latency = time.monotonic() - start
-
-    if error is not None or result is None:
-        assert error is not None
-        return AgentRun(
-            input=case.input, final_output=None, error=str(error), latency=latency, trace=cap.trace
+    run_config = RunConfig(model_provider=_MODEL_PROVIDER, workflow_name=type(agent).__name__)
+    try:
+        result = await Runner.run(agent, case.input, run_config=run_config)
+    except RunaError as exc:
+        latency = time.monotonic() - start
+        trace = (
+            exc.run_data.trace if exc.run_data and exc.run_data.trace is not None else _EMPTY_TRACE
         )
+        return AgentRun(
+            input=case.input, final_output=None, error=str(exc), latency=latency, trace=trace
+        )
+    latency = time.monotonic() - start
 
     tool_calls = [
         ToolCallRecord(
             name=span.name,
-            arguments=span.input or "",
+            arguments=str(span.input) if span.input is not None else "",
             output=str(span.output) if span.output is not None else None,
         )
-        for span in cap.trace.spans
+        for span in result.trace.spans
         if span.type == "tool"
     ]
     return AgentRun(
@@ -79,5 +73,5 @@ async def run_agent_for_eval(agent: Agent, case: Case) -> AgentRun:
         final_output=result.final_output,
         tool_calls=tool_calls,
         latency=latency,
-        trace=cap.trace,
+        trace=result.trace,
     )

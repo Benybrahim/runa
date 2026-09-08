@@ -1,118 +1,185 @@
-"""_models.py: Runa's own model provider — six providers, no litellm.
+"""_models.py: Runa's own model provider — two backends, no `openai-agents`, no `openai` SDK.
 
-`ModelProvider.get_model` maps a model name's prefix to a backend. `gpt`/unrecognized names go
-straight to OpenAI; `gemini`, `llama`, `deepseek`, and `qwen` speak OpenAI's chat-completions wire
-format natively, so they're just an `AsyncOpenAI` client pointed at that provider's own endpoint,
-reused through the SDK's own `OpenAIChatCompletionsModel`. `claude` is the one exception —
-Anthropic's Messages API isn't OpenAI-shaped — so `AnthropicModel` below talks to it directly
-through the `anthropic` SDK, translating requests and responses through the same
-`Converter`/`ChatCmplStreamHandler` machinery `OpenAIChatCompletionsModel` uses internally, rather
-than reimplementing response/event construction from scratch.
+`ModelProvider.get_model` maps a model name's prefix to a backend. A name starting with `claude`
+goes through `AnthropicModel`, talking to Anthropic's own SDK directly — Anthropic's Messages API
+isn't chat-completions-shaped, so it's the one backend that needs real translation. Everything else
+(`gpt-*`, `gemini-*`, `llama-*`, `deepseek-*`, `qwen-*`, or an unrecognized/bare name) goes through
+`OpenAICompatibleModel`, which speaks the chat-completions wire format that OpenAI, Gemini, Llama,
+DeepSeek, and Qwen all share — over plain HTTP via `httpx2`, not the `openai` package.
+
+Conversation items are plain chat-completions-shaped message dicts everywhere in Runa (see
+`runa._types.TResponseInputItem`); `AnthropicModel` is the only place that ever converts away from
+that shape. Tools/handoffs are read structurally here (`.name`/`.description`/`.params_json_schema`
+for a tool, `.tool_name`/`.tool_description` for a handoff) rather than importing their concrete
+types, so this module has no dependency on `runa.tool`/`runa.handoff`.
 """
 
 from __future__ import annotations
 
 import json
 import os
-import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
-from agents import (
-    Model,
+import httpx2 as httpx
+from anthropic import AsyncAnthropic
+
+from runa._types import (
+    InputTokensDetails,
     ModelResponse,
     ModelSettings,
-    ModelTracing,
-    OpenAIChatCompletionsModel,
+    OutputTokensDetails,
+    ToolChoice,
+    TResponseInputItem,
     Usage,
 )
-from agents import ModelProvider as BaseModelProvider
-from agents.exceptions import UserError
-from agents.handoffs import Handoff
-from agents.items import TResponseInputItem, TResponseStreamEvent
-from agents.models._trace import model_config_for_trace
-from agents.models.chatcmpl_converter import Converter
-from agents.models.chatcmpl_stream_handler import ChatCmplStreamHandler
-from agents.models.default_models import get_default_model
-from agents.models.fake_id import FAKE_RESPONSES_ID
-from agents.tool import Tool
-from agents.tracing import generation_span
-from agents.usage import _make_input_tokens_details
-from agents.util._error_tracing import model_span_errors
-from anthropic import AsyncAnthropic
-from openai import AsyncOpenAI, omit
-from openai.types.chat import ChatCompletionMessage, ChatCompletionMessageFunctionToolCall
-from openai.types.chat.chat_completion_chunk import (
-    ChatCompletionChunk,
-    Choice,
-    ChoiceDelta,
-    ChoiceDeltaToolCall,
-    ChoiceDeltaToolCallFunction,
-)
-from openai.types.chat.chat_completion_message_function_tool_call import Function
-from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCallUnion
-from openai.types.completion_usage import CompletionUsage
-from openai.types.responses import Response
-from openai.types.responses.response_prompt_param import ResponsePromptParam
-from openai.types.responses.response_usage import OutputTokensDetails
+from runa.exceptions import ModelBehaviorError, UserError
+
+_DEFAULT_MODEL = "gpt-5.4-nano"
+_CHAT_COMPLETIONS_PATH = "chat/completions"
+
+
+class Model(Protocol):
+    """What `_runner.py` needs from a model backend: a non-streaming and a streaming call.
+
+    `tools`/`handoffs` are read structurally (see module docstring); `output_schema` is `None` or
+    `str` for plain-text output, or any other type to ask the backend for JSON output.
+    """
+
+    async def get_response(
+        self,
+        system_instructions: str | None,
+        input: list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Any],
+        output_schema: type | None,
+        handoffs: list[Any],
+    ) -> ModelResponse:
+        """Send one turn to the model and return its full response."""
+        ...
+
+    def stream_response(
+        self,
+        system_instructions: str | None,
+        input: list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Any],
+        output_schema: type | None,
+        handoffs: list[Any],
+    ) -> AsyncIterator[StreamDelta]:
+        """Send one turn to the model and yield incremental `StreamDelta`s as it responds."""
+        ...
+
+
+@dataclass
+class StreamDelta:
+    """One incremental fragment of a streamed model response.
+
+    Only the fields relevant to a given fragment are set. `_runner.py` accumulates a stream of
+    these into a final message: `text` fragments concatenate; a tool-call fragment is keyed by
+    `tool_call_index`, with `id`/`name` set once (when the call starts) and `arguments` arriving
+    in pieces to be concatenated; `usage` is set once, on whichever fragment carries it (a
+    provider's final chunk, in practice).
+    """
+
+    text: str | None = None
+    tool_call_index: int | None = None
+    tool_call_id: str | None = None
+    tool_call_name: str | None = None
+    tool_call_arguments: str | None = None
+    usage: Usage | None = None
+
+
+def _tool_dict(tool: Any) -> dict[str, Any]:
+    """Convert a Runa `FunctionTool`-shaped object to a chat-completions tool definition."""
+    return {
+        "type": "function",
+        "function": {
+            "name": tool.name,
+            "description": tool.description or "",
+            "parameters": tool.params_json_schema or {"type": "object", "properties": {}},
+        },
+    }
+
+
+def _handoff_dict(handoff: Any) -> dict[str, Any]:
+    """Convert a Runa `Handoff`-shaped object to a chat-completions tool definition.
+
+    A handoff takes no structured input from the model — calling it is itself the signal to
+    switch agents — so its schema is always an empty object.
+    """
+    return {
+        "type": "function",
+        "function": {
+            "name": handoff.tool_name,
+            "description": handoff.tool_description or "",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    }
 
 
 @dataclass(frozen=True)
 class _Backend:
-    """One OpenAI-compatible provider: where it lives and which env var holds its key."""
+    """One chat-completions-shaped provider: where it lives and which env var holds its key."""
 
     prefix: str
-    base_url: str | None
+    base_url: str
     api_key_env: str
 
 
-_OPENAI = _Backend("gpt", None, "OPENAI_API_KEY")
+_OPENAI = _Backend("gpt", "https://api.openai.com/v1/", "OPENAI_API_KEY")
 _BACKENDS: tuple[_Backend, ...] = (
     _Backend(
         "gemini", "https://generativelanguage.googleapis.com/v1beta/openai/", "GEMINI_API_KEY"
     ),
-    _Backend("llama", "https://api.llama.com/compat/v1", "LLAMA_API_KEY"),
-    _Backend("deepseek", "https://api.deepseek.com/v1", "DEEPSEEK_API_KEY"),
-    _Backend("qwen", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "DASHSCOPE_API_KEY"),
+    _Backend("llama", "https://api.llama.com/compat/v1/", "LLAMA_API_KEY"),
+    _Backend("deepseek", "https://api.deepseek.com/v1/", "DEEPSEEK_API_KEY"),
+    _Backend(
+        "qwen", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/", "DASHSCOPE_API_KEY"
+    ),
 )
 
 
-class ModelProvider(BaseModelProvider):
-    """Routes a model name to one of six providers by its prefix.
+class ModelProvider:
+    """Routes a model name to one of two backends by its prefix.
 
-    A name starting with `claude` goes through `AnthropicModel`; `gemini`/`llama`/`deepseek`/`qwen`
-    go through their own OpenAI-compatible endpoint; anything else (`gpt-*`, `o*`, a bare or
-    fine-tuned name) defaults to OpenAI directly, same as an unprefixed name always has.
+    A name starting with `claude` goes through `AnthropicModel`; everything else (`gpt-*`,
+    `gemini-*`, `llama-*`, `deepseek-*`, `qwen-*`, or an unrecognized/bare name) goes through
+    `OpenAICompatibleModel` against that provider's own chat-completions endpoint.
     """
 
     def __init__(self) -> None:
-        self._openai_clients: dict[str, AsyncOpenAI] = {}
+        """Start with no clients; each is created lazily, on first use, and then reused."""
+        self._http_clients: dict[str, httpx.AsyncClient] = {}
         self._anthropic_client: AsyncAnthropic | None = None
 
     def get_model(self, model_name: str | None) -> Model:
-        name = model_name or get_default_model()
+        """Return the `Model` for `model_name` (or Runa's own default, if `None`)."""
+        name = model_name or _DEFAULT_MODEL
         lower = name.lower()
 
         if lower.startswith("claude"):
             return AnthropicModel(name, self._get_anthropic_client())
 
         backend = next((b for b in _BACKENDS if lower.startswith(b.prefix)), _OPENAI)
-        return OpenAIChatCompletionsModel(
-            model=name, openai_client=self._get_openai_client(backend)
-        )
+        return OpenAICompatibleModel(name, self._get_http_client(backend))
 
-    def _get_openai_client(self, backend: _Backend) -> AsyncOpenAI:
-        client = self._openai_clients.get(backend.prefix)
+    def _get_http_client(self, backend: _Backend) -> httpx.AsyncClient:
+        client = self._http_clients.get(backend.prefix)
         if client is not None:
             return client
         api_key = os.environ.get(backend.api_key_env)
-        if api_key is None and backend.base_url is not None:
+        if api_key is None:
             raise UserError(
                 f"{backend.api_key_env} is not set. Set it to use a {backend.prefix}-* model."
             )
-        client = AsyncOpenAI(api_key=api_key, base_url=backend.base_url)
-        self._openai_clients[backend.prefix] = client
+        client = httpx.AsyncClient(
+            base_url=backend.base_url,
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=600.0,
+        )
+        self._http_clients[backend.prefix] = client
         return client
 
     def _get_anthropic_client(self) -> AsyncAnthropic:
@@ -121,179 +188,161 @@ class ModelProvider(BaseModelProvider):
         return self._anthropic_client
 
 
-class AnthropicModel(Model):
-    """Talks to Claude directly through the `anthropic` SDK's Messages API."""
+def _openai_tool_choice(tool_choice: ToolChoice) -> Any:
+    """Map Runa's `ToolChoice` to the chat-completions `tool_choice` shape.
 
-    def __init__(self, model: str, client: AsyncAnthropic) -> None:
+    `"auto"`/`"required"`/`"none"`/`None` pass straight through; any other string is a specific
+    tool name, which the wire format wants wrapped in `{"type": "function", "function": {...}}`.
+    """
+    if tool_choice is None or tool_choice in ("auto", "required", "none"):
+        return tool_choice
+    return {"type": "function", "function": {"name": tool_choice}}
+
+
+def _usage_from_openai(usage: dict[str, Any]) -> Usage:
+    """Build a `Usage` from a chat-completions response's `usage` object."""
+    prompt_details = usage.get("prompt_tokens_details") or {}
+    completion_details = usage.get("completion_tokens_details") or {}
+    return Usage(
+        requests=1,
+        input_tokens=usage.get("prompt_tokens", 0),
+        output_tokens=usage.get("completion_tokens", 0),
+        total_tokens=usage.get("total_tokens", 0),
+        input_tokens_details=InputTokensDetails(
+            cached_tokens=prompt_details.get("cached_tokens", 0)
+        ),
+        output_tokens_details=OutputTokensDetails(
+            reasoning_tokens=completion_details.get("reasoning_tokens", 0)
+        ),
+    )
+
+
+def _raise_for_status(status_code: int, body: str) -> None:
+    """Raise `ModelBehaviorError` for a failed request; `body` is capped for legibility."""
+    if status_code < 400:
+        return
+    raise ModelBehaviorError(f"model request failed with {status_code}: {body[:2000]}")
+
+
+def _openai_deltas(chunk: dict[str, Any]) -> Iterator[StreamDelta]:
+    """Turn one chat-completions streaming chunk into zero or more `StreamDelta`s."""
+    usage = chunk.get("usage")
+    if usage:
+        yield StreamDelta(usage=_usage_from_openai(usage))
+    choices = chunk.get("choices") or []
+    if not choices:
+        return
+    delta = choices[0].get("delta") or {}
+    if delta.get("content"):
+        yield StreamDelta(text=delta["content"])
+    for call in delta.get("tool_calls") or []:
+        function = call.get("function") or {}
+        yield StreamDelta(
+            tool_call_index=call["index"],
+            tool_call_id=call.get("id"),
+            tool_call_name=function.get("name"),
+            tool_call_arguments=function.get("arguments"),
+        )
+
+
+class OpenAICompatibleModel:
+    """Talks to any chat-completions-shaped provider directly over HTTP, via `httpx2`."""
+
+    def __init__(self, model: str, client: httpx.AsyncClient) -> None:
+        """Store the model name and the shared, provider-scoped HTTP client to call it through."""
         self.model = model
         self._client = client
-
-    async def get_response(
-        self,
-        system_instructions: str | None,
-        input: str | list[TResponseInputItem],
-        model_settings: ModelSettings,
-        tools: list[Tool],
-        output_schema: Any | None,
-        handoffs: list[Handoff],
-        tracing: ModelTracing,
-        *,
-        previous_response_id: str | None = None,
-        conversation_id: str | None = None,
-        prompt: ResponsePromptParam | None = None,
-    ) -> ModelResponse:
-        _check_plain_text_output(output_schema)
-        with (
-            generation_span(
-                model=self.model,
-                model_config=model_config_for_trace(
-                    model_settings, extra_config={"model_impl": "anthropic"}
-                ),
-                disabled=tracing.is_disabled(),
-            ) as span,
-            model_span_errors(
-                span,
-                message="Error getting response",
-                trace_include_sensitive_data=tracing.include_data(),
-            ),
-        ):
-            request = self._request(system_instructions, input, model_settings, tools, handoffs)
-            message = await self._client.messages.create(**request)
-
-            chat_message = _to_chat_completion_message(message)
-            usage = _to_usage(message.usage)
-
-            if tracing.include_data():
-                span.span_data.output = [chat_message.model_dump()]
-            span.span_data.usage = {
-                "requests": usage.requests,
-                "input_tokens": usage.input_tokens,
-                "output_tokens": usage.output_tokens,
-                "total_tokens": usage.total_tokens,
-                "input_tokens_details": usage.input_tokens_details.model_dump(),
-                "output_tokens_details": usage.output_tokens_details.model_dump(),
-            }
-
-            items = Converter.message_to_output_items(
-                chat_message, provider_data={"model": self.model, "response_id": message.id}
-            )
-            return ModelResponse(output=items, usage=usage, response_id=None)
-
-    async def stream_response(
-        self,
-        system_instructions: str | None,
-        input: str | list[TResponseInputItem],
-        model_settings: ModelSettings,
-        tools: list[Tool],
-        output_schema: Any | None,
-        handoffs: list[Handoff],
-        tracing: ModelTracing,
-        *,
-        previous_response_id: str | None = None,
-        conversation_id: str | None = None,
-        prompt: ResponsePromptParam | None = None,
-    ) -> AsyncIterator[TResponseStreamEvent]:
-        _check_plain_text_output(output_schema)
-        with (
-            generation_span(
-                model=self.model,
-                model_config=model_config_for_trace(
-                    model_settings, extra_config={"model_impl": "anthropic"}
-                ),
-                disabled=tracing.is_disabled(),
-            ) as span,
-            model_span_errors(
-                span,
-                message="Error streaming response",
-                trace_include_sensitive_data=tracing.include_data(),
-            ),
-        ):
-            request = self._request(system_instructions, input, model_settings, tools, handoffs)
-            raw_stream = await self._client.messages.create(stream=True, **request)
-            chunks = _chunks_from_anthropic_stream(raw_stream, self.model)
-
-            skeleton = Response(
-                id=FAKE_RESPONSES_ID,
-                created_at=time.time(),
-                model=self.model,
-                object="response",
-                output=[],
-                tool_choice="auto",
-                top_p=model_settings.top_p,
-                temperature=model_settings.temperature,
-                tools=[],
-                parallel_tool_calls=bool(request.get("tools")),
-                reasoning=model_settings.reasoning,
-            )
-
-            final_response: Response | None = None
-            async for event in ChatCmplStreamHandler.handle_stream(
-                skeleton, cast(Any, chunks), model=self.model
-            ):
-                if event.type == "response.completed":
-                    final_response = event.response
-                yield event
-
-            if final_response is not None:
-                if tracing.include_data():
-                    span.span_data.output = [final_response.model_dump()]
-                stream_usage = final_response.usage
-                if stream_usage is not None:
-                    input_details = stream_usage.input_tokens_details
-                    span.span_data.usage = {
-                        "requests": 1,
-                        "input_tokens": stream_usage.input_tokens,
-                        "output_tokens": stream_usage.output_tokens,
-                        "total_tokens": stream_usage.total_tokens,
-                        "input_tokens_details": input_details.model_dump()
-                        if input_details is not None
-                        else {"cached_tokens": 0, "cache_write_tokens": 0},
-                        "output_tokens_details": {"reasoning_tokens": 0},
-                    }
 
     def _request(
         self,
         system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        input: list[TResponseInputItem],
         model_settings: ModelSettings,
-        tools: list[Tool],
-        handoffs: list[Handoff],
+        tools: list[Any],
+        output_schema: type | None,
+        handoffs: list[Any],
     ) -> dict[str, Any]:
-        converted = Converter.items_to_messages(input, model=self.model)
+        messages = list(input)
         if system_instructions:
-            converted.insert(0, {"role": "system", "content": system_instructions})
-        system, messages = _to_anthropic_messages(converted)
+            messages = [{"role": "system", "content": system_instructions}, *messages]
 
-        converted_tools = [Converter.tool_to_openai(t) for t in tools]
-        converted_tools += [Converter.convert_handoff_tool(h) for h in handoffs]
-
-        request: dict[str, Any] = {
-            "model": self.model,
-            "messages": messages,
-            "max_tokens": model_settings.max_tokens or 4096,
-        }
-        if system:
-            request["system"] = system
-        if converted_tools:
-            request["tools"] = [_to_anthropic_tool(t) for t in converted_tools]
-        tool_choice = _to_anthropic_tool_choice(
-            Converter.convert_tool_choice(model_settings.tool_choice)
-        )
-        if tool_choice:
-            request["tool_choice"] = tool_choice
+        request: dict[str, Any] = {"model": self.model, "messages": messages}
+        wire_tools = [_tool_dict(t) for t in tools] + [_handoff_dict(h) for h in handoffs]
+        if wire_tools:
+            request["tools"] = wire_tools
+        if model_settings.tool_choice is not None:
+            request["tool_choice"] = _openai_tool_choice(model_settings.tool_choice)
+        if model_settings.parallel_tool_calls is not None:
+            request["parallel_tool_calls"] = model_settings.parallel_tool_calls
         if model_settings.temperature is not None:
             request["temperature"] = model_settings.temperature
         if model_settings.top_p is not None:
             request["top_p"] = model_settings.top_p
+        if model_settings.max_tokens is not None:
+            request["max_tokens"] = model_settings.max_tokens
+        if output_schema is not None and output_schema is not str:
+            request["response_format"] = {"type": "json_object"}
         return request
 
+    async def get_response(
+        self,
+        system_instructions: str | None,
+        input: list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Any],
+        output_schema: type | None,
+        handoffs: list[Any],
+    ) -> ModelResponse:
+        """Send one turn to the model and return its full response."""
+        request = self._request(
+            system_instructions, input, model_settings, tools, output_schema, handoffs
+        )
+        response = await self._client.post(_CHAT_COMPLETIONS_PATH, json=request)
+        _raise_for_status(response.status_code, response.text)
+        data = response.json()
+        choice = data["choices"][0]["message"]
+        message: dict[str, Any] = {
+            "role": "assistant",
+            "content": choice.get("content"),
+            "tool_calls": choice.get("tool_calls") or None,
+        }
+        usage = _usage_from_openai(data.get("usage") or {})
+        return ModelResponse(output=[message], usage=usage, response_id=data.get("id"))
 
-def _check_plain_text_output(output_schema: Any | None) -> None:
-    """Reject structured output schemas: `AnthropicModel` doesn't translate `response_format`."""
-    if output_schema is not None and not output_schema.is_plain_text():
+    async def stream_response(
+        self,
+        system_instructions: str | None,
+        input: list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Any],
+        output_schema: type | None,
+        handoffs: list[Any],
+    ) -> AsyncIterator[StreamDelta]:
+        """Send one turn to the model and yield incremental `StreamDelta`s as it responds."""
+        request = {
+            **self._request(
+                system_instructions, input, model_settings, tools, output_schema, handoffs
+            ),
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
+        async with self._client.stream("POST", _CHAT_COMPLETIONS_PATH, json=request) as response:
+            if response.status_code >= 400:
+                body = await response.aread()
+                _raise_for_status(response.status_code, body.decode("utf-8", errors="replace"))
+            async for sse in httpx.EventSource(response):
+                if sse.data == "[DONE]":
+                    continue
+                for delta in _openai_deltas(cast(dict[str, Any], sse.json())):
+                    yield delta
+
+
+def _check_plain_text_output(output_schema: type | None) -> None:
+    """Reject structured output: `AnthropicModel` doesn't translate JSON response formats."""
+    if output_schema is not None and output_schema is not str:
         raise UserError(
             "AnthropicModel does not support structured output schemas; use a plain-text "
-            "output type (the default) for Claude models."
+            "output type (the default, or `str`) for Claude models."
         )
 
 
@@ -367,7 +416,7 @@ def _to_anthropic_turn(message: Any) -> tuple[str, list[dict[str, Any]]]:
     return "user", [{"type": "text", "text": _text_content(message.get("content"))}]
 
 
-def _to_anthropic_tool(tool: Any) -> dict[str, Any]:
+def _to_anthropic_tool(tool: dict[str, Any]) -> dict[str, Any]:
     function = tool["function"]
     return {
         "name": function["name"],
@@ -376,46 +425,17 @@ def _to_anthropic_tool(tool: Any) -> dict[str, Any]:
     }
 
 
-def _to_anthropic_tool_choice(converted: Any) -> dict[str, Any] | None:
-    """Map `Converter.convert_tool_choice`'s chat-completions-shaped result to Anthropic's."""
-    if converted is omit or converted is None:
+def _to_anthropic_tool_choice(tool_choice: ToolChoice) -> dict[str, Any] | None:
+    """Map Runa's `ToolChoice` to Anthropic's `tool_choice` shape."""
+    if tool_choice is None:
         return None
-    if converted == "auto":
+    if tool_choice == "auto":
         return {"type": "auto"}
-    if converted == "required":
+    if tool_choice == "required":
         return {"type": "any"}
-    if converted == "none":
+    if tool_choice == "none":
         return {"type": "none"}
-    if isinstance(converted, dict):
-        return {"type": "tool", "name": converted["function"]["name"]}
-    return None
-
-
-def _to_chat_completion_message(message: Any) -> ChatCompletionMessage:
-    text_parts: list[str] = []
-    tool_calls: list[ChatCompletionMessageToolCallUnion] = []
-    for block in message.content:
-        if block.type == "text":
-            text_parts.append(block.text)
-        elif block.type == "tool_use":
-            tool_calls.append(
-                ChatCompletionMessageFunctionToolCall(
-                    id=block.id,
-                    type="function",
-                    function=Function(name=block.name, arguments=json.dumps(block.input)),
-                )
-            )
-    refusal = (
-        "Response withheld by the provider's content filter."
-        if message.stop_reason == "refusal"
-        else None
-    )
-    return ChatCompletionMessage(
-        role="assistant",
-        content="".join(text_parts) or None,
-        tool_calls=tool_calls or None,
-        refusal=refusal,
-    )
+    return {"type": "tool", "name": tool_choice}
 
 
 def _to_usage(usage: Any) -> Usage:
@@ -424,83 +444,144 @@ def _to_usage(usage: Any) -> Usage:
         input_tokens=usage.input_tokens,
         output_tokens=usage.output_tokens,
         total_tokens=usage.input_tokens + usage.output_tokens,
-        input_tokens_details=_make_input_tokens_details(
-            cached_tokens=usage.cache_read_input_tokens,
-            cache_write_tokens=usage.cache_creation_input_tokens,
+        input_tokens_details=InputTokensDetails(
+            cached_tokens=usage.cache_read_input_tokens or 0,
+            cache_write_tokens=usage.cache_creation_input_tokens or 0,
         ),
         output_tokens_details=OutputTokensDetails(reasoning_tokens=0),
     )
 
 
-async def _chunks_from_anthropic_stream(
-    stream: AsyncIterator[Any], model: str
-) -> AsyncIterator[ChatCompletionChunk]:
-    """Turn Anthropic's raw SSE events into `ChatCompletionChunk`s `ChatCmplStreamHandler` expects.
+class AnthropicModel:
+    """Talks to Claude directly through the `anthropic` SDK's Messages API."""
 
-    Only the deltas the handler actually reads are synthesized (text, tool-call id/name/arguments
-    fragments, and a trailing usage-only chunk); finish_reason is left unset since the handler
-    finalizes a turn when this generator ends, not from any particular chunk.
-    """
-    chunk_id = FAKE_RESPONSES_ID
-    created = int(time.time())
-    tool_call_index: dict[int, int] = {}
+    def __init__(self, model: str, client: AsyncAnthropic) -> None:
+        """Store the model name and the shared Anthropic client to call it through."""
+        self.model = model
+        self._client = client
+
+    def _request(
+        self,
+        system_instructions: str | None,
+        input: list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Any],
+        handoffs: list[Any],
+    ) -> dict[str, Any]:
+        messages = list(input)
+        if system_instructions:
+            messages = [{"role": "system", "content": system_instructions}, *messages]
+        system, turns = _to_anthropic_messages(messages)
+
+        wire_tools = [_tool_dict(t) for t in tools] + [_handoff_dict(h) for h in handoffs]
+
+        request: dict[str, Any] = {
+            "model": self.model,
+            "messages": turns,
+            "max_tokens": model_settings.max_tokens or 4096,
+        }
+        if system:
+            request["system"] = system
+        if wire_tools:
+            request["tools"] = [_to_anthropic_tool(t) for t in wire_tools]
+        tool_choice = _to_anthropic_tool_choice(model_settings.tool_choice)
+        if tool_choice:
+            request["tool_choice"] = tool_choice
+        if model_settings.temperature is not None:
+            request["temperature"] = model_settings.temperature
+        if model_settings.top_p is not None:
+            request["top_p"] = model_settings.top_p
+        return request
+
+    async def get_response(
+        self,
+        system_instructions: str | None,
+        input: list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Any],
+        output_schema: type | None,
+        handoffs: list[Any],
+    ) -> ModelResponse:
+        """Send one turn to the model and return its full response."""
+        _check_plain_text_output(output_schema)
+        request = self._request(system_instructions, input, model_settings, tools, handoffs)
+        response = await self._client.messages.create(**request)
+
+        message: dict[str, Any] = _to_chat_message(response)
+        usage = _to_usage(response.usage)
+        return ModelResponse(output=[message], usage=usage, response_id=response.id)
+
+    async def stream_response(
+        self,
+        system_instructions: str | None,
+        input: list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Any],
+        output_schema: type | None,
+        handoffs: list[Any],
+    ) -> AsyncIterator[StreamDelta]:
+        """Send one turn to the model and yield incremental `StreamDelta`s as it responds."""
+        _check_plain_text_output(output_schema)
+        request = self._request(system_instructions, input, model_settings, tools, handoffs)
+        raw_stream = await self._client.messages.create(stream=True, **request)
+        async for delta in _anthropic_deltas(raw_stream):
+            yield delta
+
+
+def _to_chat_message(message: Any) -> dict[str, Any]:
+    """Convert an Anthropic `Message` into a chat-completions-shaped assistant message dict."""
+    text_parts: list[str] = []
+    tool_calls: list[dict[str, Any]] = []
+    for block in message.content:
+        if block.type == "text":
+            text_parts.append(block.text)
+        elif block.type == "tool_use":
+            tool_calls.append(
+                {
+                    "id": block.id,
+                    "type": "function",
+                    "function": {"name": block.name, "arguments": json.dumps(block.input)},
+                }
+            )
+    return {
+        "role": "assistant",
+        "content": "".join(text_parts) or None,
+        "tool_calls": tool_calls or None,
+    }
+
+
+async def _anthropic_deltas(stream: AsyncIterator[Any]) -> AsyncIterator[StreamDelta]:
+    """Turn Anthropic's raw SSE events into `StreamDelta`s."""
     input_tokens = 0
-
-    def chunk(delta: ChoiceDelta, usage: CompletionUsage | None = None) -> ChatCompletionChunk:
-        return ChatCompletionChunk(
-            id=chunk_id,
-            choices=[Choice(index=0, delta=delta, finish_reason=None)],
-            created=created,
-            model=model,
-            object="chat.completion.chunk",
-            usage=usage,
-        )
-
     async for event in stream:
         if event.type == "message_start":
             input_tokens = event.message.usage.input_tokens
         elif event.type == "content_block_start" and event.content_block.type == "tool_use":
             block = event.content_block
-            tool_call_index[event.index] = len(tool_call_index)
-            yield chunk(
-                ChoiceDelta(
-                    tool_calls=[
-                        ChoiceDeltaToolCall(
-                            index=tool_call_index[event.index],
-                            id=block.id,
-                            type="function",
-                            function=ChoiceDeltaToolCallFunction(name=block.name, arguments=""),
-                        )
-                    ]
-                )
+            yield StreamDelta(
+                tool_call_index=event.index,
+                tool_call_id=block.id,
+                tool_call_name=block.name,
+                tool_call_arguments="",
             )
         elif event.type == "content_block_delta":
             delta = event.delta
             if delta.type == "text_delta":
-                yield chunk(ChoiceDelta(content=delta.text))
+                yield StreamDelta(text=delta.text)
             elif delta.type == "input_json_delta":
-                raw_index = event.index
-                # Not `.get(raw_index, raw_index)`: pyright can't tell that overload apart from
-                # the one-arg form here (both operands come through as `Any`), and infers
-                # `int | None`.
-                index = tool_call_index[raw_index] if raw_index in tool_call_index else raw_index  # noqa: SIM401
-                yield chunk(
-                    ChoiceDelta(
-                        tool_calls=[
-                            ChoiceDeltaToolCall(
-                                index=index,
-                                function=ChoiceDeltaToolCallFunction(arguments=delta.partial_json),
-                            )
-                        ]
-                    )
+                yield StreamDelta(
+                    tool_call_index=event.index, tool_call_arguments=delta.partial_json
                 )
         elif event.type == "message_delta" and event.usage is not None:
             output_tokens = event.usage.output_tokens or 0
-            yield chunk(
-                ChoiceDelta(),
-                usage=CompletionUsage(
-                    prompt_tokens=input_tokens,
-                    completion_tokens=output_tokens,
+            yield StreamDelta(
+                usage=Usage(
+                    requests=1,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
                     total_tokens=input_tokens + output_tokens,
-                ),
+                )
             )
+
+
+__all__ = ["AnthropicModel", "Model", "ModelProvider", "OpenAICompatibleModel", "StreamDelta"]

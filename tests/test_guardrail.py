@@ -5,9 +5,9 @@ from collections.abc import Awaitable
 from typing import Any, cast
 
 import pytest
-from agents import GuardrailFunctionOutput, InputGuardrail, OutputGuardrail
 
 from runa import Agent, guardrail
+from runa.guardrail import GuardrailFunctionOutput, InputGuardrail, OutputGuardrail
 
 _CTX = cast(Any, None)
 _AGENT = cast(Any, None)

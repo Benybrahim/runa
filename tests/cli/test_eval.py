@@ -49,10 +49,15 @@ def test_run_project_evals_evaluates_every_declared_dataset(
     async def fake_run(agent: Any, input: Any, **kwargs: Any) -> Any:
         from dataclasses import dataclass, field
 
+        from runa.tracing import Trace
+
         @dataclass
         class _FakeResult:
             final_output: Any = input
             new_items: list[Any] = field(default_factory=list)
+            trace: Trace = field(
+                default_factory=lambda: Trace(id="t", name="t", start_time=0.0, spans=[])
+            )
 
         return _FakeResult()
 

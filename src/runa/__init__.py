@@ -1,6 +1,6 @@
 """Runa: an opinionated framework for agentic AI."""
 
-from runa.agent import Agent, websocket_session
+from runa.agent import Agent
 from runa.approval import approval
 from runa.eval import (
     DEFAULT_THRESHOLDS,
@@ -46,5 +46,4 @@ __all__ = [
     "guardrail",
     "observe",
     "tool",
-    "websocket_session",
 ]

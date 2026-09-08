@@ -4,7 +4,7 @@ import inspect
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from agents import RunContextWrapper
+from runa._types import RunContextWrapper
 
 _NeedsApproval = Callable[[RunContextWrapper[Any], dict[str, Any], str], Awaitable[bool]]
 

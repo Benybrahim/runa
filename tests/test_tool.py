@@ -5,14 +5,10 @@ from collections.abc import Awaitable
 from typing import Any, cast
 
 import pytest
-from agents import (
-    FunctionTool,
-    ToolGuardrailFunctionOutput,
-    ToolInputGuardrail,
-    ToolOutputGuardrail,
-)
 
 from runa import guardrail, tool
+from runa.guardrail import ToolGuardrailFunctionOutput, ToolInputGuardrail, ToolOutputGuardrail
+from runa.tool import FunctionTool
 
 
 def _run(
