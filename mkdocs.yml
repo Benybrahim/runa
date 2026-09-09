@@ -2,7 +2,7 @@ site_name: Runa
 site_url: https://benybrahim.github.io/runa/
 
 theme:
-  name: material
+  name: mkdocs
 
 nav:
   - Home: index.md

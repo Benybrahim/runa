@@ -14,6 +14,11 @@ Runa is an opinionated Python framework for agentic AI.
   `llama-*`, `deepseek-*`, `qwen-*`, the model name picks the provider.
 - **Persistence with zero setup.** `SQLiteSession` remembers a
   conversation across processes; `runa chat` uses it automatically.
+- **Memory that writes itself.** retrieves and stores
+  durable, user-scoped facts across conversations with no manual calls.
+- **MCP servers: exposes an MCP server's tools to the model indistinguishably from `@tool`.**
+- **Approval for the calls that matter.** `needs_approval` pauses a tool
+  call for a human to sign off, without turning it into a guardrail.
 - **Tracing you never asked for.** Every run is a span tree in `runa.db`,
   inspectable with `runa traces` or, visually, `runa ui`.
 - **Tests and evals as first-class citizens.** `runa test` for plain
@@ -54,6 +59,7 @@ Runa is an opinionated Python framework for agentic AI.
 
 
 5. Follow the guides to keep building your application. You may find the following resources handy:
+   * [Runa Docs](docs/index.md)
    * [Getting Started with Runa](docs/getting_started.md)
    * [Runa Guides](docs/guides.md)
    * [CLI Reference](docs/cli.md)
