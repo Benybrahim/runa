@@ -12,8 +12,8 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-from runa._sqlite import DEFAULT_DB_PATH
-from runa._sqlite import connect as _connect_db
+from runa.db.sqlite import DEFAULT_DB_PATH
+from runa.db.sqlite import connect as _connect_db
 from runa.eval.report import Report
 
 _RUNS_TABLE = "eval_runs"

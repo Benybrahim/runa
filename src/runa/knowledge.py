@@ -2,7 +2,7 @@
 
 Layered like `memory.py`: `Knowledge` (discovers/chunks/embeds text, hides vectors) over a
 `KnowledgeStore` (persists/searches vectors) -- `SQLiteKnowledgeStore` is the default, sharing the
-same connect-and-create-if-missing `db/runa.db` file `SQLiteSession`/`Memory` use (`_sqlite.py`).
+same connect-and-create-if-missing `db/runa.db` file `SQLiteSession`/`Memory` use (`db/sqlite.py`).
 Unlike `Memory`, `Knowledge` is application-scoped, not `user_id`-scoped, and its source of truth
 is a directory of files on disk (`app/knowledge/` by default), not calls to `remember`.
 
@@ -22,9 +22,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from runa._sqlite import DEFAULT_DB_PATH
-from runa._sqlite import connect as _connect_db
-from runa._sqlite import pack_vector as _pack
+from runa.db.sqlite import DEFAULT_DB_PATH
+from runa.db.sqlite import connect as _connect_db
+from runa.db.sqlite import pack_vector as _pack
 from runa.embeddings import DEFAULT_EMBEDDING_MODEL, embed, resolve_dimensions
 from runa.tool import FunctionTool, tool
 

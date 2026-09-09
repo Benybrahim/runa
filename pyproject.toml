@@ -15,6 +15,10 @@ dependencies = [
     "sqlite-vec>=0.1.9",
 ]
 
+[project.optional-dependencies]
+postgres = ["asyncpg>=0.30.0", "pgvector>=0.3.6"]
+redis = ["redis>=5.2.0"]
+
 [project.scripts]
 runa = "runa.cli.main:main"
 
@@ -26,6 +30,7 @@ dev = [
     "python-dotenv>=1.2.3",
     "fastapi>=0.121.0",
     "uvicorn>=0.38.0",
+    "runa[postgres,redis]",
 ]
 
 [build-system]

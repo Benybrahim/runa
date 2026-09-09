@@ -1,0 +1,54 @@
+# Multi-worker deployment for api_postgres.py: unlike api.py's SQLite version, this app can run
+# several replicas (bump `deploy.replicas`, or copy the `app` service) since PostgresSession/
+# PostgresMemoryStore/PostgresKnowledgeStore share one Postgres database instead of each process
+# owning its own db/runa.db file.
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: examples/Dockerfile
+    # Overrides the Dockerfile's default CMD (api:app -- a `runa new` project's root-level
+    # api.py): built from this repo, where the Postgres/Redis example lives at examples/.
+    command: ["uv", "run", "uvicorn", "examples.api_postgres:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_DSN: postgresql://runa:runa@postgres:5432/runa
+      REDIS_URL: redis://redis:6379/0
+      # Whichever provider `SupportAgent.model` resolves to needs its key set in the shell
+      # `docker compose` runs in -- OPENAI_API_KEY for the default `gpt-*` model.
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: runa
+      POSTGRES_PASSWORD: runa
+      POSTGRES_DB: runa
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "runa"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:

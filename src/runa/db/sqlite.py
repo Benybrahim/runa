@@ -1,4 +1,4 @@
-"""_sqlite.py: shared connect-and-create-if-missing plumbing for `db/runa.db`.
+"""db/sqlite.py: shared connect-and-create-if-missing plumbing for `db/runa.db`.
 
 `tracing/storage.py` and `eval/storage.py` each own a different set of tables in the
 same file; this only opens the connection and applies each caller's DDL, so the file (and its

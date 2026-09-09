@@ -2,7 +2,7 @@
 
 Layered as `Memory` (embeds text, hides vectors) over `MemoryStore` (persists/searches vectors) --
 `SQLiteMemoryStore` is the default, sharing the same connect-and-create-if-missing `db/runa.db`
-file `SQLiteSession` uses (`_sqlite.py`). A `vec0` virtual table holds the embeddings, partitioned
+file `SQLiteSession` uses (`db/sqlite.py`). A `vec0` virtual table holds the embeddings, partitioned
 by `user_id` for correct per-user nearest-neighbor search; a companion table holds the text/
 metadata they came from, joined back to it by rowid.
 
@@ -22,10 +22,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from runa._sqlite import DEFAULT_DB_PATH
-from runa._sqlite import connect as _connect_db
-from runa._sqlite import pack_vector as _pack
 from runa._types import ModelSettings
+from runa.db.sqlite import DEFAULT_DB_PATH
+from runa.db.sqlite import connect as _connect_db
+from runa.db.sqlite import pack_vector as _pack
 from runa.embeddings import DEFAULT_EMBEDDING_MODEL, embed, resolve_dimensions
 from runa.tool import FunctionTool, tool
 

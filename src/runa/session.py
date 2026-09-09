@@ -14,9 +14,9 @@ from abc import ABC, abstractmethod
 from contextlib import closing
 from pathlib import Path
 
-from runa._sqlite import DEFAULT_DB_PATH
-from runa._sqlite import connect as _connect_db
 from runa._types import TResponseInputItem
+from runa.db.sqlite import DEFAULT_DB_PATH
+from runa.db.sqlite import connect as _connect_db
 
 _SESSIONS_TABLE = "agent_sessions"
 _MESSAGES_TABLE = "agent_messages"

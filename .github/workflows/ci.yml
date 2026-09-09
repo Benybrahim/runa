@@ -14,6 +14,32 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
 
+    # test_postgres.py/test_redis.py skip themselves if these aren't reachable, but CI always
+    # has them, so those suites run for real instead of just against SQLite's sqlite-vec.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: runa
+          POSTGRES_PASSWORD: runa
+          POSTGRES_DB: runa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
