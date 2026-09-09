@@ -18,9 +18,23 @@ from runa._runner._streaming import RunResultStreaming
 from runa._runner._tool_calls import _run_message_tool_calls, _TurnOutcome
 from runa._types import RunContextWrapper, TResponseInputItem
 from runa.exceptions import MaxTurnsExceeded, ModelBehaviorError, RunaError
-from runa.logging import RunHooks
+from runa.logging import RunHooks, logger
 from runa.session import SessionABC
 from runa.tracing._trace import Trace
+
+
+def _latest_user_text(items: list[TResponseInputItem]) -> str | None:
+    """The most recent plain-text user message in `items`, Memory's default search query."""
+    for item in reversed(items):
+        if item.get("role") == "user" and isinstance(item.get("content"), str):
+            return item["content"]
+    return None
+
+
+def _memory_block(matches: list[Any]) -> TResponseInputItem:
+    """A small, clearly labeled system message carrying retrieved `MemoryMatch`es."""
+    lines = "\n".join(f"- {match.text}" for match in matches)
+    return {"role": "system", "content": f"Relevant memories:\n{lines}"}
 
 
 async def _run_turns(
@@ -129,6 +143,18 @@ async def _run_async(
         items = [{"role": "user", "content": input}] if isinstance(input, str) else list(input)
         original_input = items if not isinstance(input, str) else []
 
+    memory = getattr(agent, "memory", None)
+    user_id = getattr(session, "user_id", None) if session is not None else None
+    memory_query = _latest_user_text(items)
+    if memory is not None and memory_query is not None:
+        try:
+            memory_matches = await memory.search(memory_query, user_id=user_id)
+        except Exception:
+            logger.warning("memory retrieval failed for agent %s", agent.name, exc_info=True)
+            memory_matches = []
+        if memory_matches:
+            items.insert(len(items) - 1, _memory_block(memory_matches))
+
     agent_span = _new_span(trace, None, agent.name, "agent")
     await hooks.on_agent_start(context_wrapper, agent)
     try:
@@ -190,6 +216,16 @@ async def _run_async(
     if session is not None:
         to_persist = [{"role": "user", "content": input}] if isinstance(input, str) else list(input)
         await session.add_items([*to_persist, *outcome.generated])
+
+    if memory is not None and memory_query is not None:
+        try:
+            conversation = f"User: {memory_query}\nAssistant: {outcome.final_output}"
+            resolved_model = _resolve_model(agent, run_config.model_provider)
+            await memory._remember_from_conversation(
+                conversation, user_id=user_id, model=resolved_model
+            )
+        except Exception:
+            logger.warning("memory extraction failed for agent %s", agent.name, exc_info=True)
 
     await hooks.on_agent_end(context_wrapper, outcome.current_agent, outcome.final_output)
     _export(trace)

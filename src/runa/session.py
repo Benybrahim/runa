@@ -1,7 +1,7 @@
 """session.py: `SessionABC`, and the `agent_sessions`/`agent_messages` tables inside `runa.db`.
 
 Same file, same connect-and-create-if-missing pattern as `tracing/storage.py` and
-`eval/storage/sqlite.py`. `cli/sessions.py` reads these tables directly with raw SQL.
+`eval/storage.py`. `cli/sessions.py` reads these tables directly with raw SQL.
 
 A thin synchronous wrapper: Runa is a single-process, CLI-first framework, so this skips the
 thread-local connections, WAL mode, and cross-process file locking a multi-process-safe session
@@ -38,9 +38,16 @@ CREATE INDEX IF NOT EXISTS idx_{_MESSAGES_TABLE}_session_id ON {_MESSAGES_TABLE}
 
 
 class SessionABC(ABC):
-    """What `_runner.py` needs to persist and replay conversation history across turns."""
+    """What `_runner.py` needs to persist and replay conversation history across turns.
+
+    `user_id` is optional and unrelated to history: `_runner.py` reads it (when set) to scope
+    automatic `Agent.memory` retrieval/persistence to one user, so app code doesn't have to
+    thread a `user_id` through `Memory.remember`/`.search` itself. `None` means memory that goes
+    through this session lands in its own user-less scope, not everyone's.
+    """
 
     session_id: str
+    user_id: str | None
 
     @abstractmethod
     async def get_items(self, limit: int | None = None) -> list[TResponseInputItem]:
@@ -62,10 +69,20 @@ class SessionABC(ABC):
 class SQLiteSession(SessionABC):
     """Conversation history for one `session_id`, persisted to `runa.db`."""
 
-    def __init__(self, session_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> None:
-        """Store `session_id` and where in `runa.db` its history lives."""
+    def __init__(
+        self,
+        session_id: str,
+        db_path: str | Path = DEFAULT_DB_PATH,
+        *,
+        user_id: str | None = None,
+    ) -> None:
+        """Store `session_id` and where in `runa.db` its history lives.
+
+        `user_id` scopes this session's automatic memory, if its agent has any; see `SessionABC`.
+        """
         self.session_id = session_id
         self.db_path = Path(db_path)
+        self.user_id = user_id
 
     def _connect(self) -> sqlite3.Connection:
         return _connect_db(self.db_path, _DDL)

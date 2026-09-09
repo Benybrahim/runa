@@ -1,4 +1,4 @@
-"""Tests for `runa.eval.storage.sqlite`: `save_report`."""
+"""Tests for `runa.eval.storage`: `save_report`."""
 
 import json
 import sqlite3
@@ -7,7 +7,7 @@ from pathlib import Path
 from runa.eval.case import Case
 from runa.eval.evaluation.core import EvaluationResult, Status
 from runa.eval.report import CaseReport, Report
-from runa.eval.storage.sqlite import save_report
+from runa.eval.storage import save_report
 from runa.eval.tracing.adapter import AgentRun
 
 

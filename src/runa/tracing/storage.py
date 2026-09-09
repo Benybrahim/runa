@@ -1,6 +1,6 @@
 """tracing/storage.py: the `traces`/`spans` tables inside `runa.db`.
 
-Same file, same connect-and-create-if-missing pattern as `eval/storage/sqlite.py`, so a local app
+Same file, same connect-and-create-if-missing pattern as `eval/storage.py`, so a local app
 accumulates one `runa.db` with no setup regardless of which of eval or tracing wrote to it first.
 """
 

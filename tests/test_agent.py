@@ -16,6 +16,7 @@ from runa._types import ModelResponse, RunContextWrapper, Usage
 from runa.agent import Subagent
 from runa.exceptions import MaxTurnsExceeded, RunErrorDetails
 from runa.logging import LoggingRunHooks
+from runa.memory import Memory
 from runa.tool import FunctionTool, tool
 
 
@@ -295,6 +296,86 @@ def test_explicit_kwarg_overrides_class_attribute() -> None:
     agent = Researcher(model="gpt-4.1")
 
     assert agent.model == "gpt-4.1"
+
+
+def test_memory_defaults_to_none() -> None:
+    """Without `memory=`, an agent behaves exactly as if `runa.memory` didn't exist."""
+    agent = Researcher()
+
+    assert agent.memory is None
+    assert "search_memory" not in _tool_names(agent)
+
+
+def test_memory_auto_gives_a_default_memory_instance_and_no_tool() -> None:
+    """`memory="auto"` builds a default `Memory` for the run lifecycle to use, with no tool.
+
+    Automatic retrieval/persistence is the run lifecycle's job (see `test_runner.py`), not
+    something `Agent.__init__` does.
+    """
+
+    class AutoMemory(Agent):
+        name = "AutoMemory"
+        instructions = "auto memory"
+        memory = "auto"
+
+    agent = AutoMemory()
+
+    assert isinstance(agent.memory, Memory)
+    assert "search_memory" not in _tool_names(agent)
+
+
+def test_memory_llm_adds_a_tool_and_leaves_self_memory_none() -> None:
+    """`memory="llm"` gives the model a `search_memory` tool instead of automatic retrieval."""
+
+    class LLMMemory(Agent):
+        name = "LLMMemory"
+        instructions = "llm memory"
+        memory = "llm"
+
+    agent = LLMMemory()
+
+    assert agent.memory is None
+    assert "search_memory" in _tool_names(agent)
+
+
+def test_memory_accepts_a_custom_instance_for_auto_mode() -> None:
+    """A `Memory(...)` class attribute is used as-is, same as `"auto"` but with that instance."""
+    custom = Memory(dimensions=4)
+
+    class WithMemory(Agent):
+        name = "WithMemory"
+        instructions = "has memory"
+        memory = custom
+
+    agent = WithMemory()
+
+    assert agent.memory is custom
+    assert "search_memory" not in _tool_names(agent)
+
+
+def test_memory_kwarg_also_works_as_a_constructor_argument() -> None:
+    """`Agent(..., memory="auto")` works the same as setting it as a class attribute."""
+
+    class WithMemory(Agent):
+        name = "WithMemory"
+        instructions = "has memory"
+
+    agent = WithMemory(memory="auto")
+
+    assert isinstance(agent.memory, Memory)
+
+
+def test_memory_rejects_an_unknown_string() -> None:
+    """A `memory=` string other than `"auto"`/`"llm"` fails clearly instead of misbehaving."""
+    from runa.exceptions import UserError
+
+    class BadMemory(Agent):
+        name = "BadMemory"
+        instructions = "bad memory"
+        memory = "sometimes"
+
+    with pytest.raises(UserError, match="memory"):
+        BadMemory()
 
 
 def test_history_starts_empty() -> None:

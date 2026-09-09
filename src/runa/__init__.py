@@ -14,6 +14,7 @@ from runa.eval import (
 from runa.guardrail import guardrail
 from runa.logging import AgentHooks, LoggingAgentHooks, LoggingRunHooks, RunHooks
 from runa.mcp import MCPServer, MCPServerStdio, MCPServerStreamableHttp
+from runa.memory import Memory, MemoryMatch
 from runa.run import Run
 from runa.session import SQLiteSession
 from runa.tool import tool
@@ -33,6 +34,8 @@ __all__ = [
     "MCPServer",
     "MCPServerStdio",
     "MCPServerStreamableHttp",
+    "Memory",
+    "MemoryMatch",
     "Report",
     "Run",
     "RunHooks",

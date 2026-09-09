@@ -2,7 +2,7 @@
 
 Deterministic checks, judge-model-backed semantic metrics, and SQLite
 storage are all implementation details behind `evaluate_agent()`; see
-`eval/evaluation/`, `eval/judge.py`, and `eval/storage/`.
+`eval/evaluation/`, `eval/judge.py`, and `eval/storage.py`.
 """
 
 from runa.eval.case import Case

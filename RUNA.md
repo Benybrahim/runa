@@ -1,0 +1,262 @@
+# RUNA.md
+
+How an application is meant to use each Runa primitive. Runa is
+opinionated: for every primitive below there is exactly one sanctioned
+shape, not a menu of equivalent options. Where the rule is enforced in
+code (a raised error, not just a docs recommendation), that's noted —
+breaking it isn't a style nit, it's a `TypeError` at runtime.
+
+13 primitives:
+
+1. [Agent](#1-agent) 2. [Tool](#2-tool) 3. [Guardrail](#3-guardrail)
+4. [Approval](#4-approval) 5. [Subagent](#5-subagent-handoffdelegate)
+6. [Session](#6-session) 7. [Memory](#7-memory) 8. [MCP Server](#8-mcp-server)
+9. [Model](#9-model) 10. [Hooks](#10-hooks) 11. [Test](#11-test)
+12. [Eval](#12-eval-caseDataset) 13. [Tracing](#13-tracing)
+
+## 1. Agent
+
+**Always a subclass, never instantiated directly.**
+
+```python
+class SupportAgent(Agent):
+    name = "support_agent"
+    model = "claude-sonnet-5"
+    instruction = ""
+    tools = [...]
+    guardrails = [...]
+```
+
+`instructions` is loaded by default from `app/prompts/support_agent.md`
+
+## 2. Tool
+
+**Always a plain function wrapped in `@tool`**
+
+```python
+@tool
+def get_weather(city: str) -> str:
+    """Return the current weather for a city.
+    
+    city: city name
+    """
+```
+
+## 3. Guardrail
+
+**Always a plain function wrapped in `@guardrail`**. Can be used both for agents and tools.
+
+For:
+- input: `guardrail.input` or `guardrail.i`
+- output: `guardrail.output` or `guardrail.o`
+
+```python
+@guardrail
+def block_empty(x: str) -> bool:
+    """Trip when the user sends an empty message."""
+    return not x.strip()
+
+
+# agent guardrail
+class MyAgent:
+    guardrails = [block_empty.input]
+
+
+# tool guardrail
+@tool(guardrails=[block_empty.input])
+def get_weather(city: str) -> str: ...
+```
+
+**IMPORTANT**: Guardrails are applied in list order — the first one to trip stops the rest.
+
+## 4. Human Approval
+
+Tool use can need human approval:
+```python
+@tool(needs_approval=True)
+def issue_refund(amount: float) -> str: ...
+```
+
+A function wrapped in `@approval` can also be used, to check if human approval is needed or no
+
+```python
+@approval
+def large_refund(amount: float) -> bool:
+    """Refunds of $50 or more need a human to sign off."""
+    return amount >= 50
+
+
+@tool(needs_approval=large_refund)
+def issue_refund(amount: float) -> str: ...
+```
+
+## 5. Subagent (handoff/delegate)
+
+```python
+class MyAgent:
+    subagents = [MyAgent2.handoff, MyAgent3.delegate, Agent4]
+```
+
+* `.handoff/.h`: the subagent takes over the run entirely.
+* `.delegate/.d`: the subagent does the task and returns its result to the
+  main agent, like a tool call — the main agent stays in control.
+* `None`: main agent will choose automatically to handoff or delegate
+
+
+## 6. Session
+
+**Default to no session (`agent.history`, in-memory, instance-scoped).
+Reach for `SQLiteSession` only when a conversation must survive past the
+`Agent` instance** — a new process, a different request, a resumed CLI
+chat.
+
+```python
+session = SQLiteSession("user-42")
+agent.run_sync("...", session=session)
+```
+
+With a `session`, only the new message is ever passed to `run`/`run_sync`
+— prior turns come back from `runa.db` automatically, and `agent.history`
+is left untouched. Don't mix the two: pick session-backed or
+in-memory per agent instance, not both for the same conversation.
+`SQLiteSession` is the only session implementation Runa ships; a custom
+store subclasses `SessionABC`'s four methods, nothing less.
+
+## 7. Memory
+
+**Opt in via `Agent(memory=...)`, one of `"auto"`, `"llm"`, a `Memory(...)`
+instance, or `None` (the default).**
+
+```python
+class SupportAgent(Agent):
+    name = "support_agent"
+    memory = "auto"
+```
+
+* `"auto"`: `Runner` retrieves relevant memories before each run and
+  persists new ones after — no manual `.search`/`.remember` calls.
+* `"llm"`: the model gets a `search_memory` tool and decides itself when
+  to call it; nothing is written automatically.
+* `None`: the agent behaves exactly as if `runa.memory` didn't exist.
+
+`"llm"` always uses a default `Memory()`; pass your own instance for
+`"auto"` mode if you need a non-default `db_path`/`model`/`store`.
+`Memory` is durable, semantic, `user_id`-scoped facts backed by the same
+`db/runa.db` (`sqlite-vec`) `SQLiteSession` uses — `remember`/`search`/
+`forget`, nothing lower. This is long-term memory *across* conversations;
+for one conversation's own turns, see [Session](#6-session).
+
+## 8. MCP Server
+
+**Always built as `MCPServer(...).http(...)` or `MCPServer(...).stdio(...)`,
+listed in `mcp=`/`mcp_servers=` — never `MCPServerStdio(...)`/
+`MCPServerStreamableHttp(...)` directly** unless you're the one
+implementing a third transport.
+
+```python
+files = MCPServer(name="files").stdio("npx", ["-y", "@modelcontextprotocol/server-filesystem", "."])
+search = MCPServer(name="search").http("https://example.com/mcp")
+
+mcp = [files, search]
+```
+
+An MCP server's tools are exposed to the model exactly like `@tool`
+functions — never branch application code on whether a tool came from MCP
+or from `@tool`; the framework already erases that distinction. The
+connection opens lazily and lives for the agent's whole lifetime, so
+there's no explicit `.connect()`/`.close()` for user code to call in the
+common case.
+
+## 9. Model
+
+**Always a plain string on `model`, never a constructed client.** The
+string's prefix (`claude-`, `gpt-`, `gemini-`, `llama-`, `deepseek-`,
+`qwen-`) picks the provider and its API key env var; nothing is
+configured globally.
+
+```python
+model = "claude-sonnet-5"
+```
+
+Mixing providers across agents in one app (a cheap router, a stronger
+answerer) is expected, not an edge case — `model` is per-agent by design.
+Tune sampling with `model_settings = ModelSettings(...)`, never
+provider-specific kwargs on `model` itself.
+
+## 10. Hooks
+
+**Override only the lifecycle methods you need; every other method stays
+a no-op.** Two scopes, chosen by what the callback should see, not by
+which one is "newer":
+
+* `RunHooks`, passed as `Agent.run(hooks=...)` — fires for every agent in
+  that run, including ones reached by handoff/delegate. Use this for
+  cross-cutting concerns (metrics, a single audit log for the whole run).
+* `AgentHooks`, assigned to an `Agent` subclass's `hooks` attribute —
+  fires only for that one agent. Use this for a concern that belongs to
+  one agent's identity, not the run as a whole.
+
+Don't subclass `LoggingRunHooks`/`LoggingAgentHooks` to add behavior;
+subclass `RunHooks`/`AgentHooks` directly and pass your own — the
+`Logging*` classes are the framework's default, not a base to build on.
+
+## 11. Test
+
+**A test is a bare `test_*` function using plain `assert` — no pytest, no
+custom assertion helpers.** `runa test` is its own small runner, not a
+pytest wrapper, specifically so a generated app needs no test framework
+as a dependency.
+
+```python
+def test_answers_politely():
+    run = SupportAgent().run_sync("Hi")
+    assert run.status == "completed"
+```
+
+`async def test_*` is awaited automatically — don't wrap async tests in
+`asyncio.run` yourself.
+
+## 12. Eval (Case/Dataset)
+
+**A module under `app/evaluations/` declares exactly two module-level
+names, `agent` and `dataset`** (a list of `Case`); `runa eval` imports
+every such module and calls `agent.evaluate(dataset)` on it. There's no
+other registration mechanism — a dataset that isn't a module-level
+`dataset` next to a module-level `agent` doesn't get picked up.
+
+```python
+agent = SupportAgent()
+dataset = [Case(input="Where's my order #4821?", expected="Asks for or looks up the order status")]
+```
+
+Only `Case.input` is required; add `expected`/`expected_tool`/`context`
+only for the specific grading signal each enables — don't fill in fields
+a case doesn't need "for completeness." The judge model defaults to the
+agent's own `model`; override it with `judge=` only when a cheaper/
+different model should grade instead of the agent's own.
+
+## 13. Tracing
+
+**Never configured, never opted into — every `Agent.run`/`run_sync` is
+traced automatically**, and `Run.trace` is always populated. Reach for
+manual `trace`/`span` (`runa.tracing`) only to group work that *isn't*
+itself an `Agent.run()` call (a batch job, a pre/post-processing step) —
+never to wrap an `Agent.run()` call, which already produces its own
+independent `Trace` on its own.
+
+```python
+with tracing.trace("nightly-batch") as t:
+    with tracing.span("step-1", t):
+        ...
+```
+
+Add a `TraceExporter` (`ConsoleExporter`, `SQLiteExporter`, or your own)
+to change *where* traces go; never change *whether* they're captured —
+there is no flag for that.
+
+---
+
+When a change would let a user reach the same result through a second
+shape (a new `Handoff(...)` call site, a hand-built tool schema, a
+`RunHooks` subclass that overrides `Logging*`), that's a sign to close the
+second path, not to document it alongside the first.

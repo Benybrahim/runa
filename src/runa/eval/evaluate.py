@@ -13,7 +13,7 @@ from runa.eval.evaluation.defaults import DEFAULT_THRESHOLDS
 from runa.eval.evaluation.deterministic import check_expected_tool_called, check_run_completed
 from runa.eval.evaluation.semantic import evaluate_semantic
 from runa.eval.report import CaseReport, Report
-from runa.eval.storage.sqlite import save_report
+from runa.eval.storage import save_report
 from runa.eval.tracing.adapter import run_agent_for_eval
 
 
@@ -53,7 +53,7 @@ async def evaluate_agent(
     grading needs no separate credentials. `threshold` overrides every metric's pass threshold at
     once; `thresholds` overrides just the named ones. Every case runs to completion even if an
     earlier one fails or errors, and the finished `Report` is persisted to `runa.db` before it's
-    returned (see `eval/storage/sqlite.py`).
+    returned (see `eval/storage.py`).
     """
     resolved_thresholds = _resolve_thresholds(threshold, thresholds)
     judge_model_name = _resolve_judge(judge, agent)

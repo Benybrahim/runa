@@ -26,6 +26,9 @@ Each one stands alone — read whichever covers what you're building today.
 * **[Sessions and Chat](sessions.md).**
   Persisting conversation history with `SQLiteSession`, and `runa chat`.
 
+* **[Memory](memory.md).**
+  Long-term, semantic memory that persists across conversations.
+
 * **[MCP Servers](mcp.md).**
   Connecting to external tool servers over MCP.
 

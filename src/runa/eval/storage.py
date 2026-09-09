@@ -1,4 +1,4 @@
-"""eval/storage/sqlite.py: the `eval_runs`/`eval_cases` tables inside `runa.db`.
+"""eval/storage.py: the `eval_runs`/`eval_cases` tables inside `runa.db`.
 
 Every `agent.evaluate()` call writes one row to `eval_runs` (one "experiment") and one row
 per case to `eval_cases`, in the same `runa.db` file `SQLiteSession` already uses, so a
@@ -74,3 +74,6 @@ def save_report(report: Report, *, db_path: Path = DEFAULT_DB_PATH) -> int:
         )
         conn.commit()
     return run_id
+
+
+__all__ = ["save_report"]

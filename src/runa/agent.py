@@ -10,10 +10,11 @@ from typing import TYPE_CHECKING, Any, Literal
 from runa._models import ModelProvider
 from runa._runner import RunConfig, Runner, RunState, StreamEvent
 from runa._types import ModelSettings, RunContextWrapper, TResponseInputItem, Usage
-from runa.exceptions import RunaError
+from runa.exceptions import RunaError, UserError
 from runa.guardrail import flatten_agent_guardrails
 from runa.handoff import agent_as_tool
 from runa.logging import LoggingRunHooks, RunHooks
+from runa.memory import Memory
 from runa.run import Run
 from runa.session import SessionABC
 from runa.tool import FunctionTool
@@ -33,6 +34,7 @@ _AGENT_FIELDS = (
     "mcp_servers",
     "output_type",
     "hooks",
+    "memory",
 )
 
 _MODEL_PROVIDER = ModelProvider()
@@ -163,6 +165,15 @@ class Agent:
 
         `mcp=[...]` (as a constructor kwarg, or a `mcp` class attribute) is sugar for
         `mcp_servers=[...]`; both are merged into `mcp_servers` if given together.
+
+        `memory` opts this agent into long-term memory, one of:
+          - `"auto"` (or a `Memory(...)` instance): `Runner` retrieves relevant memories before
+            each run and persists new ones after -- no manual `memory.search`/`.remember` calls.
+          - `"llm"`: the model gets a `search_memory` tool and decides itself when to call it;
+            no automatic retrieval/persistence.
+          - `None` (the default): the agent behaves exactly as if `runa.memory` didn't exist.
+        `"llm"` always uses a default `Memory()`; pass your own instance for `"auto"` mode if you
+        need a non-default `db_path`/`model`/`store`.
         """
         if type(self) is Agent:
             raise TypeError("Agent must be subclassed, e.g. `class MyAgent(Agent): name = ...`")
@@ -197,6 +208,19 @@ class Agent:
         new_input_guardrails, new_output_guardrails = flatten_agent_guardrails(
             getattr(type(self), "guardrails", [])
         )
+
+        memory_setting = kwargs.get("memory")
+        if memory_setting is None or isinstance(memory_setting, Memory):
+            self.memory = memory_setting
+        elif memory_setting == "auto":
+            self.memory = Memory()
+        elif memory_setting == "llm":
+            self.memory = None
+            tools.append(Memory()._as_tool())
+        else:
+            raise UserError(
+                f"memory must be 'auto', 'llm', a Memory(...), or None, got {memory_setting!r}"
+            )
 
         self.name: str = kwargs["name"]
         self.instructions = _adapt_instructions(kwargs.get("instructions"))

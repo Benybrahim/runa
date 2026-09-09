@@ -329,6 +329,128 @@ def test_gen_trace_id_returns_a_fresh_id_each_time() -> None:
     assert gen_trace_id() != gen_trace_id()
 
 
+class _MemoryMatchStub:
+    """Just enough of `MemoryMatch` for `_memory_block` to format it -- no `runa.memory` import."""
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
+class _FakeMemory:
+    """A duck-typed `agent.memory` stand-in: records what the runner calls it with."""
+
+    def __init__(self, matches: list[Any] | None = None) -> None:
+        self.matches = matches or []
+        self.search_calls: list[tuple[str, str | None]] = []
+        self.remembered: list[tuple[str, str | None, Any]] = []
+
+    async def search(self, query: str, *, user_id: str | None = None, k: int = 5) -> list[Any]:
+        self.search_calls.append((query, user_id))
+        return self.matches
+
+    async def _remember_from_conversation(
+        self, conversation: str, *, user_id: str | None, model: Any
+    ) -> list[str]:
+        self.remembered.append((conversation, user_id, model))
+        return []
+
+
+def test_memory_is_searched_before_the_turn_and_injected_as_a_labeled_block() -> None:
+    """`agent.memory.search` runs with the user's message, and its matches reach the model."""
+    memory = _FakeMemory(matches=[_MemoryMatchStub("User prefers Japanese.")])
+    model = _ScriptedModel([_text_response("ok")])
+    agent = _agent(model=model, memory=memory)
+
+    result = asyncio.run(Runner.run(agent, "hi", run_config=_run_config()))
+
+    assert memory.search_calls == [("hi", None)]
+    sent = [(item.get("role"), item.get("content")) for item in model.calls[0]]
+    assert ("system", "Relevant memories:\n- User prefers Japanese.") in sent
+    assert result.final_output == "ok"
+
+
+def test_memory_with_no_matches_injects_nothing() -> None:
+    """An empty `search` result leaves the model's input exactly as it would be without memory."""
+    memory = _FakeMemory(matches=[])
+    model = _ScriptedModel([_text_response("ok")])
+    agent = _agent(model=model, memory=memory)
+
+    asyncio.run(Runner.run(agent, "hi", run_config=_run_config()))
+
+    assert model.calls[0] == [{"role": "user", "content": "hi"}]
+
+
+def test_memory_extraction_runs_after_the_turn_with_the_exchange_and_resolved_model() -> None:
+    """After a run, the runner hands memory the turn's exchange and the agent's own model."""
+    memory = _FakeMemory()
+    model = _ScriptedModel([_text_response("sure, noted")])
+    agent = _agent(model=model, memory=memory)
+
+    asyncio.run(Runner.run(agent, "I prefer Japanese", run_config=_run_config()))
+
+    assert len(memory.remembered) == 1
+    conversation, user_id, resolved_model = memory.remembered[0]
+    assert "I prefer Japanese" in conversation
+    assert "sure, noted" in conversation
+    assert user_id is None
+    assert resolved_model is model
+
+
+def test_memory_user_id_is_derived_from_the_session(tmp_path: Any) -> None:
+    """`Session(user_id=...)` scopes both the retrieval and the extraction call."""
+    from runa.session import SQLiteSession
+
+    memory = _FakeMemory()
+    session = SQLiteSession("s1", db_path=tmp_path / "runa.db", user_id="u1")
+    agent = _agent(model=_ScriptedModel([_text_response("ok")]), memory=memory)
+
+    asyncio.run(Runner.run(agent, "hi", session=session, run_config=_run_config()))
+
+    assert memory.search_calls == [("hi", "u1")]
+    assert memory.remembered[0][1] == "u1"
+
+
+def test_memory_retrieval_failure_degrades_gracefully() -> None:
+    """A broken `memory.search` doesn't fail the run; the turn proceeds without memory."""
+
+    class _BoomMemory:
+        async def search(self, query: str, *, user_id: str | None = None, k: int = 5) -> list[Any]:
+            raise RuntimeError("boom")
+
+    agent = _agent(model=_ScriptedModel([_text_response("ok")]), memory=_BoomMemory())
+
+    result = asyncio.run(Runner.run(agent, "hi", run_config=_run_config()))
+
+    assert result.final_output == "ok"
+
+
+def test_memory_extraction_failure_degrades_gracefully() -> None:
+    """A broken extraction step doesn't fail the run; the final output is unaffected."""
+
+    class _BoomMemory:
+        async def search(self, query: str, *, user_id: str | None = None, k: int = 5) -> list[Any]:
+            return []
+
+        async def _remember_from_conversation(self, *args: Any, **kwargs: Any) -> list[str]:
+            raise RuntimeError("boom")
+
+    agent = _agent(model=_ScriptedModel([_text_response("ok")]), memory=_BoomMemory())
+
+    result = asyncio.run(Runner.run(agent, "hi", run_config=_run_config()))
+
+    assert result.final_output == "ok"
+
+
+def test_agent_without_memory_behaves_exactly_as_before() -> None:
+    """An agent with no `memory` attribute at all runs unaffected -- no lookup, no injection."""
+    agent = _agent(model=_ScriptedModel([_text_response("ok")]))
+    assert not hasattr(agent, "memory")
+
+    result = asyncio.run(Runner.run(agent, "hi", run_config=_run_config()))
+
+    assert result.final_output == "ok"
+
+
 def test_mcp_server_tools_are_merged_in_and_callable() -> None:
     """A tool listed by an `mcp_servers` entry is callable exactly like a `@tool` function."""
     from runa.tool import FunctionTool
