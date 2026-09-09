@@ -14,17 +14,16 @@ its `knowledge`/`_knowledge_block` handling, the same shape as its `memory` hand
 
 from __future__ import annotations
 
-import json
 import sqlite3
-import struct
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 
 from runa._sqlite import DEFAULT_DB_PATH
 from runa._sqlite import connect as _connect_db
-from runa.embeddings import DEFAULT_EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, embed
+from runa._sqlite import pack_vector as _pack
+from runa.embeddings import DEFAULT_EMBEDDING_MODEL, embed, resolve_dimensions
 from runa.tool import FunctionTool, tool
 
 _ITEMS_TABLE = "knowledge_items"
@@ -39,12 +38,11 @@ _CHUNK_OVERLAP = 200
 
 @dataclass
 class KnowledgeMatch:
-    """One `Knowledge.search` result: its id, stored text, source file, metadata, and distance."""
+    """One `Knowledge.search` result: its id, stored text, source file, and distance."""
 
     id: int
     text: str
     source: str
-    metadata: dict[str, Any] | None
     distance: float
 
 
@@ -55,9 +53,7 @@ class KnowledgeStore(Protocol):
     no inheritance required. `SQLiteKnowledgeStore` is the default.
     """
 
-    async def add(
-        self, *, text: str, source: str, embedding: list[float], metadata: dict[str, Any] | None
-    ) -> int:
+    async def add(self, *, text: str, source: str, embedding: list[float]) -> int:
         """Store one already-embedded chunk, returning its new id."""
         ...
 
@@ -76,17 +72,12 @@ def _ddl(dimensions: int) -> str:
         id INTEGER PRIMARY KEY,
         text TEXT NOT NULL,
         source TEXT NOT NULL,
-        metadata TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE VIRTUAL TABLE IF NOT EXISTS {_VECTORS_TABLE} USING vec0(
         embedding float[{dimensions}]
     );
     """
-
-
-def _pack(vector: list[float]) -> bytes:
-    return struct.pack(f"{len(vector)}f", *vector)
 
 
 class SQLiteKnowledgeStore:
@@ -100,14 +91,12 @@ class SQLiteKnowledgeStore:
     def _connect(self) -> sqlite3.Connection:
         return _connect_db(self.db_path, _ddl(self.dimensions), load_vec=True)
 
-    async def add(
-        self, *, text: str, source: str, embedding: list[float], metadata: dict[str, Any] | None
-    ) -> int:
+    async def add(self, *, text: str, source: str, embedding: list[float]) -> int:
         """Store one already-embedded chunk, returning its new id."""
         with closing(self._connect()) as conn:
             cursor = conn.execute(
-                f"INSERT INTO {_ITEMS_TABLE} (text, source, metadata) VALUES (?, ?, ?)",
-                (text, source, json.dumps(metadata) if metadata is not None else None),
+                f"INSERT INTO {_ITEMS_TABLE} (text, source) VALUES (?, ?)",
+                (text, source),
             )
             item_id = cursor.lastrowid
             assert item_id is not None
@@ -123,7 +112,7 @@ class SQLiteKnowledgeStore:
         with closing(self._connect()) as conn:
             rows = conn.execute(
                 f"""
-                SELECT items.id, items.text, items.source, items.metadata, vectors.distance
+                SELECT items.id, items.text, items.source, vectors.distance
                 FROM {_VECTORS_TABLE} AS vectors
                 JOIN {_ITEMS_TABLE} AS items ON items.id = vectors.rowid
                 WHERE vectors.embedding MATCH ? AND vectors.k = ?
@@ -132,14 +121,8 @@ class SQLiteKnowledgeStore:
                 (_pack(embedding), k),
             ).fetchall()
         return [
-            KnowledgeMatch(
-                id=item_id,
-                text=text,
-                source=source,
-                metadata=json.loads(metadata) if metadata is not None else None,
-                distance=distance,
-            )
-            for item_id, text, source, metadata, distance in rows
+            KnowledgeMatch(id=item_id, text=text, source=source, distance=distance)
+            for item_id, text, source, distance in rows
         ]
 
     async def clear(self) -> None:
@@ -209,10 +192,7 @@ class Knowledge:
         """
         self.directory = Path(directory)
         self.model = model
-        resolved_dimensions = dimensions or EMBEDDING_DIMENSIONS.get(model)
-        if resolved_dimensions is None:
-            raise ValueError(f"unknown embedding size for {model!r}; pass dimensions= explicitly")
-        self.dimensions: int = resolved_dimensions
+        self.dimensions: int = resolve_dimensions(model, dimensions)
         self._store: KnowledgeStore = store or SQLiteKnowledgeStore(
             db_path, dimensions=self.dimensions
         )
@@ -236,7 +216,7 @@ class Knowledge:
         if chunks:
             vectors = await embed([text for text, _ in chunks], model=self.model)
             for (text, source), vector in zip(chunks, vectors, strict=True):
-                await self._store.add(text=text, source=source, embedding=vector, metadata=None)
+                await self._store.add(text=text, source=source, embedding=vector)
         self._ingested = True
         return len(chunks)
 

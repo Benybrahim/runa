@@ -135,6 +135,28 @@ def _flatten_subagents(subagents: SubagentsList | SubagentsDict) -> SubagentsLis
     return flat
 
 
+def _resolve_retrieval_setting(
+    setting: Any, cls: type[Memory] | type[Knowledge], tools: list[FunctionTool]
+) -> Memory | Knowledge | None:
+    """Resolve a `memory=`/`knowledge=` setting to the instance (or `None`) `Agent` should store.
+
+    Shared by both, since they follow the identical four-shape contract documented on
+    `Agent.__init__`: `None`/an instance pass through, `"auto"` builds a default instance,
+    `"llm"` appends a search tool and leaves the attribute `None`, anything else is a `UserError`.
+    """
+    name = cls.__name__.lower()
+    if setting is None or isinstance(setting, cls):
+        return setting
+    if setting == "auto":
+        return cls()
+    if setting == "llm":
+        tools.append(cls()._as_tool())
+        return None
+    raise UserError(
+        f"{name} must be 'auto', 'llm', a {cls.__name__}(...), or None, got {setting!r}"
+    )
+
+
 class _Mode:
     """Descriptor behind `Agent.handoff`/`.delegate`; `.h`/`.d` alias the same instances.
 
@@ -219,32 +241,8 @@ class Agent:
             getattr(type(self), "guardrails", [])
         )
 
-        memory_setting = kwargs.get("memory")
-        if memory_setting is None or isinstance(memory_setting, Memory):
-            self.memory = memory_setting
-        elif memory_setting == "auto":
-            self.memory = Memory()
-        elif memory_setting == "llm":
-            self.memory = None
-            tools.append(Memory()._as_tool())
-        else:
-            raise UserError(
-                f"memory must be 'auto', 'llm', a Memory(...), or None, got {memory_setting!r}"
-            )
-
-        knowledge_setting = kwargs.get("knowledge")
-        if knowledge_setting is None or isinstance(knowledge_setting, Knowledge):
-            self.knowledge = knowledge_setting
-        elif knowledge_setting == "auto":
-            self.knowledge = Knowledge()
-        elif knowledge_setting == "llm":
-            self.knowledge = None
-            tools.append(Knowledge()._as_tool())
-        else:
-            raise UserError(
-                "knowledge must be 'auto', 'llm', a Knowledge(...), or None, got "
-                f"{knowledge_setting!r}"
-            )
+        self.memory = _resolve_retrieval_setting(kwargs.get("memory"), Memory, tools)
+        self.knowledge = _resolve_retrieval_setting(kwargs.get("knowledge"), Knowledge, tools)
 
         self.name: str = kwargs["name"]
         self.instructions = _adapt_instructions(kwargs.get("instructions"))

@@ -26,6 +26,17 @@ _EMBEDDINGS_PATH = "embeddings"
 _client: httpx.AsyncClient | None = None
 
 
+def resolve_dimensions(model: str, dimensions: int | None) -> int:
+    """`dimensions` if given, else `model`'s built-in size; raises if neither is known.
+
+    Shared by `runa.memory.Memory` and `runa.knowledge.Knowledge`'s `__init__`.
+    """
+    resolved = dimensions or EMBEDDING_DIMENSIONS.get(model)
+    if resolved is None:
+        raise ValueError(f"unknown embedding size for {model!r}; pass dimensions= explicitly")
+    return resolved
+
+
 def _get_client() -> httpx.AsyncClient:
     global _client
     if _client is None:
@@ -49,4 +60,4 @@ async def embed(texts: list[str], *, model: str = DEFAULT_EMBEDDING_MODEL) -> li
     return [item["embedding"] for item in sorted(data, key=lambda item: item["index"])]
 
 
-__all__ = ["DEFAULT_EMBEDDING_MODEL", "EMBEDDING_DIMENSIONS", "embed"]
+__all__ = ["DEFAULT_EMBEDDING_MODEL", "EMBEDDING_DIMENSIONS", "embed", "resolve_dimensions"]

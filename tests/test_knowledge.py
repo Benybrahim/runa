@@ -210,22 +210,13 @@ def test_custom_store_can_be_injected() -> None:
         def __init__(self) -> None:
             self.added: list[dict[str, Any]] = []
 
-        async def add(
-            self,
-            *,
-            text: str,
-            source: str,
-            embedding: list[float],
-            metadata: dict[str, Any] | None,
-        ) -> int:
-            self.added.append({"text": text, "source": source, "metadata": metadata})
+        async def add(self, *, text: str, source: str, embedding: list[float]) -> int:
+            self.added.append({"text": text, "source": source})
             return len(self.added)
 
         async def search(self, *, embedding: list[float], k: int) -> list[KnowledgeMatch]:
             return [
-                KnowledgeMatch(
-                    id=idx, text=item["text"], source=item["source"], metadata=None, distance=0.0
-                )
+                KnowledgeMatch(id=idx, text=item["text"], source=item["source"], distance=0.0)
                 for idx, item in enumerate(self.added, start=1)
             ]
 
@@ -236,7 +227,7 @@ def test_custom_store_can_be_injected() -> None:
     know = Knowledge(store=store)
 
     async def _run() -> list[KnowledgeMatch]:
-        await store.add(text="cats are great pets", source="manual", embedding=[0.0], metadata=None)
+        await store.add(text="cats are great pets", source="manual", embedding=[0.0])
         know._ingested = True
         return await know.search("anything")
 

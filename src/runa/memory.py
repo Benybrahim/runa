@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-import struct
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,8 +22,9 @@ from typing import Any, Protocol
 
 from runa._sqlite import DEFAULT_DB_PATH
 from runa._sqlite import connect as _connect_db
+from runa._sqlite import pack_vector as _pack
 from runa._types import ModelSettings
-from runa.embeddings import DEFAULT_EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, embed
+from runa.embeddings import DEFAULT_EMBEDDING_MODEL, embed, resolve_dimensions
 from runa.tool import FunctionTool, tool
 
 _ITEMS_TABLE = "memory_items"
@@ -89,10 +89,6 @@ def _ddl(dimensions: int) -> str:
         embedding float[{dimensions}]
     );
     """
-
-
-def _pack(vector: list[float]) -> bytes:
-    return struct.pack(f"{len(vector)}f", *vector)
 
 
 class SQLiteMemoryStore:
@@ -214,10 +210,7 @@ class Memory:
         `dimensions` only needs setting for a model not in Runa's built-in size table.
         """
         self.model = model
-        resolved_dimensions = dimensions or EMBEDDING_DIMENSIONS.get(model)
-        if resolved_dimensions is None:
-            raise ValueError(f"unknown embedding size for {model!r}; pass dimensions= explicitly")
-        self.dimensions: int = resolved_dimensions
+        self.dimensions: int = resolve_dimensions(model, dimensions)
         self._store: MemoryStore = store or SQLiteMemoryStore(db_path, dimensions=self.dimensions)
 
     async def remember(

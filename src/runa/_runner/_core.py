@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 
@@ -41,6 +42,21 @@ def _knowledge_block(matches: list[Any]) -> TResponseInputItem:
     """A small, clearly labeled system message carrying retrieved `KnowledgeMatch`es."""
     lines = "\n".join(f"- {match.text}" for match in matches)
     return {"role": "system", "content": f"Relevant knowledge:\n{lines}"}
+
+
+async def _no_matches() -> list[Any]:
+    return []
+
+
+async def _retrieve(
+    source: Any, query: str, *, label: str, agent_name: str, **search_kwargs: Any
+) -> list[Any]:
+    """Search `source` for `query`, degrading to no matches (and a logged warning) if it raises."""
+    try:
+        return await source.search(query, **search_kwargs)
+    except Exception:
+        logger.warning("%s retrieval failed for agent %s", label, agent_name, exc_info=True)
+        return []
 
 
 async def _run_turns(
@@ -153,21 +169,17 @@ async def _run_async(
     knowledge = getattr(agent, "knowledge", None)
     user_id = getattr(session, "user_id", None) if session is not None else None
     memory_query = _latest_user_text(items)
-    if memory is not None and memory_query is not None:
-        try:
-            memory_matches = await memory.search(memory_query, user_id=user_id)
-        except Exception:
-            logger.warning("memory retrieval failed for agent %s", agent.name, exc_info=True)
-            memory_matches = []
+    if memory_query is not None and (memory is not None or knowledge is not None):
+        memory_matches, knowledge_matches = await asyncio.gather(
+            _retrieve(memory, memory_query, label="memory", agent_name=agent.name, user_id=user_id)
+            if memory is not None
+            else _no_matches(),
+            _retrieve(knowledge, memory_query, label="knowledge", agent_name=agent.name)
+            if knowledge is not None
+            else _no_matches(),
+        )
         if memory_matches:
             items.insert(len(items) - 1, _memory_block(memory_matches))
-
-    if knowledge is not None and memory_query is not None:
-        try:
-            knowledge_matches = await knowledge.search(memory_query)
-        except Exception:
-            logger.warning("knowledge retrieval failed for agent %s", agent.name, exc_info=True)
-            knowledge_matches = []
         if knowledge_matches:
             items.insert(len(items) - 1, _knowledge_block(knowledge_matches))
 

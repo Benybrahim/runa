@@ -7,16 +7,25 @@ which module writes to it first.
 """
 
 import sqlite3
+import struct
 from pathlib import Path
 
 DEFAULT_DB_PATH = Path("db/runa.db")
+
+
+def pack_vector(vector: list[float]) -> bytes:
+    """Pack `vector` as the little-endian `float[]` blob a `vec0` column expects.
+
+    Shared by `runa.memory.SQLiteMemoryStore` and `runa.knowledge.SQLiteKnowledgeStore`.
+    """
+    return struct.pack(f"{len(vector)}f", *vector)
 
 
 def connect(db_path: Path, ddl: str, *, load_vec: bool = False) -> sqlite3.Connection:
     """Open `db_path`, creating its parent directory if needed, applying `ddl`.
 
     `load_vec=True` loads the `sqlite-vec` extension first, for callers whose `ddl` declares a
-    `vec0` virtual table (only `runa.memory` needs this) -- everyone else pays nothing for it.
+    `vec0` virtual table (`runa.memory`/`runa.knowledge`) -- everyone else pays nothing for it.
     """
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
