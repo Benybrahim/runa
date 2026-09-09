@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://benybrahim.github.io/runa/getting_started/">
+        <link rel="shortcut icon" href="../img/favicon.ico">
+        <title>Getting Started - Runa</title>
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../css/brands.min.css" rel="stylesheet">
+        <link href="../css/solid.min.css" rel="stylesheet">
+        <link href="../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="..">Runa</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href=".." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="./" class="nav-link active" aria-current="page">Getting Started</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../guides/" class="nav-link">Guides</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Core Concepts</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../agents/" class="dropdown-item">Agents</a>
+</li>
+                                    
+<li>
+    <a href="../tools/" class="dropdown-item">Tools</a>
+</li>
+                                    
+<li>
+    <a href="../guardrails/" class="dropdown-item">Guardrails</a>
+</li>
+                                    
+<li>
+    <a href="../subagents/" class="dropdown-item">Subagents</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Running Agents</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../sessions/" class="dropdown-item">Sessions and Chat</a>
+</li>
+                                    
+<li>
+    <a href="../memory/" class="dropdown-item">Memory</a>
+</li>
+                                    
+<li>
+    <a href="../cache/" class="dropdown-item">Cache</a>
+</li>
+                                    
+<li>
+    <a href="../mcp/" class="dropdown-item">MCP Servers</a>
+</li>
+                                    
+<li>
+    <a href="../approval/" class="dropdown-item">Human Approval</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Testing and Evaluation</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../testing/" class="dropdown-item">Testing</a>
+</li>
+                                    
+<li>
+    <a href="../evaluation/" class="dropdown-item">Evaluation</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../tracing/" class="nav-link">Observability</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../models/" class="dropdown-item">Model Providers</a>
+</li>
+                                    
+<li>
+    <a href="../cli/" class="dropdown-item">CLI Reference</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href=".." class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../guides/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#getting-started-with-runa" class="nav-link">Getting Started with Runa</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#guide-assumptions" class="nav-link">Guide Assumptions</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#what-is-runa" class="nav-link">What Is Runa?</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#creating-a-new-runa-application" class="nav-link">Creating a New Runa Application</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#hello-runa" class="nav-link">Hello, Runa!</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#giving-your-agent-tools" class="nav-link">Giving Your Agent Tools</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#adding-guardrails" class="nav-link">Adding Guardrails</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#delegating-to-subagents" class="nav-link">Delegating to Subagents</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#chatting-with-your-agent" class="nav-link">Chatting With Your Agent</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#persisting-conversations-in-code" class="nav-link">Persisting Conversations in Code</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#testing-your-agent" class="nav-link">Testing Your Agent</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#inspecting-traces" class="nav-link">Inspecting Traces</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#whats-next" class="nav-link">What's Next?</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="getting-started-with-runa">Getting Started with Runa</h1>
+<p>This guide covers everything you need to build your first Runa agent. After
+reading it, you'll know how to:</p>
+<ul>
+<li>Create a new Runa application</li>
+<li>Write an Agent, give it tools, and run it</li>
+<li>Add guardrails</li>
+<li>Delegate work to other agents</li>
+<li>Chat with your agent and persist conversations</li>
+<li>Test and evaluate your agent</li>
+</ul>
+<h2 id="guide-assumptions">Guide Assumptions</h2>
+<p>This guide is for beginners who want to build their first Runa application.
+It assumes no prior experience with Runa. Some familiarity with Python
+helps.</p>
+<h2 id="what-is-runa">What Is Runa?</h2>
+<p>Runa is an opinionated framework for agentic AI. "Opinionated" means Runa
+assumes there's a best way to build an agent application, and it's designed
+to encourage that way — chiefly, through convention over configuration.</p>
+<p>An Agent is a Python class. Its attributes — <code>name</code>, <code>instructions</code>,
+<code>tools</code>, <code>subagents</code>, <code>guardrails</code> — are the whole configuration surface.
+There's no separate config file, no client to instantiate, no provider to
+wire up: the model string on the class (<code>"gpt-5.4-nano"</code>, <code>"claude-..."</code>,
+<code>"gemini-..."</code>) tells Runa which provider to call.</p>
+<h2 id="creating-a-new-runa-application">Creating a New Runa Application</h2>
+<h3 id="installing-runa">Installing Runa</h3>
+<p>Runa needs Python 3.14. Install it with <a href="https://docs.astral.sh/uv/">uv</a>:</p>
+<pre><code class="language-bash">uv venv --python 3.14
+source .venv/bin/activate
+uv add git+https://github.com/benybrahim/runa.git
+</code></pre>
+<p>Confirm it installed:</p>
+<pre><code class="language-bash">runa --help
+</code></pre>
+<h3 id="creating-the-application">Creating the Application</h3>
+<p><code>runa new</code> scaffolds a new application with everything you need:</p>
+<pre><code class="language-bash">runa new blog
+cd blog
+</code></pre>
+<p>Take a look at what was generated:</p>
+<pre><code>blog/
+├── app/
+│   ├── agents/          # Agent subclasses
+│   ├── tools/           # @tool-decorated functions
+│   ├── prompts/         # prompt text, kept out of Python source
+│   └── evaluations/     # eval cases, run with `runa eval`
+├── tests/                # deterministic tests, run with `runa test`
+├── config/               # shared config (clients, settings)
+├── db/                   # runa.db: conversation history and traces
+├── main.py               # application entry point, loads .env
+├── .env                  # your model's API key — fill this in, never commit it
+└── pyproject.toml
+</code></pre>
+<p>Open <code>.env</code> and set the API key for whichever model your agents will use:</p>
+<pre><code>OPENAI_API_KEY=sk-...
+</code></pre>
+<p>That's the only configuration step. Nothing else needs to be wired up
+globally — a model is a per-<code>Agent</code> attribute, and Runa resolves it to the
+right provider by name.</p>
+<h2 id="hello-runa">Hello, Runa!</h2>
+<p>Let's generate an agent:</p>
+<pre><code class="language-bash">runa generate agent Greeter
+</code></pre>
+<p>This creates <code>app/agents/greeter_agent.py</code>:</p>
+<pre><code class="language-python">from runa import Agent
+
+
+class GreeterAgent(Agent):
+    name = &quot;greeter_agent&quot;
+    instructions = &quot;&quot;&quot;
+    TODO: describe what GreeterAgent does.
+    &quot;&quot;&quot;
+</code></pre>
+<p>Replace the instructions:</p>
+<pre><code class="language-python">from runa import Agent
+
+
+class GreeterAgent(Agent):
+    name = &quot;greeter_agent&quot;
+    instructions = &quot;You greet the user warmly, in one sentence.&quot;
+</code></pre>
+<p>Run it from <code>main.py</code>, or straight from a Python shell:</p>
+<pre><code class="language-python">from app.agents.greeter_agent import GreeterAgent
+
+agent = GreeterAgent()
+run = agent.run_sync(&quot;Hi, I'm new here.&quot;)
+print(run.output)
+</code></pre>
+<p>Or skip writing any code and talk to it directly:</p>
+<pre><code class="language-bash">runa chat greeter_agent
+</code></pre>
+<p><code>run_sync</code> returns a <code>Run</code> with <code>.output</code>, <code>.usage</code>, <code>.status</code>, and
+<code>.error</code>. Calling <code>run_sync</code>/<code>run</code> again on the same agent instance
+continues the same conversation — <code>self.history</code> remembers what was said.</p>
+<h2 id="giving-your-agent-tools">Giving Your Agent Tools</h2>
+<p>A tool is a plain Python function. Its signature <em>is</em> its schema — Runa
+reads the type hints and the docstring, so there's nothing else to declare.</p>
+<pre><code class="language-bash">runa generate tool CurrentTime
+</code></pre>
+<pre><code class="language-python"># app/tools/current_time.py
+from datetime import datetime
+
+from runa import tool
+
+
+@tool
+def current_time() -&gt; str:
+    &quot;&quot;&quot;Return the current local time as an ISO 8601 string.&quot;&quot;&quot;
+    return datetime.now().isoformat()
+</code></pre>
+<p>Attach it to an agent with <code>tools</code>:</p>
+<pre><code class="language-python">from runa import Agent
+
+from app.tools.current_time import current_time
+
+
+class GreeterAgent(Agent):
+    name = &quot;greeter_agent&quot;
+    instructions = &quot;You greet the user warmly, and tell them the time if asked.&quot;
+    tools = [current_time]
+</code></pre>
+<p>The model decides on its own when to call <code>current_time</code> — you never call
+it yourself.</p>
+<p>Omit <code>instructions</code> and it's loaded automatically from
+<code>app/prompts/greeter_agent.md</code> (matching the <code>name</code>); if that file doesn't
+exist yet, it's created with a <code>TODO</code> stub — the same one <code>runa generate
+prompt</code> writes — ready for you to fill in:</p>
+<pre><code class="language-python">class GreeterAgent(Agent):
+    name = &quot;greeter_agent&quot;
+    tools = [current_time]
+</code></pre>
+<h2 id="adding-guardrails">Adding Guardrails</h2>
+<p>A guardrail is a predicate: <code>(value) -&gt; bool</code>, tripping the run when it
+returns <code>True</code>. Bind it to <code>.input</code> or <code>.output</code> to say which side it
+checks.</p>
+<pre><code class="language-python">from runa import Agent, guardrail
+
+from app.tools.current_time import current_time
+
+
+@guardrail
+def block_empty(input: str) -&gt; bool:
+    &quot;&quot;&quot;Trip when the user sends an empty message.&quot;&quot;&quot;
+    return not input.strip()
+
+
+class GreeterAgent(Agent):
+    name = &quot;greeter_agent&quot;
+    instructions = &quot;You greet the user warmly, and tell them the time if asked.&quot;
+    tools = [current_time]
+    guardrails = [block_empty.input]
+</code></pre>
+<p>The same <code>@guardrail</code> predicate works on a tool's arguments or return
+value, via <code>@tool(guardrails=[...])</code>:</p>
+<pre><code class="language-python">@guardrail
+def no_args(args: dict) -&gt; bool:
+    &quot;&quot;&quot;Trip if `current_time` is somehow called with arguments.&quot;&quot;&quot;
+    return bool(args)
+
+
+@tool(guardrails=[no_args.input])
+def current_time() -&gt; str:
+    &quot;&quot;&quot;Return the current local time as an ISO 8601 string.&quot;&quot;&quot;
+    return datetime.now().isoformat()
+</code></pre>
+<p>A tripped guardrail stops the run; <code>agent.run_sync(...)</code> comes back with
+<code>status="error"</code> instead of raising.</p>
+<h2 id="delegating-to-subagents">Delegating to Subagents</h2>
+<p>An agent can hand a conversation off to another agent, or call one as a
+tool, via <code>subagents</code>:</p>
+<pre><code class="language-python">from runa import Agent
+
+
+class ResearcherAgent(Agent):
+    name = &quot;researcher_agent&quot;
+    instructions = &quot;You research topics thoroughly and report back findings.&quot;
+
+
+class GreeterAgent(Agent):
+    name = &quot;greeter_agent&quot;
+    instructions = &quot;You greet the user, and bring in the researcher for anything factual.&quot;
+    subagents = [ResearcherAgent.handoff]
+</code></pre>
+<ul>
+<li><code>.handoff</code> transfers the whole conversation to the subagent.</li>
+<li><code>.delegate</code> calls the subagent as a tool and returns its answer to the
+  caller, which stays in control.</li>
+</ul>
+<h2 id="chatting-with-your-agent">Chatting With Your Agent</h2>
+<p><code>runa chat</code> starts an interactive REPL against any agent's declared
+<code>name</code>:</p>
+<pre><code class="language-bash">runa chat greeter_agent
+</code></pre>
+<p>Every chat persists to <code>db/runa.db</code> under a fresh session id. Pick it back
+up later:</p>
+<pre><code class="language-bash">runa chat greeter_agent --continue   # most recent session
+runa chat greeter_agent --resume     # choose from past sessions
+runa chat --list                     # every session in runa.db
+runa chat --show SESSION_ID          # replay one session's history
+</code></pre>
+<h2 id="persisting-conversations-in-code">Persisting Conversations in Code</h2>
+<p><code>runa chat</code> uses <code>SQLiteSession</code> under the hood; use it directly to persist
+history from your own code:</p>
+<pre><code class="language-python">from runa import SQLiteSession
+
+from app.agents.greeter_agent import GreeterAgent
+
+agent = GreeterAgent()
+session = SQLiteSession(&quot;user-42&quot;)
+
+agent.run_sync(&quot;Hi, I'm new here.&quot;, session=session)
+agent.run_sync(&quot;What did I just say?&quot;, session=session)
+</code></pre>
+<p>With a <code>session</code>, prior turns are read from <code>runa.db</code> automatically — you
+only ever pass the new message.</p>
+<h2 id="testing-your-agent">Testing Your Agent</h2>
+<p><code>tests/</code> holds deterministic checks — plain <code>assert</code> against a run:</p>
+<pre><code class="language-python"># tests/test_greeter_agent.py
+from app.agents.greeter_agent import GreeterAgent
+
+
+def test_greets_politely():
+    run = GreeterAgent().run_sync(&quot;Hi&quot;)
+    assert run.status == &quot;completed&quot;
+    assert run.output
+</code></pre>
+<pre><code class="language-bash">runa test
+</code></pre>
+<p><code>app/evaluations/</code> holds behavioral evals — grading with a judge model
+instead of an assertion:</p>
+<pre><code class="language-bash">runa generate evaluation GreeterAgent
+</code></pre>
+<pre><code class="language-python"># app/evaluations/greeter_agent_eval.py
+from runa import Case
+
+from app.agents.greeter_agent import GreeterAgent
+
+agent = GreeterAgent()
+
+dataset = [
+    Case(input=&quot;Hi there&quot;, expected=&quot;A warm, one-sentence greeting&quot;),
+]
+</code></pre>
+<pre><code class="language-bash">runa eval
+</code></pre>
+<h2 id="inspecting-traces">Inspecting Traces</h2>
+<p>Every run is traced to <code>runa.db</code>:</p>
+<pre><code class="language-bash">runa traces list
+runa traces errors
+runa traces show TRACE_ID
+</code></pre>
+<h2 id="whats-next">What's Next?</h2>
+<ul>
+<li>Run <code>runa generate --help</code> to see everything scaffolding can create.</li>
+<li>Read the source under <code>app/agents/</code>, <code>app/tools/</code>, and
+  <code>app/evaluations/</code> in your generated project — the generated comments
+  and docstrings double as reference documentation.</li>
+<li>Keep prompts that grow beyond a line or two in <code>app/prompts/&lt;name&gt;.md</code>
+  instead of inlining them in Python — omit <code>instructions</code> and it's loaded
+  from there automatically, creating the file with a <code>TODO</code> stub first if
+  it doesn't exist yet.</li>
+</ul></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../js/base.js"></script>
+        <script src="../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

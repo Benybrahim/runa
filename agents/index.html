@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://benybrahim.github.io/runa/agents/">
+        <link rel="shortcut icon" href="../img/favicon.ico">
+        <title>Agents - Runa</title>
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../css/brands.min.css" rel="stylesheet">
+        <link href="../css/solid.min.css" rel="stylesheet">
+        <link href="../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="..">Runa</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href=".." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../getting_started/" class="nav-link">Getting Started</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../guides/" class="nav-link">Guides</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Core Concepts</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Agents</a>
+</li>
+                                    
+<li>
+    <a href="../tools/" class="dropdown-item">Tools</a>
+</li>
+                                    
+<li>
+    <a href="../guardrails/" class="dropdown-item">Guardrails</a>
+</li>
+                                    
+<li>
+    <a href="../subagents/" class="dropdown-item">Subagents</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Running Agents</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../sessions/" class="dropdown-item">Sessions and Chat</a>
+</li>
+                                    
+<li>
+    <a href="../memory/" class="dropdown-item">Memory</a>
+</li>
+                                    
+<li>
+    <a href="../cache/" class="dropdown-item">Cache</a>
+</li>
+                                    
+<li>
+    <a href="../mcp/" class="dropdown-item">MCP Servers</a>
+</li>
+                                    
+<li>
+    <a href="../approval/" class="dropdown-item">Human Approval</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Testing and Evaluation</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../testing/" class="dropdown-item">Testing</a>
+</li>
+                                    
+<li>
+    <a href="../evaluation/" class="dropdown-item">Evaluation</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../tracing/" class="nav-link">Observability</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../models/" class="dropdown-item">Model Providers</a>
+</li>
+                                    
+<li>
+    <a href="../cli/" class="dropdown-item">CLI Reference</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../guides/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../tools/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#agents" class="nav-link">Agents</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#attributes" class="nav-link">Attributes</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#instructions-as-a-function" class="nav-link">Instructions as a Function</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#running-an-agent" class="nav-link">Running an Agent</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#usage" class="nav-link">Usage</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#visualizing-an-agent" class="nav-link">Visualizing an Agent</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="agents">Agents</h1>
+<p>An <code>Agent</code> is a Python class. Its class attributes are its entire
+configuration — there's no separate config object to build.</p>
+<pre><code class="language-python">from runa import Agent
+
+
+class SupportAgent(Agent):
+    name = &quot;support_agent&quot;
+    instructions = &quot;You help customers troubleshoot their orders.&quot;
+    model = &quot;claude-sonnet-5&quot;
+</code></pre>
+<h2 id="attributes">Attributes</h2>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>required</td>
+<td>The agent's identity: traces, handoffs, <code>runa chat</code> all key off it</td>
+</tr>
+<tr>
+<td><code>instructions</code></td>
+<td><code>None</code></td>
+<td>A system prompt string, or a <code>(context) -&gt; str</code> callable</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>"gpt-5.4-nano"</code></td>
+<td>Which model to call — see <a href="../models/">Model Providers</a></td>
+</tr>
+<tr>
+<td><code>model_settings</code></td>
+<td><code>ModelSettings()</code></td>
+<td>Temperature, max tokens, etc.</td>
+</tr>
+<tr>
+<td><code>tools</code></td>
+<td><code>[]</code></td>
+<td><code>@tool</code>-decorated functions — see <a href="../tools/">Tools</a></td>
+</tr>
+<tr>
+<td><code>subagents</code></td>
+<td><code>[]</code></td>
+<td>Other agents to hand off or delegate to — see <a href="../subagents/">Subagents</a></td>
+</tr>
+<tr>
+<td><code>guardrails</code></td>
+<td><code>[]</code></td>
+<td>Input/output checks — see <a href="../guardrails/">Guardrails</a></td>
+</tr>
+<tr>
+<td><code>mcp</code>/<code>mcp_servers</code></td>
+<td><code>[]</code></td>
+<td>MCP servers whose tools this agent can call — see <a href="../mcp/">MCP Servers</a></td>
+</tr>
+<tr>
+<td><code>output_type</code></td>
+<td><code>None</code></td>
+<td>A type the final output must parse as</td>
+</tr>
+<tr>
+<td><code>hooks</code></td>
+<td><code>None</code></td>
+<td>An <code>AgentHooks</code> instance scoped to this agent</td>
+</tr>
+</tbody>
+</table>
+<p><code>name</code> is the only required attribute. Everything else has a sane default,
+in the spirit of convention over configuration.</p>
+<h2 id="instructions-as-a-function">Instructions as a Function</h2>
+<p><code>instructions</code> can be a plain string, or a function of one argument — the
+<code>context</code> passed to <code>run</code>/<code>run_sync</code> — resolved fresh on every call:</p>
+<pre><code class="language-python">from dataclasses import dataclass
+
+
+@dataclass
+class Context:
+    user_name: str
+
+
+def instructions(context: Context) -&gt; str:
+    return f&quot;You are a friendly assistant helping {context.user_name}.&quot;
+
+
+class Assistant(Agent):
+    name = &quot;assistant&quot;
+    instructions = instructions
+
+
+Assistant().run_sync(&quot;Hi&quot;, context=Context(user_name=&quot;Ada&quot;))
+</code></pre>
+<p><code>context</code> is never sent to the model. It's plumbed through to
+<code>instructions</code>, tools, and guardrails as-is, so it's the place to put
+per-run data (a user id, a tenant, a request-scoped client) without
+smuggling it through global state.</p>
+<h2 id="running-an-agent">Running an Agent</h2>
+<pre><code class="language-python">agent = SupportAgent()
+run = agent.run_sync(&quot;My order hasn't arrived.&quot;)
+print(run.output)
+</code></pre>
+<p><code>run_sync</code>/<code>run</code>/<code>run_streamed</code> all append the turn to <code>agent.history</code>, so
+the next call on the same instance continues the conversation. Pass
+<code>session=</code> instead to persist history to <code>runa.db</code> — see
+<a href="../sessions/">Sessions and Chat</a>.</p>
+<p><code>run</code>/<code>run_sync</code> return a <code>Run</code>:</p>
+<ul>
+<li><code>run.output</code> — the final output (<code>None</code> if the run errored)</li>
+<li><code>run.status</code> — <code>"completed"</code> or <code>"error"</code></li>
+<li><code>run.error</code> — the error message, when <code>status == "error"</code></li>
+<li><code>run.usage</code> — this call's token usage</li>
+<li><code>run.trace</code> — the full span tree for this call, see <a href="../tracing/">Tracing</a></li>
+</ul>
+<p>A guardrail tripwire or a runtime error (<code>MaxTurnsExceeded</code>, a model error)
+is caught and reported as <code>status="error"</code> rather than raised —
+<code>agent.history</code> is left unchanged, since the turn never completed.</p>
+<p><code>run_streamed</code> instead yields <code>StreamEvent</code>s as the model responds, and
+updates <code>agent.history</code> only once the stream is fully consumed.</p>
+<h2 id="usage">Usage</h2>
+<pre><code class="language-python">agent.last_usage  # tokens used by the most recent call
+agent.usage  # accumulated across every call on this instance
+</code></pre>
+<p>Both are populated regardless of whether the run succeeded, used a
+<code>session</code>, or passed <code>hooks</code>.</p>
+<h2 id="visualizing-an-agent">Visualizing an Agent</h2>
+<p><code>agent.graph</code> renders the agent, its tools, and its handoffs as a Graphviz
+diagram (inline in Jupyter; <code>.render(path)</code> to save, <code>.source</code> for raw
+DOT). Needs the system <code>dot</code> binary to actually rasterize an image.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../js/base.js"></script>
+        <script src="../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>
