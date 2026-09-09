@@ -17,7 +17,7 @@ class SessionNotFound(Exception):
     """Raised when `show_session` names a session id `db/runa.db` has no history for."""
 
 
-def _format_item(item: dict[str, Any]) -> str:
+def _parse_item(item: dict[str, Any]) -> tuple[str, str]:
     role = item.get("role") or item.get("type", "item")
     content = item.get("content")
     if isinstance(content, str):
@@ -27,11 +27,11 @@ def _format_item(item: dict[str, Any]) -> str:
         text = "".join(parts) if parts else str(content)
     else:
         text = str(item)
-    return f"{role}: {text}"
+    return role, text
 
 
-def list_sessions(*, root: Path) -> str:
-    """List every session id `db/runa.db` has conversation history for."""
+def session_rows(*, root: Path) -> list[tuple[str, str]]:
+    """Return `(session_id, updated_at)` for every session in `db/runa.db`, oldest first."""
     db_path = resolve_db_path(root)
     with closing(sqlite3.connect(db_path)) as conn:
         conn.row_factory = sqlite3.Row
@@ -41,10 +41,15 @@ def list_sessions(*, root: Path) -> str:
             ).fetchall()
         except sqlite3.OperationalError:
             rows = []
+    return [(row["session_id"], row["updated_at"]) for row in rows]
+
+
+def list_sessions(*, root: Path) -> str:
+    """List every session id `db/runa.db` has conversation history for."""
+    rows = session_rows(root=root)
     if not rows:
         return "no sessions found"
-
-    return "\n".join(f"{row['session_id']}  {row['updated_at']}" for row in rows)
+    return "\n".join(f"{session_id}  {updated_at}" for session_id, updated_at in rows)
 
 
 def list_sessions_for_agent(agent_name: str, *, root: Path) -> list[tuple[str, str]]:
@@ -70,8 +75,11 @@ def list_sessions_for_agent(agent_name: str, *, root: Path) -> list[tuple[str, s
     return [(row["session_id"], row["updated_at"]) for row in rows]
 
 
-def show_session(session_id: str, *, root: Path) -> str:
-    """Render a session's message history."""
+def session_messages(session_id: str, *, root: Path) -> list[dict[str, str]]:
+    """Return `session_id`'s messages as `{"created_at", "role", "text"}` dicts, oldest first.
+
+    Raises `SessionNotFound` if `db/runa.db` has no `agent_sessions` row for `session_id`.
+    """
     db_path = resolve_db_path(root)
     with closing(sqlite3.connect(db_path)) as conn:
         conn.row_factory = sqlite3.Row
@@ -88,7 +96,17 @@ def show_session(session_id: str, *, root: Path) -> str:
             (session_id,),
         ).fetchall()
 
-    lines = [f"session {session_id}", ""]
+    messages = []
     for row in rows:
-        lines.append(f"{row['created_at']}  {_format_item(json.loads(row['message_data']))}")
+        role, text = _parse_item(json.loads(row["message_data"]))
+        messages.append({"created_at": row["created_at"], "role": role, "text": text})
+    return messages
+
+
+def show_session(session_id: str, *, root: Path) -> str:
+    """Render a session's message history."""
+    messages = session_messages(session_id, root=root)
+    lines = [f"session {session_id}", ""]
+    for message in messages:
+        lines.append(f"{message['created_at']}  {message['role']}: {message['text']}")
     return "\n".join(lines)

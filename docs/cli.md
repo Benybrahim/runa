@@ -57,6 +57,16 @@ runa traces errors         # most recent traces that errored
 runa traces show TRACE_ID  # one trace's full span tree
 ```
 
+## `runa ui`
+
+Serve a local, read-only dashboard over `runa.db` — Agents, Sessions, Traces, and Evaluations.
+Needs the `ui` extra (`uv add "runa[ui]"`); not installed by a plain `runa` install.
+
+```bash
+runa ui                    # http://127.0.0.1:8765
+runa ui --host 0.0.0.0 --port 3000
+```
+
 ## Exit Codes
 
 `runa eval` and `runa test` exit `1` if any case/test failed, `0`

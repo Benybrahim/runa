@@ -10,6 +10,7 @@ from runa._runner._guardrails import _run_input_guardrails, _run_output_guardrai
 from runa._runner._helpers import (
     _agent_tools,
     _model_settings,
+    _normalized_handoffs,
     _resolve_instructions,
     _resolve_model,
 )
@@ -149,7 +150,7 @@ async def _run_turns(
             _model_settings(current_agent),
             await _agent_tools(current_agent),
             getattr(current_agent, "output_type", None),
-            getattr(current_agent, "handoffs", []),
+            list(_normalized_handoffs(getattr(current_agent, "handoffs", [])).values()),
         )
         context_wrapper.usage.add(response.usage)
         _close_span(llm_span, output={"usage": response.usage.__dict__})

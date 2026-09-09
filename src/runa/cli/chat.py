@@ -10,42 +10,24 @@ pick up a past one instead, keyed by session id over the app's `db/runa.db`
 (the same file `runa chat --list`/`--show` reads, see `cli/sessions.py`).
 """
 
-import importlib
-import inspect
-from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
 from runa._runner import Runner
 from runa.agent import Agent, _default_hooks
-from runa.cli._project import NotARunaProject, loaded_app, resolve_db_path
+from runa.cli._project import (
+    iter_agent_classes,
+    loaded_app,
+    require_agents_dir,
+    resolve_db_path,
+)
 from runa.cli.sessions import list_sessions_for_agent
 from runa.session import SQLiteSession
 
 
 class AgentNotFound(Exception):
     """Raised when no Agent under `app/agents/` declares the given `name`."""
-
-
-def _require_agents_dir(root: Path) -> Path:
-    agents_dir = root / "app" / "agents"
-    if not agents_dir.is_dir():
-        raise NotARunaProject(
-            f"{agents_dir} does not exist, run this from inside a Runa "
-            "project created with `runa new`"
-        )
-    return agents_dir
-
-
-def _iter_agent_classes(agents_dir: Path) -> Iterator[type[Agent]]:
-    for agent_file in sorted(agents_dir.glob("*.py")):
-        if agent_file.stem == "__init__":
-            continue
-        module = importlib.import_module(f"app.agents.{agent_file.stem}")
-        for _, obj in inspect.getmembers(module, inspect.isclass):
-            if issubclass(obj, Agent) and obj is not Agent and obj.__module__ == module.__name__:
-                yield obj
 
 
 def find_agent_class(agent_name: str, *, agents_dir: Path) -> type[Agent]:
@@ -55,7 +37,7 @@ def find_agent_class(agent_name: str, *, agents_dir: Path) -> type[Agent]:
     not the Python class name — `name` is the identity the SDK itself uses for traces,
     instructions, and handoffs, so it's what an operator should type too.
     """
-    for agent_cls in _iter_agent_classes(agents_dir):
+    for agent_cls in iter_agent_classes(agents_dir):
         if getattr(agent_cls, "name", None) == agent_name:
             return agent_cls
     raise AgentNotFound(f"no Agent named {agent_name!r} found under {agents_dir}")
@@ -129,7 +111,7 @@ def run_agent_repl(
     the in-process object instead of round-tripping through `db/runa.db` on every call. A pending
     approval is resolved right here by prompting the operator, since there's someone to ask.
     """
-    agents_dir = _require_agents_dir(root)
+    agents_dir = require_agents_dir(root)
     db_path = resolve_db_path(root)
 
     with loaded_app(root):

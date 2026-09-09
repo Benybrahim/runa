@@ -15,7 +15,7 @@ Runa is an opinionated Python framework for agentic AI.
 - **Persistence with zero setup.** `SQLiteSession` remembers a
   conversation across processes; `runa chat` uses it automatically.
 - **Tracing you never asked for.** Every run is a span tree in `runa.db`,
-  inspectable with `runa traces`.
+  inspectable with `runa traces` or, visually, `runa ui`.
 - **Tests and evals as first-class citizens.** `runa test` for plain
   assertions, `runa eval` for judged, dataset-driven grading.
 

@@ -68,11 +68,13 @@ class _ScriptedModel:
     def __init__(self, responses: list[ModelResponse]) -> None:
         self._responses = list(responses)
         self.calls: list[list[Any]] = []
+        self.received_handoffs: list[Any] = []
 
     async def get_response(
         self, system_instructions, input, model_settings, tools, output_schema, handoffs
     ):  # noqa: ANN001, ARG002
         self.calls.append(list(input))
+        self.received_handoffs = handoffs
         return self._responses.pop(0)
 
     async def stream_response(self, *args: Any, **kwargs: Any):  # noqa: ANN001, ANN002, ANN003
@@ -181,6 +183,24 @@ def test_handoff_switches_current_agent() -> None:
     assert result.final_output == "handled by target"
     handoff_spans = [s for s in result.trace.spans if s.type == "handoff"]
     assert len(handoff_spans) == 1
+
+
+def test_bare_agent_handoff_is_normalized_before_reaching_the_model() -> None:
+    """A raw `Agent` in `.handoffs` reaches the model wrapped as a `Handoff`, not as-is.
+
+    `Agent.__init__` stores bare `Agent`s in `.handoffs` (see `agent.py`), but `_handoff_dict`
+    (`_models/_base.py`) needs `.tool_name`/`.tool_description`, which a bare `Agent` doesn't have.
+    """
+    target = _agent(name="Target", model=_ScriptedModel([_text_response("handled by target")]))
+    model = _ScriptedModel([_text_response("hi")])
+    main = _agent(name="Main", handoffs=[target], model=model)
+
+    asyncio.run(Runner.run(main, "hello", run_config=_run_config()))
+
+    assert len(model.received_handoffs) == 1
+    (received,) = model.received_handoffs
+    assert isinstance(received, Handoff)
+    assert received.tool_name == "transfer_to_target"
 
 
 def test_input_guardrail_tripwire_halts_the_run() -> None:

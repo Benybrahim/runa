@@ -7,10 +7,13 @@ the sys.path / sys.modules bookkeeping.
 """
 
 import importlib
+import inspect
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+
+from runa.agent import Agent
 
 
 class NotARunaProject(Exception):
@@ -79,3 +82,35 @@ def loaded_app(root: Path) -> Iterator[None]:
         yield
     finally:
         sys.path.remove(root_str)
+
+
+def require_agents_dir(root: Path) -> Path:
+    """Return `root/app/agents`, raising `NotARunaProject` if it doesn't exist.
+
+    Shared by `chat.py` (resolving an Agent by name) and `cli/agents.py` (listing every
+    declared Agent), so both give the same clean error outside a `runa new` project.
+    """
+    agents_dir = root / "app" / "agents"
+    if not agents_dir.is_dir():
+        raise NotARunaProject(
+            f"{agents_dir} does not exist, run this from inside a Runa "
+            "project created with `runa new`"
+        )
+    return agents_dir
+
+
+def iter_agent_classes(agents_dir: Path) -> Iterator[type[Agent]]:
+    """Yield every `Agent` subclass declared directly in a module under `agents_dir`.
+
+    Each module is imported as `app.agents.<stem>`, so callers must run this inside
+    `loaded_app(root)` (or otherwise have `root` on `sys.path`) first. `obj.__module__ ==
+    module.__name__` excludes an `Agent` subclass merely imported into the module (e.g. a
+    subagent imported for its `.handoff`/`.delegate` reference) from one actually defined there.
+    """
+    for agent_file in sorted(agents_dir.glob("*.py")):
+        if agent_file.stem == "__init__":
+            continue
+        module = importlib.import_module(f"app.agents.{agent_file.stem}")
+        for _, obj in inspect.getmembers(module, inspect.isclass):
+            if issubclass(obj, Agent) and obj is not Agent and obj.__module__ == module.__name__:
+                yield obj

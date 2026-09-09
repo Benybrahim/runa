@@ -6,7 +6,14 @@ from pathlib import Path
 import pytest
 
 from runa.cli.new import scaffold_project
-from runa.cli.sessions import SessionNotFound, list_sessions, list_sessions_for_agent, show_session
+from runa.cli.sessions import (
+    SessionNotFound,
+    list_sessions,
+    list_sessions_for_agent,
+    session_messages,
+    session_rows,
+    show_session,
+)
 from runa.session import SQLiteSession
 
 
@@ -70,3 +77,38 @@ def test_show_session_renders_history(tmp_path: Path) -> None:
     output = show_session("SupportAgent", root=project_dir)
 
     assert "hello" in output
+
+
+def test_session_rows_reports_no_rows_when_runa_db_is_empty(tmp_path: Path) -> None:
+    """`session_rows` returns an empty list when `runa.db` has no history yet."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    assert session_rows(root=project_dir) == []
+
+
+def test_session_rows_returns_id_and_updated_at_pairs(tmp_path: Path) -> None:
+    """`session_rows` returns every session as an `(id, updated_at)` pair."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+    _add_history(project_dir / "db" / "runa.db", "SupportAgent")
+
+    rows = session_rows(root=project_dir)
+
+    assert [session_id for session_id, _ in rows] == ["SupportAgent"]
+
+
+def test_session_messages_raises_for_an_unknown_session(tmp_path: Path) -> None:
+    """`session_messages` raises `SessionNotFound` for a session id with no history."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    with pytest.raises(SessionNotFound):
+        session_messages("nope", root=project_dir)
+
+
+def test_session_messages_returns_role_and_text_per_message(tmp_path: Path) -> None:
+    """`session_messages` splits each message into its `role` and `text`."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+    _add_history(project_dir / "db" / "runa.db", "SupportAgent")
+
+    messages = session_messages("SupportAgent", root=project_dir)
+
+    assert messages == [{"created_at": messages[0]["created_at"], "role": "user", "text": "hello"}]

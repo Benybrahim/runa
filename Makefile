@@ -1,4 +1,4 @@
-.PHONY: install format lint typecheck test check hello examples clean
+.PHONY: install format lint typecheck test check hello tour examples clean
 
 install:
 	uv sync
@@ -27,14 +27,8 @@ check:
 hello:
 	uv run python examples/hello.py
 
-examples:
-	uv run python examples/hello.py
-	uv run python examples/conversation.py
-	uv run python examples/background.py
-	uv run python examples/approval.py
-	uv run python examples/eval.py
-	uv run python examples/delegate.py
-	uv run python examples/streaming.py
+tour:
+	uv run python examples/tour.py
 
 clean:
 	rm -rf .pytest_cache

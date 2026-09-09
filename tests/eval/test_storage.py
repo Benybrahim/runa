@@ -7,7 +7,7 @@ from pathlib import Path
 from runa.eval.case import Case
 from runa.eval.evaluation.core import EvaluationResult, Status
 from runa.eval.report import CaseReport, Report
-from runa.eval.storage import save_report
+from runa.eval.storage import get_eval_run, list_eval_runs, save_report
 from runa.eval.tracing.adapter import AgentRun
 
 
@@ -55,3 +55,46 @@ def test_save_report_handles_an_empty_dataset(tmp_path: Path) -> None:
         ).fetchone()[0]
 
     assert count == 0
+
+
+def test_list_eval_runs_returns_summaries_newest_first(tmp_path: Path) -> None:
+    """`list_eval_runs` returns every run without its cases, most recent id first."""
+    db_path = tmp_path / "runa.db"
+    save_report(Report(agent_name="A", cases=[]), db_path=db_path)
+    save_report(Report(agent_name="B", cases=[]), db_path=db_path)
+
+    runs = list_eval_runs(db_path=db_path)
+
+    assert [run.agent_name for run in runs] == ["B", "A"]
+    assert runs[0].cases == []
+
+
+def test_get_eval_run_returns_none_for_an_unknown_id(tmp_path: Path) -> None:
+    """`get_eval_run` returns `None` when `db_path` has no such `eval_runs.id`."""
+    db_path = tmp_path / "runa.db"
+
+    assert get_eval_run(999, db_path=db_path) is None
+
+
+def test_get_eval_run_returns_the_run_with_its_cases(tmp_path: Path) -> None:
+    """`get_eval_run` reconstructs each `EvalCaseRow`, including its parsed `results`."""
+    db_path = tmp_path / "runa.db"
+    case_report = CaseReport(
+        index=0,
+        case=Case(input="hi", expected="hello"),
+        run=AgentRun(input="hi", final_output="hello"),
+        results=[
+            EvaluationResult(metric="task_completion", status=Status.PASS, reason="ok", score=1.0)
+        ],
+    )
+    run_id = save_report(Report(agent_name="A", cases=[case_report]), db_path=db_path)
+
+    run = get_eval_run(run_id, db_path=db_path)
+
+    assert run is not None
+    assert run.agent_name == "A"
+    assert len(run.cases) == 1
+    assert run.cases[0].input == "hi"
+    assert run.cases[0].output == "hello"
+    assert run.cases[0].passed is True
+    assert run.cases[0].results[0]["metric"] == "task_completion"

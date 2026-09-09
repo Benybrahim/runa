@@ -28,6 +28,7 @@ from runa.cli.new import ProjectAlreadyExists, scaffold_project
 from runa.cli.sessions import SessionNotFound, list_sessions, show_session
 from runa.cli.test import run_project_tests
 from runa.cli.traces import TraceNotFound, list_errors_cli, list_traces_cli, show_trace
+from runa.cli.ui import serve_ui
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -103,6 +104,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
     traces_show_parser = traces_subparsers.add_parser("show", help="Show a trace's span tree")
     traces_show_parser.add_argument("trace_id")
+
+    ui_parser = subparsers.add_parser(
+        "ui", help="Serve a local dashboard over this app's db/runa.db (needs the `ui` extra)"
+    )
+    ui_parser.add_argument("--host", default="127.0.0.1")
+    ui_parser.add_argument("--port", type=int, default=8765)
 
     return parser
 
@@ -238,6 +245,10 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
         failed = sum(1 for result in results if not result.passed)
         print(f"\n{len(results) - failed}/{len(results)} passed")
         return 1 if failed else 0
+
+    if args.command == "ui":
+        serve_ui(cwd, host=args.host, port=args.port)
+        return 0
 
     if args.traces_action == "list":
         print(list_traces_cli(root=cwd))

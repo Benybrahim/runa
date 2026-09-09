@@ -19,6 +19,8 @@ runa traces errors           # most recent traces that errored
 runa traces show TRACE_ID    # one trace's full span tree
 ```
 
+Or visually, with `runa ui` — see [CLI Reference](cli.md#runa-ui).
+
 ### Privacy Policy
 
 `observe()` configures what tracing captures, globally or for a block:

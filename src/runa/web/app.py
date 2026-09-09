@@ -1,0 +1,79 @@
+"""web/app.py: the `runa ui` FastAPI app -- Agents, Sessions, Traces, Evaluations, read-only.
+
+Every route calls straight into one `web/<page>.py`'s render function; no route does its own
+data-fetching or HTML-building. `create_app(root)` closes over the app's directory, the same way
+every `cli/*.py` command takes `root` as a parameter instead of assuming `cwd`.
+"""
+
+from pathlib import Path
+
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+
+from runa.cli._project import AppLoadError, NotARunaProject
+from runa.web import agents as agents_page
+from runa.web import evaluations as evaluations_page
+from runa.web import sessions as sessions_page
+from runa.web import traces as traces_page
+from runa.web._html import empty, page
+
+
+def _error_page(active: str, message: str) -> str:
+    return page(title="Error", active=active, body=f"<h1>Error</h1>{empty(message)}")
+
+
+def create_app(root: Path) -> FastAPI:
+    """Build the `runa ui` app for the project at `root`."""
+    app = FastAPI(title="runa ui", docs_url=None, redoc_url=None)
+
+    @app.get("/", include_in_schema=False)
+    def index() -> RedirectResponse:
+        return RedirectResponse("/agents")
+
+    @app.get("/agents", response_class=HTMLResponse, include_in_schema=False)
+    def agents_list() -> str:
+        return agents_page.render(root=root)
+
+    @app.get("/sessions", response_class=HTMLResponse, include_in_schema=False)
+    def sessions_list() -> str:
+        return sessions_page.render_list(root=root)
+
+    @app.get("/sessions/{session_id}", response_class=HTMLResponse, include_in_schema=False)
+    def session_detail(session_id: str) -> HTMLResponse:
+        try:
+            return HTMLResponse(sessions_page.render_detail(session_id, root=root))
+        except sessions_page.SessionNotFound as exc:
+            return HTMLResponse(_error_page("Sessions", str(exc)), status_code=404)
+
+    @app.get("/traces", response_class=HTMLResponse, include_in_schema=False)
+    def traces_list(status: str | None = None) -> str:
+        return traces_page.render_list(root=root, status=status)
+
+    @app.get("/traces/{trace_id}", response_class=HTMLResponse, include_in_schema=False)
+    def trace_detail(trace_id: str) -> HTMLResponse:
+        try:
+            return HTMLResponse(traces_page.render_detail(trace_id, root=root))
+        except traces_page.TraceNotFound as exc:
+            return HTMLResponse(_error_page("Traces", str(exc)), status_code=404)
+
+    @app.get("/evaluations", response_class=HTMLResponse, include_in_schema=False)
+    def evaluations_list() -> str:
+        return evaluations_page.render_list(root=root)
+
+    @app.get("/evaluations/{run_id}", response_class=HTMLResponse, include_in_schema=False)
+    def evaluation_detail(run_id: int) -> HTMLResponse:
+        try:
+            return HTMLResponse(evaluations_page.render_detail(run_id, root=root))
+        except evaluations_page.EvalRunNotFound as exc:
+            return HTMLResponse(_error_page("Evaluations", str(exc)), status_code=404)
+
+    @app.exception_handler(NotARunaProject)
+    def _not_a_project(_request: Request, exc: NotARunaProject) -> HTMLResponse:
+        return HTMLResponse(_error_page("Agents", str(exc)), status_code=400)
+
+    @app.exception_handler(AppLoadError)
+    def _app_load_error(_request: Request, exc: AppLoadError) -> HTMLResponse:
+        message = f"failed to load main.py: {exc}"
+        return HTMLResponse(_error_page("Agents", message), status_code=500)
+
+    return app

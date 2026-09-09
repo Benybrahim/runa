@@ -73,13 +73,14 @@ async def _stream_async(
 
         system_instructions = await _resolve_instructions(current_agent, context_wrapper)
         turn_tools = await _agent_tools(current_agent)
+        handoff_map = _normalized_handoffs(getattr(current_agent, "handoffs", []))
         async for delta in model.stream_response(
             system_instructions,
             items,
             _model_settings(current_agent),
             turn_tools,
             getattr(current_agent, "output_type", None),
-            getattr(current_agent, "handoffs", []),
+            list(handoff_map.values()),
         ):
             yield RawResponsesStreamEvent(data=delta)
             if delta.text:
@@ -111,7 +112,6 @@ async def _stream_async(
             await hooks.on_agent_end(context_wrapper, current_agent, message["content"] or "")
             return
 
-        handoff_map = _normalized_handoffs(getattr(current_agent, "handoffs", []))
         for call in message["tool_calls"]:
             yield RunItemStreamEvent(name="tool_called", item=call)
             name = call["function"]["name"]

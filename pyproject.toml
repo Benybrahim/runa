@@ -18,6 +18,7 @@ dependencies = [
 [project.optional-dependencies]
 postgres = ["asyncpg>=0.30.0", "pgvector>=0.3.6"]
 redis = ["redis>=5.2.0"]
+ui = ["fastapi>=0.121.0", "uvicorn>=0.38.0"]
 
 [project.scripts]
 runa = "runa.cli.main:main"
@@ -28,9 +29,8 @@ dev = [
     "ruff>=0.16.4",
     "pyright>=1.1.400",
     "python-dotenv>=1.2.3",
-    "fastapi>=0.121.0",
-    "uvicorn>=0.38.0",
-    "runa[postgres,redis]",
+    "httpx>=0.28.0",
+    "runa[postgres,redis,ui]",
 ]
 
 [build-system]
