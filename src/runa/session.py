@@ -65,6 +65,17 @@ class SessionABC(ABC):
     async def clear_session(self) -> None:
         """Delete this session and all of its items."""
 
+    async def set_items(self, items: list[TResponseInputItem]) -> None:
+        """Replace this session's entire history with `items` -- `Agent(compact=...)`'s hook.
+
+        A concrete default built from `clear_session`/`add_items`, not `@abstractmethod`: an
+        existing custom `SessionABC` gets this for free, with no new method it's forced to
+        implement. Override for a single-transaction replace if that matters for your store, the
+        way `SQLiteSession` does.
+        """
+        await self.clear_session()
+        await self.add_items(items)
+
 
 class SQLiteSession(SessionABC):
     """Conversation history for one `session_id`, persisted to `runa.db`."""
@@ -119,6 +130,25 @@ class SQLiteSession(SessionABC):
                 f"INSERT INTO {_MESSAGES_TABLE} (session_id, message_data) VALUES (?, ?)",
                 [(self.session_id, json.dumps(item)) for item in items],
             )
+            conn.execute(
+                f"UPDATE {_SESSIONS_TABLE} SET updated_at = CURRENT_TIMESTAMP WHERE session_id = ?",
+                (self.session_id,),
+            )
+            conn.commit()
+
+    async def set_items(self, items: list[TResponseInputItem]) -> None:
+        """Replace this session's entire history with `items`, in one transaction."""
+        with closing(self._connect()) as conn:
+            conn.execute(f"DELETE FROM {_MESSAGES_TABLE} WHERE session_id = ?", (self.session_id,))
+            if items:
+                conn.execute(
+                    f"INSERT OR IGNORE INTO {_SESSIONS_TABLE} (session_id) VALUES (?)",
+                    (self.session_id,),
+                )
+                conn.executemany(
+                    f"INSERT INTO {_MESSAGES_TABLE} (session_id, message_data) VALUES (?, ?)",
+                    [(self.session_id, json.dumps(item)) for item in items],
+                )
             conn.execute(
                 f"UPDATE {_SESSIONS_TABLE} SET updated_at = CURRENT_TIMESTAMP WHERE session_id = ?",
                 (self.session_id,),

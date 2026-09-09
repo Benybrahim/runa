@@ -6,8 +6,10 @@ file `SQLiteSession` uses (`_sqlite.py`). A `vec0` virtual table holds the embed
 by `user_id` for correct per-user nearest-neighbor search; a companion table holds the text/
 metadata they came from, joined back to it by rowid.
 
-`_remember_from_conversation` is what `_runner._core._run_async` calls after a run to turn the
-turn's exchange into zero or more remembered facts -- internal, not part of the public API.
+`remember_from_conversation` is what `_runner._core._run_async` calls after a run to turn the
+turn's exchange into zero or more remembered facts; `MemoryLike` is the contract (it and
+`search`) a wholesale custom `memory=` object needs, as opposed to `Memory(store=...)`'s
+narrower escape hatch of swapping just the storage backend.
 """
 
 from __future__ import annotations
@@ -43,6 +45,30 @@ class MemoryMatch:
     text: str
     metadata: dict[str, Any] | None
     distance: float
+
+
+class MemoryLike(Protocol):
+    """What `Agent(memory=...)` needs from a custom memory object, beyond `"auto"`/`"llm"`/`None`.
+
+    `Memory` satisfies this already. Implement it yourself to replace Runa's embeddings-based
+    retrieval entirely -- a different scoring method, a hosted memory service, keyword search,
+    whatever -- rather than just swapping `Memory(store=...)`'s storage backend. No inheritance
+    required; `Agent.__init__` accepts any object shaped like this.
+    """
+
+    async def search(self, query: str, *, user_id: str | None = None, k: int = 5) -> list[Any]:
+        """Return up to `k` items relevant to `query`, most relevant first."""
+        ...
+
+    async def remember_from_conversation(
+        self, conversation: str, *, user_id: str | None, model: Any
+    ) -> list[str]:
+        """Extract and store whatever from `conversation` is durably worth remembering.
+
+        Returns the texts stored, empty if none were worth it. `model` is the agent's own
+        resolved `Model`, handed back in case extraction wants an LLM call of its own.
+        """
+        ...
 
 
 class MemoryStore(Protocol):
@@ -260,13 +286,15 @@ class Memory:
 
         return search_memory
 
-    async def _remember_from_conversation(
+    async def remember_from_conversation(
         self, conversation: str, *, user_id: str | None, model: Any
     ) -> list[str]:
         """Ask `model` what's durably worth remembering from `conversation`, and store it.
 
-        Internal: called by `_runner._core._run_async` after a run when `agent.memory` is set,
-        not meant to be called directly. Returns the texts it stored, empty if none were worth it.
+        Called by `_runner._core._run_async` after a run when `agent.memory` is set, not meant to
+        be called directly by app code -- but part of `MemoryLike`, the contract a custom
+        `memory=` object must implement alongside `search`. Returns the texts it stored, empty if
+        none were worth it.
         """
         prompt = _EXTRACTION_PROMPT.format(conversation=conversation)
         response = await model.get_response(
@@ -283,4 +311,4 @@ class Memory:
         return stored
 
 
-__all__ = ["Memory", "MemoryMatch", "MemoryStore"]
+__all__ = ["Memory", "MemoryLike", "MemoryMatch", "MemoryStore"]

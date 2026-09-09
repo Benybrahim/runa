@@ -37,6 +37,7 @@ _AGENT_FIELDS = (
     "hooks",
     "memory",
     "knowledge",
+    "compact",
 )
 
 _MODEL_PROVIDER = ModelProvider()
@@ -137,15 +138,19 @@ def _flatten_subagents(subagents: SubagentsList | SubagentsDict) -> SubagentsLis
 
 def _resolve_retrieval_setting(
     setting: Any, cls: type[Memory] | type[Knowledge], tools: list[FunctionTool]
-) -> Memory | Knowledge | None:
+) -> Any:
     """Resolve a `memory=`/`knowledge=` setting to the instance (or `None`) `Agent` should store.
 
     Shared by both, since they follow the identical four-shape contract documented on
-    `Agent.__init__`: `None`/an instance pass through, `"auto"` builds a default instance,
-    `"llm"` appends a search tool and leaves the attribute `None`, anything else is a `UserError`.
+    `Agent.__init__`: `None` passes through, `"auto"` builds a default instance, `"llm"` appends
+    a search tool and leaves the attribute `None`. Anything else -- a `Memory`/`Knowledge`, or any
+    other object shaped like `MemoryLike`/`KnowledgeLike` -- passes through untouched too, since
+    `_runner._core` only ever calls its methods, never checks its type: this is the escape hatch
+    for a wholesale custom `memory=`/`knowledge=` object. Only an unrecognized *string* is
+    rejected, so a typo fails clearly instead of being silently treated as a custom object.
     """
     name = cls.__name__.lower()
-    if setting is None or isinstance(setting, cls):
+    if setting is None or not isinstance(setting, str):
         return setting
     if setting == "auto":
         return cls()
@@ -153,7 +158,8 @@ def _resolve_retrieval_setting(
         tools.append(cls()._as_tool())
         return None
     raise UserError(
-        f"{name} must be 'auto', 'llm', a {cls.__name__}(...), or None, got {setting!r}"
+        f"{name} must be 'auto', 'llm', a {cls.__name__}(...)-shaped object, or None, "
+        f"got {setting!r}"
     )
 
 
@@ -191,21 +197,31 @@ class Agent:
         `mcp_servers=[...]`; both are merged into `mcp_servers` if given together.
 
         `memory` opts this agent into long-term memory, one of:
-          - `"auto"` (or a `Memory(...)` instance): `Runner` retrieves relevant memories before
-            each run and persists new ones after -- no manual `memory.search`/`.remember` calls.
+          - `"auto"` (or a `Memory(...)` instance, or any object shaped like `runa.memory`'s
+            `MemoryLike`): `Runner` retrieves relevant memories before each run and persists new
+            ones after -- no manual `memory.search`/`.remember` calls.
           - `"llm"`: the model gets a `search_memory` tool and decides itself when to call it;
             no automatic retrieval/persistence.
           - `None` (the default): the agent behaves exactly as if `runa.memory` didn't exist.
         `"llm"` always uses a default `Memory()`; pass your own instance for `"auto"` mode if you
-        need a non-default `db_path`/`model`/`store`.
+        need a non-default `db_path`/`model`/`store` -- or a wholesale custom `MemoryLike` object
+        to replace embeddings-based retrieval entirely, not just its storage backend.
 
         `knowledge` opts this agent into retrieval from application/domain documents, one of
-        `"auto"`, `"llm"`, a `Knowledge(...)` instance, or `None` (the default) -- the same four
-        shapes as `memory`, with the same meaning: `"auto"`/an instance searches automatically
-        before every turn (no `tools=[...]` wiring needed); `"llm"` gives the model a
-        `search_knowledge` tool it calls itself; `None` leaves the agent unaffected.
+        `"auto"`, `"llm"`, a `Knowledge(...)` (or `KnowledgeLike`-shaped) instance, or `None` (the
+        default) -- the same four shapes as `memory`, with the same meaning: `"auto"`/an instance
+        searches automatically before every turn (no `tools=[...]` wiring needed); `"llm"` gives
+        the model a `search_knowledge` tool it calls itself; `None` leaves the agent unaffected.
         `"llm"` always uses a default `Knowledge()`; pass your own instance for `"auto"` mode if
-        you need a non-default `directory`/`db_path`/`model`/`store`.
+        you need a non-default `directory`/`db_path`/`model`/`store`, or a custom `KnowledgeLike`
+        object for a retrieval pipeline of your own.
+
+        `compact` keeps `history`/`session` from growing without bound, one of:
+          - `True`: `runa.compact.default_compactor` -- past `DEFAULT_COMPACTION_TOKENS`, keep
+            only the most recent exchange. A rolling window, not a summary.
+          - a `runa.compact.Compactor` (any `(items, usage_tokens) -> items | None` callable):
+            your own strategy -- a different threshold, an LLM summary, whatever you return.
+          - `False` (the default): off.
         """
         if type(self) is Agent:
             raise TypeError("Agent must be subclassed, e.g. `class MyAgent(Agent): name = ...`")
@@ -255,6 +271,7 @@ class Agent:
         self.output_guardrails = new_output_guardrails
         self.output_type: type | None = kwargs.get("output_type")
         self.hooks = kwargs.get("hooks")
+        self.compact: bool = kwargs.get("compact", False)
 
         self.history: list[TResponseInputItem] = []
         self.usage = Usage()

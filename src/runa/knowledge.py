@@ -10,6 +10,8 @@ Kept deliberately separate from `Memory`: `Memory` is durable facts about a user
 from conversations; `Knowledge` is the application's own domain documents, put there by whoever
 built the app. `_runner._core._run_async` is what makes retrieval automatic during `run` -- see
 its `knowledge`/`_knowledge_block` handling, the same shape as its `memory` handling.
+`KnowledgeLike` is the contract a wholesale custom `knowledge=` object needs, as opposed to
+`Knowledge(store=...)`'s narrower escape hatch of swapping just the storage backend.
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ import sqlite3
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from runa._sqlite import DEFAULT_DB_PATH
 from runa._sqlite import connect as _connect_db
@@ -44,6 +46,20 @@ class KnowledgeMatch:
     text: str
     source: str
     distance: float
+
+
+class KnowledgeLike(Protocol):
+    """What `Agent(knowledge=...)` needs from a custom object, beyond `"auto"`/`"llm"`/`None`.
+
+    `Knowledge` satisfies this already. Implement it yourself to replace Runa's own
+    discover-chunk-embed pipeline entirely -- a hosted retrieval service, a differently-indexed
+    document store, whatever -- rather than just swapping `Knowledge(store=...)`'s storage
+    backend. No inheritance required.
+    """
+
+    async def search(self, query: str, *, k: int = 5) -> list[Any]:
+        """Return up to `k` items relevant to `query`, most relevant first."""
+        ...
 
 
 class KnowledgeStore(Protocol):
@@ -251,4 +267,4 @@ class Knowledge:
         return search_knowledge
 
 
-__all__ = ["Knowledge", "KnowledgeMatch", "KnowledgeStore"]
+__all__ = ["Knowledge", "KnowledgeLike", "KnowledgeMatch", "KnowledgeStore"]

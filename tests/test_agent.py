@@ -354,6 +354,31 @@ def test_memory_accepts_a_custom_instance_for_auto_mode() -> None:
     assert "search_memory" not in _tool_names(agent)
 
 
+def test_memory_accepts_a_wholesale_custom_object_not_just_a_memory_instance() -> None:
+    """A non-`Memory` object shaped like `MemoryLike` is accepted as-is: the escape hatch."""
+
+    class CustomMemory:
+        async def search(self, query: str, *, user_id: str | None = None, k: int = 5) -> list[Any]:
+            return []
+
+        async def remember_from_conversation(
+            self, conversation: str, *, user_id: str | None, model: Any
+        ) -> list[str]:
+            return []
+
+    custom = CustomMemory()
+
+    class WithCustomMemory(Agent):
+        name = "WithCustomMemory"
+        instructions = "has custom memory"
+        memory = custom
+
+    agent = WithCustomMemory()
+
+    assert agent.memory is custom
+    assert "search_memory" not in _tool_names(agent)
+
+
 def test_memory_kwarg_also_works_as_a_constructor_argument() -> None:
     """`Agent(..., memory="auto")` works the same as setting it as a class attribute."""
 
@@ -432,6 +457,26 @@ def test_knowledge_accepts_a_custom_instance_for_auto_mode() -> None:
         knowledge = custom
 
     agent = WithKnowledge()
+
+    assert agent.knowledge is custom
+    assert "search_knowledge" not in _tool_names(agent)
+
+
+def test_knowledge_accepts_a_wholesale_custom_object_not_just_a_knowledge_instance() -> None:
+    """A non-`Knowledge` object shaped like `KnowledgeLike` is accepted as-is: the escape hatch."""
+
+    class CustomKnowledge:
+        async def search(self, query: str, *, k: int = 5) -> list[Any]:
+            return []
+
+    custom = CustomKnowledge()
+
+    class WithCustomKnowledge(Agent):
+        name = "WithCustomKnowledge"
+        instructions = "has custom knowledge"
+        knowledge = custom
+
+    agent = WithCustomKnowledge()
 
     assert agent.knowledge is custom
     assert "search_knowledge" not in _tool_names(agent)

@@ -329,6 +329,120 @@ def test_gen_trace_id_returns_a_fresh_id_each_time() -> None:
     assert gen_trace_id() != gen_trace_id()
 
 
+def test_to_input_list_does_not_duplicate_generated_items() -> None:
+    """`original_input` must stay independent of `items`, or the turn's own output doubles up.
+
+    `_run_turns` appends every generated message straight onto the `items` list it's handed; if
+    `original_input` aliased that same list (as it used to), `to_input_list` would return the
+    turn's output twice -- once folded into `original_input`, once from `_generated_items`.
+    """
+    agent = _agent(model=_ScriptedModel([_text_response("hi there")]))
+
+    result = asyncio.run(
+        Runner.run(agent, [{"role": "user", "content": "hi"}], run_config=_run_config())
+    )
+
+    assert result.to_input_list() == [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "hi there", "tool_calls": None},
+    ]
+
+
+def _huge_usage() -> Usage:
+    return Usage(input_tokens=200_001, output_tokens=1, total_tokens=200_002, requests=1)
+
+
+def test_compact_drops_history_before_the_latest_user_message_once_over_budget() -> None:
+    """`agent.compact=True` trims older turns once this run's usage crosses 200k tokens."""
+    agent = _agent(model=_ScriptedModel([_text_response("ok", usage=_huge_usage())]), compact=True)
+    history = [
+        {"role": "user", "content": "old question"},
+        {"role": "assistant", "content": "old answer", "tool_calls": None},
+        {"role": "user", "content": "new question"},
+    ]
+
+    result = asyncio.run(Runner.run(agent, history, run_config=_run_config()))
+
+    assert result.to_input_list() == [
+        {"role": "user", "content": "new question"},
+        {"role": "assistant", "content": "ok", "tool_calls": None},
+    ]
+    compact_spans = [s for s in result.trace.spans if s.type == "custom" and s.name == "compact"]
+    assert compact_spans
+    assert all(s.output == {"dropped": 2} for s in compact_spans)
+
+
+def test_compact_defaults_to_off() -> None:
+    """Without `compact=True`, history is left alone no matter how large usage gets."""
+    agent = _agent(model=_ScriptedModel([_text_response("ok", usage=_huge_usage())]))
+    history = [
+        {"role": "user", "content": "old question"},
+        {"role": "assistant", "content": "old answer", "tool_calls": None},
+        {"role": "user", "content": "new question"},
+    ]
+
+    result = asyncio.run(Runner.run(agent, history, run_config=_run_config()))
+
+    assert result.to_input_list() == [
+        *history,
+        {"role": "assistant", "content": "ok", "tool_calls": None},
+    ]
+    assert not [s for s in result.trace.spans if s.type == "custom" and s.name == "compact"]
+
+
+def test_compact_shrinks_session_backed_history_too(tmp_path: Any) -> None:
+    """`compact=True` replaces a session's stored history too, not just `agent.history`."""
+    from runa.session import SQLiteSession
+
+    session = SQLiteSession("s1", db_path=tmp_path / "runa.db")
+    asyncio.run(
+        session.add_items(
+            [
+                {"role": "user", "content": "old question"},
+                {"role": "assistant", "content": "old answer", "tool_calls": None},
+            ]
+        )
+    )
+    agent = _agent(model=_ScriptedModel([_text_response("ok", usage=_huge_usage())]), compact=True)
+
+    asyncio.run(Runner.run(agent, "new question", session=session, run_config=_run_config()))
+
+    assert asyncio.run(session.get_items()) == [
+        {"role": "user", "content": "new question"},
+        {"role": "assistant", "content": "ok", "tool_calls": None},
+    ]
+
+
+def test_compact_accepts_a_custom_compactor_callable() -> None:
+    """`compact=` also accepts a plain `(items, tokens) -> items|None` callable, not just `True`.
+
+    Its own arbitrary strategy (here: drop the oldest single item, ignoring `usage_tokens`
+    entirely) takes effect -- proof the built-in `default_compactor` isn't secretly still in
+    charge.
+    """
+    calls: list[int] = []
+
+    def drop_oldest_item(items: list[Any], usage_tokens: int) -> list[Any] | None:
+        calls.append(usage_tokens)
+        return items[1:] if len(items) > 1 else None
+
+    agent = _agent(model=_ScriptedModel([_text_response("ok")]), compact=drop_oldest_item)
+    history = [
+        {"role": "user", "content": "old question"},
+        {"role": "assistant", "content": "old answer", "tool_calls": None},
+        {"role": "user", "content": "new question"},
+    ]
+
+    result = asyncio.run(Runner.run(agent, history, run_config=_run_config()))
+
+    assert calls == [2, 2]  # consulted twice: mid-run on `items`, again on `original_input`
+    assert result.to_input_list() == [
+        {"role": "assistant", "content": "old answer", "tool_calls": None},
+        {"role": "user", "content": "new question"},
+        {"role": "assistant", "content": "ok", "tool_calls": None},
+    ]
+
+
 class _MemoryMatchStub:
     """Just enough of `MemoryMatch` for `_memory_block` to format it -- no `runa.memory` import."""
 
@@ -348,7 +462,7 @@ class _FakeMemory:
         self.search_calls.append((query, user_id))
         return self.matches
 
-    async def _remember_from_conversation(
+    async def remember_from_conversation(
         self, conversation: str, *, user_id: str | None, model: Any
     ) -> list[str]:
         self.remembered.append((conversation, user_id, model))
@@ -447,7 +561,7 @@ def test_memory_extraction_failure_degrades_gracefully() -> None:
         async def search(self, query: str, *, user_id: str | None = None, k: int = 5) -> list[Any]:
             return []
 
-        async def _remember_from_conversation(self, *args: Any, **kwargs: Any) -> list[str]:
+        async def remember_from_conversation(self, *args: Any, **kwargs: Any) -> list[str]:
             raise RuntimeError("boom")
 
     agent = _agent(model=_ScriptedModel([_text_response("ok")]), memory=_BoomMemory())

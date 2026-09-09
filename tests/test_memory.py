@@ -230,7 +230,7 @@ def test_remember_from_conversation_stores_extracted_candidates(tmp_path: Path) 
     model = _FakeModel('{"memories": ["User prefers Japanese."]}')
 
     async def _run():
-        stored = await mem._remember_from_conversation(
+        stored = await mem.remember_from_conversation(
             "User: hi\nAssistant: hello", user_id="u1", model=model
         )
         matches = await mem.search("language preference", user_id="u1")
@@ -250,7 +250,7 @@ def test_remember_from_conversation_stores_nothing_when_the_model_finds_nothing(
     model = _FakeModel('{"memories": []}')
 
     async def _run():
-        return await mem._remember_from_conversation(
+        return await mem.remember_from_conversation(
             "User: hi\nAssistant: hello", user_id="u1", model=model
         )
 

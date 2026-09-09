@@ -18,6 +18,7 @@ from runa._runner._state import RunConfig, RunResult, RunState, gen_trace_id
 from runa._runner._streaming import RunResultStreaming
 from runa._runner._tool_calls import _run_message_tool_calls, _TurnOutcome
 from runa._types import RunContextWrapper, TResponseInputItem
+from runa.compact import Compactor, default_compactor
 from runa.exceptions import MaxTurnsExceeded, ModelBehaviorError, RunaError
 from runa.logging import RunHooks, logger
 from runa.session import SessionABC
@@ -74,6 +75,41 @@ async def _retrieve(
         return []
 
 
+def _resolve_compactor(agent: Any) -> Compactor | None:
+    """`agent.compact` to the `Compactor` to run, or `None` if compaction is off.
+
+    `True` means Runa's own `default_compactor`; anything else truthy is trusted as already
+    being a `Compactor` -- `Agent(compact=...)`'s escape hatch, the same shape as
+    `memory=`/`knowledge=` accepting an instance instead of `"auto"`.
+    """
+    compact = getattr(agent, "compact", False)
+    if not compact:
+        return None
+    return default_compactor if compact is True else compact
+
+
+def _maybe_compact(
+    agent: Any, items: list[TResponseInputItem], usage_tokens: int, trace: Trace, parent_id: str
+) -> None:
+    """Run `agent.compact`'s `Compactor`, if any, and replace `items` in place if it trims them.
+
+    Called twice: mid-`_run_turns`, on `items`, so a single run's own repeated calls (a long
+    tool-calling loop) don't keep resending an ever-growing prompt; and once more in `_run_async`
+    (on `original_input` for a no-session run, or on the full `[*history, *new_tail]` view for a
+    session-backed one) so the *next* call's history reflects the same cut too.
+    """
+    compactor = _resolve_compactor(agent)
+    if compactor is None:
+        return
+    replacement = compactor(items, usage_tokens)
+    if replacement is None or len(replacement) == len(items):
+        return
+    span = _new_span(trace, parent_id, "compact", "custom", input={"tokens": usage_tokens})
+    dropped = len(items) - len(replacement)
+    items[:] = replacement
+    _close_span(span, output={"dropped": dropped})
+
+
 async def _run_turns(
     current_agent: Any,
     items: list[TResponseInputItem],
@@ -118,6 +154,9 @@ async def _run_turns(
         context_wrapper.usage.add(response.usage)
         _close_span(llm_span, output={"usage": response.usage.__dict__})
         await hooks.on_llm_end(context_wrapper, current_agent, response)
+        _maybe_compact(
+            current_agent, items, context_wrapper.usage.total_tokens, trace, agent_span_id
+        )
 
         if not response.output:
             raise ModelBehaviorError("model returned no output items")
@@ -171,6 +210,7 @@ async def _run_async(
     if run_config.group_id is not None or run_config.trace_metadata is not None:
         trace.metadata = {**(run_config.trace_metadata or {}), "group_id": run_config.group_id}
 
+    history: list[TResponseInputItem] = []
     if session is not None:
         history = await session.get_items()
         new_message = {"role": "user", "content": input} if isinstance(input, str) else None
@@ -178,7 +218,7 @@ async def _run_async(
         original_input: list[TResponseInputItem] = []
     else:
         items = [{"role": "user", "content": input}] if isinstance(input, str) else list(input)
-        original_input = items if not isinstance(input, str) else []
+        original_input = list(items) if not isinstance(input, str) else []
 
     memory = getattr(agent, "memory", None)
     knowledge = getattr(agent, "knowledge", None)
@@ -275,20 +315,37 @@ async def _run_async(
 
     if session is not None:
         to_persist = [{"role": "user", "content": input}] if isinstance(input, str) else list(input)
-        await session.add_items([*to_persist, *outcome.generated])
+        new_tail = [*to_persist, *outcome.generated]
+        full_history = [*history, *new_tail]
+        _maybe_compact(
+            agent, full_history, context_wrapper.usage.total_tokens, trace, agent_span.id
+        )
+        if len(full_history) == len(history) + len(new_tail):
+            await session.add_items(new_tail)
+        else:
+            await session.set_items(full_history)
 
     if memory is not None and memory_query is not None:
         extraction_span = _new_span(trace, None, "memory", "custom", input=memory_query)
         try:
             conversation = f"User: {memory_query}\nAssistant: {outcome.final_output}"
             resolved_model = _resolve_model(agent, run_config.model_provider)
-            stored = await memory._remember_from_conversation(
+            stored = await memory.remember_from_conversation(
                 conversation, user_id=user_id, model=resolved_model
             )
             _close_span(extraction_span, output={"stored": len(stored)})
         except Exception as exc:
             _close_span(extraction_span, error=str(exc))
             logger.warning("memory extraction failed for agent %s", agent.name, exc_info=True)
+
+    # `original_input` is what `agent.history` becomes via `to_input_list()` for a no-session run
+    # (the session case is compacted above, against `session`'s own stored history) -- compact it
+    # too, so the *next* call starts from the same cut `items` already made mid-run, not the full
+    # pre-compaction history.
+    if session is None:
+        _maybe_compact(
+            agent, original_input, context_wrapper.usage.total_tokens, trace, agent_span.id
+        )
 
     await hooks.on_agent_end(context_wrapper, outcome.current_agent, outcome.final_output)
     _export(trace)

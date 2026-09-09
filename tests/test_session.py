@@ -77,6 +77,56 @@ def test_clear_session_drops_its_items_and_row(tmp_path: Path) -> None:
     assert row is None
 
 
+def test_set_items_replaces_the_entire_history(tmp_path: Path) -> None:
+    """`set_items` drops whatever was stored and writes `items` in its place."""
+    session = SQLiteSession("s1", db_path=tmp_path / "runa.db")
+
+    async def _run() -> list[Any]:
+        await session.add_items(
+            [{"role": "user", "content": "old"}, {"role": "assistant", "content": "reply"}]
+        )
+        await session.set_items([{"role": "user", "content": "new"}])
+        return await session.get_items()
+
+    assert asyncio.run(_run()) == [{"role": "user", "content": "new"}]
+
+
+def test_sessionabc_default_set_items_works_without_an_override(tmp_path: Path) -> None:
+    """A custom `SessionABC` gets `set_items` for free from `clear_session`/`add_items`.
+
+    No new abstract method to implement -- an existing subclass that predates `set_items` still
+    gets correct (if not transactional) behavior for it, unlike `SQLiteSession`'s own override.
+    """
+    from runa.session import SessionABC
+
+    class PlainSession(SessionABC):
+        def __init__(self) -> None:
+            self.session_id = "s1"
+            self.user_id = None
+            self._items: list[Any] = []
+
+        async def get_items(self, limit: int | None = None) -> list[Any]:
+            return list(self._items) if limit is None else self._items[-limit:]
+
+        async def add_items(self, items: list[Any]) -> None:
+            self._items.extend(items)
+
+        async def pop_item(self) -> Any | None:
+            return self._items.pop() if self._items else None
+
+        async def clear_session(self) -> None:
+            self._items = []
+
+    session = PlainSession()
+
+    async def _run() -> list[Any]:
+        await session.add_items([{"role": "user", "content": "old"}])
+        await session.set_items([{"role": "user", "content": "new"}])
+        return await session.get_items()
+
+    assert asyncio.run(_run()) == [{"role": "user", "content": "new"}]
+
+
 def test_sessions_are_isolated_by_session_id(tmp_path: Path) -> None:
     """Items added under one `session_id` don't leak into another sharing the same `runa.db`."""
     db_path = tmp_path / "runa.db"
