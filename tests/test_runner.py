@@ -368,6 +368,13 @@ def test_memory_is_searched_before_the_turn_and_injected_as_a_labeled_block() ->
     assert ("system", "Relevant memories:\n- User prefers Japanese.") in sent
     assert result.final_output == "ok"
 
+    (agent_span,) = [s for s in result.trace.spans if s.type == "agent"]
+    (retrieval_span,) = [s for s in result.trace.spans if s.type == "retrieval"]
+    assert retrieval_span.name == "memory"
+    assert retrieval_span.parent_id == agent_span.id
+    assert retrieval_span.status == "ok"
+    assert retrieval_span.output == {"count": 1}
+
 
 def test_memory_with_no_matches_injects_nothing() -> None:
     """An empty `search` result leaves the model's input exactly as it would be without memory."""
@@ -386,7 +393,7 @@ def test_memory_extraction_runs_after_the_turn_with_the_exchange_and_resolved_mo
     model = _ScriptedModel([_text_response("sure, noted")])
     agent = _agent(model=model, memory=memory)
 
-    asyncio.run(Runner.run(agent, "I prefer Japanese", run_config=_run_config()))
+    result = asyncio.run(Runner.run(agent, "I prefer Japanese", run_config=_run_config()))
 
     assert len(memory.remembered) == 1
     conversation, user_id, resolved_model = memory.remembered[0]
@@ -394,6 +401,11 @@ def test_memory_extraction_runs_after_the_turn_with_the_exchange_and_resolved_mo
     assert "sure, noted" in conversation
     assert user_id is None
     assert resolved_model is model
+
+    (extraction_span,) = [s for s in result.trace.spans if s.type == "custom"]
+    assert extraction_span.name == "memory"
+    assert extraction_span.status == "ok"
+    assert extraction_span.output == {"stored": 0}
 
 
 def test_memory_user_id_is_derived_from_the_session(tmp_path: Any) -> None:
@@ -423,6 +435,10 @@ def test_memory_retrieval_failure_degrades_gracefully() -> None:
 
     assert result.final_output == "ok"
 
+    (retrieval_span,) = [s for s in result.trace.spans if s.type == "retrieval"]
+    assert retrieval_span.status == "error"
+    assert retrieval_span.error == "boom"
+
 
 def test_memory_extraction_failure_degrades_gracefully() -> None:
     """A broken extraction step doesn't fail the run; the final output is unaffected."""
@@ -439,6 +455,10 @@ def test_memory_extraction_failure_degrades_gracefully() -> None:
     result = asyncio.run(Runner.run(agent, "hi", run_config=_run_config()))
 
     assert result.final_output == "ok"
+
+    (extraction_span,) = [s for s in result.trace.spans if s.type == "custom"]
+    assert extraction_span.status == "error"
+    assert extraction_span.error == "boom"
 
 
 class _KnowledgeMatchStub:
@@ -472,6 +492,11 @@ def test_knowledge_is_searched_before_the_turn_and_injected_as_a_labeled_block()
     sent = [(item.get("role"), item.get("content")) for item in model.calls[0]]
     assert ("system", "Relevant knowledge:\n- Refunds take 5 business days.") in sent
     assert result.final_output == "ok"
+
+    (retrieval_span,) = [s for s in result.trace.spans if s.type == "retrieval"]
+    assert retrieval_span.name == "knowledge"
+    assert retrieval_span.status == "ok"
+    assert retrieval_span.output == {"count": 1}
 
 
 def test_knowledge_with_no_matches_injects_nothing() -> None:

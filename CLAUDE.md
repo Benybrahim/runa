@@ -33,3 +33,4 @@ Conventions: [Runa.md](./RUNA.md)
 - Don't Repeat Yourself
 - Keep it Simple
 - You Aren't Gonna Need it
+- Give Escape Hatch

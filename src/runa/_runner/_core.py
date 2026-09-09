@@ -49,12 +49,27 @@ async def _no_matches() -> list[Any]:
 
 
 async def _retrieve(
-    source: Any, query: str, *, label: str, agent_name: str, **search_kwargs: Any
+    source: Any,
+    query: str,
+    *,
+    label: str,
+    agent_name: str,
+    trace: Trace,
+    parent_id: str,
+    **search_kwargs: Any,
 ) -> list[Any]:
-    """Search `source` for `query`, degrading to no matches (and a logged warning) if it raises."""
+    """Search `source` for `query`, degrading to no matches (and a logged warning) if it raises.
+
+    Wrapped in a `"retrieval"` span so a trace shows whether memory/knowledge were consulted, what
+    came back, and any failure -- not just the `llm`/`agent` spans around it.
+    """
+    span = _new_span(trace, parent_id, label, "retrieval", input=query)
     try:
-        return await source.search(query, **search_kwargs)
-    except Exception:
+        matches = await source.search(query, **search_kwargs)
+        _close_span(span, output={"count": len(matches)})
+        return matches
+    except Exception as exc:
+        _close_span(span, error=str(exc))
         logger.warning("%s retrieval failed for agent %s", label, agent_name, exc_info=True)
         return []
 
@@ -169,12 +184,30 @@ async def _run_async(
     knowledge = getattr(agent, "knowledge", None)
     user_id = getattr(session, "user_id", None) if session is not None else None
     memory_query = _latest_user_text(items)
+
+    agent_span = _new_span(trace, None, agent.name, "agent")
+
     if memory_query is not None and (memory is not None or knowledge is not None):
         memory_matches, knowledge_matches = await asyncio.gather(
-            _retrieve(memory, memory_query, label="memory", agent_name=agent.name, user_id=user_id)
+            _retrieve(
+                memory,
+                memory_query,
+                label="memory",
+                agent_name=agent.name,
+                trace=trace,
+                parent_id=agent_span.id,
+                user_id=user_id,
+            )
             if memory is not None
             else _no_matches(),
-            _retrieve(knowledge, memory_query, label="knowledge", agent_name=agent.name)
+            _retrieve(
+                knowledge,
+                memory_query,
+                label="knowledge",
+                agent_name=agent.name,
+                trace=trace,
+                parent_id=agent_span.id,
+            )
             if knowledge is not None
             else _no_matches(),
         )
@@ -183,7 +216,6 @@ async def _run_async(
         if knowledge_matches:
             items.insert(len(items) - 1, _knowledge_block(knowledge_matches))
 
-    agent_span = _new_span(trace, None, agent.name, "agent")
     await hooks.on_agent_start(context_wrapper, agent)
     try:
         await _run_input_guardrails(agent, context_wrapper, input, trace, agent_span.id)
@@ -246,13 +278,16 @@ async def _run_async(
         await session.add_items([*to_persist, *outcome.generated])
 
     if memory is not None and memory_query is not None:
+        extraction_span = _new_span(trace, None, "memory", "custom", input=memory_query)
         try:
             conversation = f"User: {memory_query}\nAssistant: {outcome.final_output}"
             resolved_model = _resolve_model(agent, run_config.model_provider)
-            await memory._remember_from_conversation(
+            stored = await memory._remember_from_conversation(
                 conversation, user_id=user_id, model=resolved_model
             )
-        except Exception:
+            _close_span(extraction_span, output={"stored": len(stored)})
+        except Exception as exc:
+            _close_span(extraction_span, error=str(exc))
             logger.warning("memory extraction failed for agent %s", agent.name, exc_info=True)
 
     await hooks.on_agent_end(context_wrapper, outcome.current_agent, outcome.final_output)
