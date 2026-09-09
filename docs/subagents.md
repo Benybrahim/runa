@@ -29,14 +29,17 @@ class Assistant(Agent):
 `SomeAgent.handoff` transfers the whole conversation to `SomeAgent` — from
 that point on, it's the one talking to the user. Use this when a subagent
 should fully take over (e.g. "route this support ticket to billing").
+`.h` is shorthand for `.handoff` — the exact same binding, just shorter to
+type. There's no other way to bind a handoff.
 
 ## Delegate
 
-`SomeAgent.delegate` wires `SomeAgent` in as a callable tool instead. The
-calling agent stays in control: it calls the subagent, gets its output
-back, and decides what to do next. Use this when you want a subroutine,
-not a handoff (e.g. "ask the researcher, then summarize their answer
-yourself").
+`SomeAgent.delegate` wires `SomeAgent` in as a callable tool instead: it
+does the task and returns its result to the calling agent, like a tool
+call. The calling agent stays in control — it gets the output back and
+decides what to do next. Use this when you want a subroutine, not a
+handoff (e.g. "ask the researcher, then summarize their answer
+yourself"). `.d` is shorthand for `.delegate`, same as `.h`/`.handoff`.
 
 A bare entry in `subagents` (no `.handoff`/`.delegate`) is wired as
 **both** — a handoff and a delegate tool at once — so the model can either

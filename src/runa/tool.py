@@ -1,6 +1,6 @@
 """`@tool` decorator for exposing functions to agents.
 
-`function_tool` derives a JSON schema for the model to call a plain Python function by, purely by
+`tool` derives a JSON schema for the model to call a plain Python function by, purely by
 reflection over its signature (`_schema_from_signature` below) — the same "let types speak for
 themselves" approach the rest of Runa follows, and the one the `pyright` override comment in
 `pyproject.toml` already documents as this codebase's intended design for tool schemas.
@@ -17,6 +17,7 @@ from types import UnionType
 from typing import Any, Literal, get_args, get_origin, get_type_hints, overload
 
 from runa._types import RunContextWrapper
+from runa.approval import _NeedsApproval as _ApprovalPredicate
 from runa.guardrail import (
     ToolGuardrailsDict,
     ToolGuardrailsList,
@@ -26,7 +27,7 @@ from runa.guardrail import (
 )
 
 _RESERVED_PARAMS = ("ctx", "call_id")
-_NeedsApproval = bool | Callable[[RunContextWrapper, dict[str, Any], str], Awaitable[bool]]
+_NeedsApproval = bool | _ApprovalPredicate
 
 
 @dataclass
@@ -110,31 +111,35 @@ def _bind_arguments(
 
 
 @overload
-def function_tool(func: Callable[..., Any]) -> FunctionTool: ...
+def tool(func: Callable[..., Any]) -> FunctionTool: ...
 
 
 @overload
-def function_tool(
+def tool(
     func: None = None,
     *,
     name_override: str | None = None,
     description_override: str | None = None,
-    tool_input_guardrails: list[ToolInputGuardrail[Any]] | None = None,
-    tool_output_guardrails: list[ToolOutputGuardrail[Any]] | None = None,
+    guardrails: ToolGuardrailsList | ToolGuardrailsDict | None = None,
     needs_approval: _NeedsApproval = False,
 ) -> Callable[[Callable[..., Any]], FunctionTool]: ...
 
 
-def function_tool(
+def tool(
     func: Callable[..., Any] | None = None,
     *,
     name_override: str | None = None,
     description_override: str | None = None,
-    tool_input_guardrails: list[ToolInputGuardrail[Any]] | None = None,
-    tool_output_guardrails: list[ToolOutputGuardrail[Any]] | None = None,
+    guardrails: ToolGuardrailsList | ToolGuardrailsDict | None = None,
     needs_approval: _NeedsApproval = False,
 ) -> FunctionTool | Callable[[Callable[..., Any]], FunctionTool]:
-    """Wrap a plain function as a `FunctionTool`, deriving its schema from its signature."""
+    """Wrap a plain function as a `FunctionTool`, deriving its schema from its signature.
+
+    `guardrails=[...]` (or `{...}`) wires `@guardrail` predicates — bare (wired as both sides)
+    or bound via `.input`/`.output` — against the tool call's parsed arguments and its return
+    value, respectively.
+    """
+    input_guardrails, output_guardrails = flatten_tool_guardrails(guardrails or [])
 
     def decorator(fn: Callable[..., Any]) -> FunctionTool:
         schema, _ = _schema_from_signature(fn)
@@ -150,47 +155,12 @@ def function_tool(
             description=description_override or (inspect.getdoc(fn) or "").strip(),
             params_json_schema=schema,
             on_invoke_tool=on_invoke_tool,
-            tool_input_guardrails=tool_input_guardrails,
-            tool_output_guardrails=tool_output_guardrails,
+            tool_input_guardrails=input_guardrails or None,
+            tool_output_guardrails=output_guardrails or None,
             needs_approval=needs_approval,
         )
 
     return decorator(func) if func is not None else decorator
 
 
-@overload
-def tool(func: Callable[..., Any]) -> FunctionTool: ...
-
-
-@overload
-def tool(
-    func: None = None,
-    *,
-    guardrail: ToolGuardrailsList | ToolGuardrailsDict | None = None,
-    **kwargs: Any,
-) -> Callable[[Callable[..., Any]], FunctionTool]: ...
-
-
-def tool(
-    func: Callable[..., Any] | None = None,
-    *,
-    guardrail: ToolGuardrailsList | ToolGuardrailsDict | None = None,
-    **kwargs: Any,
-) -> FunctionTool | Callable[[Callable[..., Any]], FunctionTool]:
-    """Wrap a function as a `FunctionTool`, adding a `guardrail=[...]` (or `{...}`) list.
-
-    Accepts native `ToolInputGuardrail`/`ToolOutputGuardrail`, a bare `@guardrail` predicate
-    (wired as both), or the same `.input`/`.output`-bound predicate used for `Agent.guardrails`
-    — reused here against the tool call's parsed arguments and its return value, respectively.
-    Everything else, including `needs_approval`, passes straight through to `function_tool`.
-    """
-    input_guardrails, output_guardrails = flatten_tool_guardrails(guardrail or [])
-    decorator = function_tool(
-        tool_input_guardrails=input_guardrails or None,
-        tool_output_guardrails=output_guardrails or None,
-        **kwargs,
-    )
-    return decorator(func) if func is not None else decorator
-
-
-__all__ = ["FunctionTool", "function_tool", "tool"]
+__all__ = ["FunctionTool", "tool"]

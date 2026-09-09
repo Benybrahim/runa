@@ -26,9 +26,12 @@ Each one stands alone — read whichever covers what you're building today.
 * **[Sessions and Chat](sessions.md).**
   Persisting conversation history with `SQLiteSession`, and `runa chat`.
 
-* **[MCP Servers and Approval](mcp_and_approval.md).**
-  Connecting to external tool servers over MCP, and gating sensitive tool
-  calls behind human approval.
+* **[MCP Servers](mcp.md).**
+  Connecting to external tool servers over MCP.
+
+* **[Human Approval](approval.md).**
+  Gating sensitive tool calls behind human approval, and how that differs
+  from a guardrail.
 
 ## Testing and Evaluation
 

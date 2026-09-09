@@ -2,6 +2,8 @@
 
 Runa is an opinionated Python framework for agentic AI.
 
+Conventions: [Runa.md](./RUNA.md)
+
 ## Commands
 
 * `make install`: uv sync

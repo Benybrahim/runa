@@ -222,7 +222,7 @@ def test_tool_input_guardrail_tripwire_halts_the_run() -> None:
         """Trip on any arguments."""
         return bool(args)
 
-    @tool(guardrail=[block_args.input])
+    @tool(guardrails=[block_args.input])
     def search(query: str) -> str:
         """Search for something."""
         return "results"

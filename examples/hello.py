@@ -46,7 +46,7 @@ def log_call(value: object) -> bool:
     return False
 
 
-@tool(guardrail=[no_args.input, block_long.output, log_call])
+@tool(guardrails=[no_args.input, block_long.output, log_call])
 def now() -> str:
     """Return the current local time as an ISO 8601 string."""
     return datetime.now().isoformat()

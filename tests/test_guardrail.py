@@ -85,21 +85,6 @@ def test_bare_guardrail_wires_both_input_and_output() -> None:
     assert [g.name for g in agent.output_guardrails] == ["block_empty"]
 
 
-def test_explicit_input_guardrails_kwarg_merges_with_class_attribute() -> None:
-    """An explicit `input_guardrails` kwarg is preserved alongside the `guardrails` attribute."""
-    bound_input, bound_output = block_empty.input, block_long.output
-
-    class Support(Agent):
-        name = "Support"
-        instructions = "support"
-        guardrails = [bound_output]
-
-    agent = Support(input_guardrails=[bound_input])
-
-    assert agent.input_guardrails == [bound_input]
-    assert agent.output_guardrails == [bound_output]
-
-
 def test_dict_guardrails_wire_by_key() -> None:
     """A `{"input": [...], "output": [...]}` dict binds each bare entry by its key."""
 
@@ -129,6 +114,20 @@ def test_output_predicate_false_does_not_trip() -> None:
     result = _run(block_long.output, "short")
 
     assert result.tripwire_triggered is False
+
+
+def test_i_and_o_are_shorthand_for_input_and_output() -> None:
+    """`.i`/`.o` bind exactly like `.input`/`.output` — same guardrail, same name, same side."""
+
+    class Support(Agent):
+        name = "Support"
+        instructions = "support"
+        guardrails = [block_empty.i, block_long.o]
+
+    agent = Support()
+
+    assert [g.name for g in agent.input_guardrails] == ["block_empty"]
+    assert [g.name for g in agent.output_guardrails] == ["block_long"]
 
 
 def test_async_predicate_is_awaited() -> None:

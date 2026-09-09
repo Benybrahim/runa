@@ -152,6 +152,20 @@ def test_delegate_adds_only_to_tools() -> None:
     assert _tool_names(agent) == [Researcher().as_tool(None, None).name]
 
 
+def test_h_and_d_are_shorthand_for_handoff_and_delegate() -> None:
+    """`.h`/`.d` bind exactly like `.handoff`/`.delegate` — same subagent, same mode."""
+
+    class Main(Agent):
+        name = "Main"
+        instructions = "main"
+        subagents = [Researcher.h, Translator.d]
+
+    agent = Main()
+
+    assert _handoff_names(agent) == ["Researcher"]
+    assert _tool_names(agent) == [Translator().as_tool(None, None).name]
+
+
 def test_delegate_tool_name_and_description_override() -> None:
     """Calling a `.delegate` subagent overrides the generated tool's name/description."""
 

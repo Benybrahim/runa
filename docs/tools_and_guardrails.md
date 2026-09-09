@@ -83,6 +83,8 @@ class SupportAgent(Agent):
 
 * On `.input`, the predicate sees the latest user message as plain text.
 * On `.output`, it sees the agent's final output.
+* `.i`/`.o` are shorthand for `.input`/`.output` — the exact same binding,
+  just shorter to type. There's no other way to bind a guardrail.
 
 Listed bare (no `.input`/`.output`), a guardrail is wired to both sides:
 
@@ -103,7 +105,7 @@ back with `status="error"` instead of raising.
 ### Guardrails on Tools
 
 The same `@guardrail` predicate works against a tool's arguments or return
-value, via `@tool(guardrail=[...])`:
+value, via `@tool(guardrails=[...])`:
 
 ```python
 @guardrail
@@ -112,7 +114,7 @@ def no_args(args: dict) -> bool:
     return bool(args)
 
 
-@tool(guardrail=[no_args.input])
+@tool(guardrails=[no_args.input])
 def now() -> str:
     """Return the current time."""
     ...
@@ -128,5 +130,7 @@ A guardrail predicate can be `async def` too; it's awaited automatically.
 
 ## Human Approval
 
-Some tool calls shouldn't run without a person saying yes — see
-[MCP Servers and Approval](mcp_and_approval.md).
+Some tool calls shouldn't run without a person saying yes. That's a
+different mechanism from a guardrail — a guardrail's predicate is the
+final verdict, `needs_approval`'s predicate only decides whether to stop
+and ask a human — see [Human Approval](approval.md).

@@ -98,7 +98,7 @@ class OutputGuardrailTripwireTriggered(RunaError):
 
 
 class ToolInputGuardrailTripwireTriggered(RunaError):
-    """Raised when a `@tool(guardrail=...)` input guardrail's tripwire trips."""
+    """Raised when a `@tool(guardrails=...)` input guardrail's tripwire trips."""
 
     def __init__(
         self, guardrail: ToolInputGuardrail[Any], output: ToolGuardrailFunctionOutput
@@ -110,7 +110,7 @@ class ToolInputGuardrailTripwireTriggered(RunaError):
 
 
 class ToolOutputGuardrailTripwireTriggered(RunaError):
-    """Raised when a `@tool(guardrail=...)` output guardrail's tripwire trips."""
+    """Raised when a `@tool(guardrails=...)` output guardrail's tripwire trips."""
 
     def __init__(
         self, guardrail: ToolOutputGuardrail[Any], output: ToolGuardrailFunctionOutput

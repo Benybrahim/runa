@@ -30,10 +30,7 @@ _AGENT_FIELDS = (
     "model",
     "model_settings",
     "tools",
-    "handoffs",
     "mcp_servers",
-    "input_guardrails",
-    "output_guardrails",
     "output_type",
     "hooks",
 )
@@ -135,6 +132,11 @@ def _flatten_subagents(subagents: SubagentsList | SubagentsDict) -> SubagentsLis
 
 
 class _Mode:
+    """Descriptor behind `Agent.handoff`/`.delegate`; `.h`/`.d` alias the same instances.
+
+    Accessed on a subclass (`SomeAgent.handoff`), builds a `Subagent` bound to that mode.
+    """
+
     def __init__(self, mode: Literal["handoff", "delegate"]) -> None:
         self.mode: Literal["handoff", "delegate"] = mode
 
@@ -151,7 +153,9 @@ class Agent:
     """
 
     handoff = _Mode("handoff")
+    h = handoff
     delegate = _Mode("delegate")
+    d = delegate
     model = "gpt-5.4-nano"
 
     def __init__(self, **kwargs: Any) -> None:
@@ -172,7 +176,7 @@ class Agent:
         if "instructions" not in kwargs:
             kwargs["instructions"] = _load_prompt(type(self), kwargs["name"])
 
-        handoffs = list(kwargs.get("handoffs") or [])
+        handoffs: list[Any] = []
         tools = list(kwargs.get("tools") or [])
         mcp_servers = [
             *(kwargs.get("mcp_servers") or []),
@@ -201,8 +205,8 @@ class Agent:
         self.tools: list[FunctionTool] = tools
         self.handoffs: list[Any] = handoffs
         self.mcp_servers: list[Any] = mcp_servers
-        self.input_guardrails = [*(kwargs.get("input_guardrails") or []), *new_input_guardrails]
-        self.output_guardrails = [*(kwargs.get("output_guardrails") or []), *new_output_guardrails]
+        self.input_guardrails = new_input_guardrails
+        self.output_guardrails = new_output_guardrails
         self.output_type: type | None = kwargs.get("output_type")
         self.hooks = kwargs.get("hooks")
 

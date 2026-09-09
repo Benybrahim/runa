@@ -210,7 +210,7 @@ class GreeterAgent(Agent):
 ```
 
 The same `@guardrail` predicate works on a tool's arguments or return
-value, via `@tool(guardrail=[...])`:
+value, via `@tool(guardrails=[...])`:
 
 ```python
 @guardrail
@@ -219,7 +219,7 @@ def no_args(args: dict) -> bool:
     return bool(args)
 
 
-@tool(guardrail=[no_args.input])
+@tool(guardrails=[no_args.input])
 def current_time() -> str:
     """Return the current local time as an ISO 8601 string."""
     return datetime.now().isoformat()

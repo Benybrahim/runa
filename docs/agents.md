@@ -24,7 +24,7 @@ class SupportAgent(Agent):
 | `tools`        | `[]`             | `@tool`-decorated functions — see [Tools and Guardrails](tools_and_guardrails.md) |
 | `subagents`    | `[]`             | Other agents to hand off or delegate to — see [Subagents](subagents.md) |
 | `guardrails`   | `[]`             | Input/output checks — see [Tools and Guardrails](tools_and_guardrails.md) |
-| `mcp`/`mcp_servers` | `[]`        | MCP servers whose tools this agent can call — see [MCP Servers](mcp_and_approval.md) |
+| `mcp`/`mcp_servers` | `[]`        | MCP servers whose tools this agent can call — see [MCP Servers](mcp.md) |
 | `output_type`  | `None`           | A type the final output must parse as |
 | `hooks`        | `None`           | An `AgentHooks` instance scoped to this agent |
 

@@ -1,4 +1,4 @@
-"""Tests for the `@tool` decorator's `guardrail=` wiring."""
+"""Tests for the `@tool` decorator's `guardrails=` wiring."""
 
 import asyncio
 from collections.abc import Awaitable
@@ -61,7 +61,7 @@ def test_bare_tool_has_no_guardrails_or_approval() -> None:
 def test_guardrail_list_splits_by_binding() -> None:
     """`.input`/`.output`-bound entries land in their matching SDK tool-guardrail list."""
 
-    @tool(guardrail=[block_args.input, block_long.output])
+    @tool(guardrails=[block_args.input, block_long.output])
     def now() -> str:
         """Return a constant string."""
         return "now"
@@ -73,7 +73,7 @@ def test_guardrail_list_splits_by_binding() -> None:
 def test_bare_guardrail_wires_both_sides() -> None:
     """A bare `@guardrail` predicate in the list is wired as both input and output."""
 
-    @tool(guardrail=[block_args])
+    @tool(guardrails=[block_args])
     def now() -> str:
         """Return a constant string."""
         return "now"
@@ -85,7 +85,7 @@ def test_bare_guardrail_wires_both_sides() -> None:
 def test_dict_guardrails_wire_by_key() -> None:
     """A `{"input": [...], "output": [...]}` dict binds each bare entry by its key."""
 
-    @tool(guardrail={"input": [block_args], "output": [block_long]})
+    @tool(guardrails={"input": [block_args], "output": [block_long]})
     def now() -> str:
         """Return a constant string."""
         return "now"
@@ -98,14 +98,14 @@ def test_invalid_guardrail_entry_raises() -> None:
     """A `guardrail` entry not bound via `.input`/`.output` is rejected."""
     with pytest.raises(TypeError, match="guardrail entries must be"):
 
-        @tool(guardrail=cast(Any, [lambda value: False]))
+        @tool(guardrails=cast(Any, [lambda value: False]))
         def now() -> str:
             """Return a constant string."""
             return "now"
 
 
 def test_needs_approval_passes_through_natively() -> None:
-    """`needs_approval=True` forwards straight through to `function_tool`, unmodified."""
+    """`needs_approval=True` forwards straight through to `FunctionTool`, unmodified."""
 
     @tool(needs_approval=True)
     def now() -> str:
@@ -118,7 +118,7 @@ def test_needs_approval_passes_through_natively() -> None:
 def test_tool_input_guardrail_sees_parsed_arguments() -> None:
     """An `.input`-bound predicate, reused in a tool context, sees parsed call arguments."""
 
-    @tool(guardrail=[block_args.input])
+    @tool(guardrails=[block_args.input])
     def now() -> str:
         """Return a constant string."""
         return "now"
@@ -131,7 +131,7 @@ def test_tool_input_guardrail_sees_parsed_arguments() -> None:
 def test_tool_output_guardrail_sees_return_value() -> None:
     """An `.output`-bound predicate, reused in a tool context, sees the tool's return value."""
 
-    @tool(guardrail=[block_long.output])
+    @tool(guardrails=[block_long.output])
     def now() -> str:
         """Return a constant string."""
         return "now"
