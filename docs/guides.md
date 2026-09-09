@@ -29,6 +29,9 @@ Each one stands alone — read whichever covers what you're building today.
 * **[Memory](memory.md).**
   Long-term, semantic memory that persists across conversations.
 
+* **[Cache](cache.md).**
+  A minimal get/set/delete/clear cache, independent of Agent/Memory/Sessions.
+
 * **[MCP Servers](mcp.md).**
   Connecting to external tool servers over MCP.
 

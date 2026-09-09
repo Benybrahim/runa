@@ -2,6 +2,7 @@
 
 from runa.agent import Agent
 from runa.approval import approval
+from runa.cache import Cache, MemoryCache, SQLiteCache
 from runa.eval import (
     DEFAULT_THRESHOLDS,
     Case,
@@ -25,6 +26,7 @@ __all__ = [
     "DEFAULT_THRESHOLDS",
     "Agent",
     "AgentHooks",
+    "Cache",
     "Case",
     "CaseReport",
     "ConsoleExporter",
@@ -38,10 +40,12 @@ __all__ = [
     "MCPServerStdio",
     "MCPServerStreamableHttp",
     "Memory",
+    "MemoryCache",
     "MemoryMatch",
     "Report",
     "Run",
     "RunHooks",
+    "SQLiteCache",
     "SQLiteExporter",
     "SQLiteSession",
     "Span",

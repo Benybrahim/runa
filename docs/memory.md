@@ -60,3 +60,6 @@ one user's facts never surface in another's search.
 Remembering a near-duplicate of an existing memory skips the write and
 returns the existing id instead — restating the same fact across
 conversations doesn't pile up duplicates.
+
+For a plain get/set/delete/clear cache — no embeddings, no `user_id`
+scoping — see [Cache](cache.md) instead.
