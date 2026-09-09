@@ -13,6 +13,7 @@ from runa._types import ModelSettings, RunContextWrapper, TResponseInputItem, Us
 from runa.exceptions import RunaError, UserError
 from runa.guardrail import flatten_agent_guardrails
 from runa.handoff import agent_as_tool
+from runa.knowledge import Knowledge
 from runa.logging import LoggingRunHooks, RunHooks
 from runa.memory import Memory
 from runa.run import Run
@@ -35,6 +36,7 @@ _AGENT_FIELDS = (
     "output_type",
     "hooks",
     "memory",
+    "knowledge",
 )
 
 _MODEL_PROVIDER = ModelProvider()
@@ -174,6 +176,14 @@ class Agent:
           - `None` (the default): the agent behaves exactly as if `runa.memory` didn't exist.
         `"llm"` always uses a default `Memory()`; pass your own instance for `"auto"` mode if you
         need a non-default `db_path`/`model`/`store`.
+
+        `knowledge` opts this agent into retrieval from application/domain documents, one of
+        `"auto"`, `"llm"`, a `Knowledge(...)` instance, or `None` (the default) -- the same four
+        shapes as `memory`, with the same meaning: `"auto"`/an instance searches automatically
+        before every turn (no `tools=[...]` wiring needed); `"llm"` gives the model a
+        `search_knowledge` tool it calls itself; `None` leaves the agent unaffected.
+        `"llm"` always uses a default `Knowledge()`; pass your own instance for `"auto"` mode if
+        you need a non-default `directory`/`db_path`/`model`/`store`.
         """
         if type(self) is Agent:
             raise TypeError("Agent must be subclassed, e.g. `class MyAgent(Agent): name = ...`")
@@ -220,6 +230,20 @@ class Agent:
         else:
             raise UserError(
                 f"memory must be 'auto', 'llm', a Memory(...), or None, got {memory_setting!r}"
+            )
+
+        knowledge_setting = kwargs.get("knowledge")
+        if knowledge_setting is None or isinstance(knowledge_setting, Knowledge):
+            self.knowledge = knowledge_setting
+        elif knowledge_setting == "auto":
+            self.knowledge = Knowledge()
+        elif knowledge_setting == "llm":
+            self.knowledge = None
+            tools.append(Knowledge()._as_tool())
+        else:
+            raise UserError(
+                "knowledge must be 'auto', 'llm', a Knowledge(...), or None, got "
+                f"{knowledge_setting!r}"
             )
 
         self.name: str = kwargs["name"]

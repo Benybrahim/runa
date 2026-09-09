@@ -37,6 +37,12 @@ def _memory_block(matches: list[Any]) -> TResponseInputItem:
     return {"role": "system", "content": f"Relevant memories:\n{lines}"}
 
 
+def _knowledge_block(matches: list[Any]) -> TResponseInputItem:
+    """A small, clearly labeled system message carrying retrieved `KnowledgeMatch`es."""
+    lines = "\n".join(f"- {match.text}" for match in matches)
+    return {"role": "system", "content": f"Relevant knowledge:\n{lines}"}
+
+
 async def _run_turns(
     current_agent: Any,
     items: list[TResponseInputItem],
@@ -144,6 +150,7 @@ async def _run_async(
         original_input = items if not isinstance(input, str) else []
 
     memory = getattr(agent, "memory", None)
+    knowledge = getattr(agent, "knowledge", None)
     user_id = getattr(session, "user_id", None) if session is not None else None
     memory_query = _latest_user_text(items)
     if memory is not None and memory_query is not None:
@@ -154,6 +161,15 @@ async def _run_async(
             memory_matches = []
         if memory_matches:
             items.insert(len(items) - 1, _memory_block(memory_matches))
+
+    if knowledge is not None and memory_query is not None:
+        try:
+            knowledge_matches = await knowledge.search(memory_query)
+        except Exception:
+            logger.warning("knowledge retrieval failed for agent %s", agent.name, exc_info=True)
+            knowledge_matches = []
+        if knowledge_matches:
+            items.insert(len(items) - 1, _knowledge_block(knowledge_matches))
 
     agent_span = _new_span(trace, None, agent.name, "agent")
     await hooks.on_agent_start(context_wrapper, agent)

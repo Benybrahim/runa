@@ -31,5 +31,5 @@ Conventions: [Runa.md](./RUNA.md)
 - Optimize for Developer Happiness
 - Convention Over Configuration
 - Don't Repeat Yourself
-- Keep it simple
+- Keep it Simple
 - You Aren't Gonna Need it

@@ -12,11 +12,12 @@ def test_scaffold_project_creates_the_conventional_app_layout(tmp_path: Path) ->
     project_dir = scaffold_project("demo", root=tmp_path)
 
     assert project_dir == tmp_path / "demo"
-    for subdir in ("agents", "tools", "prompts", "evaluations"):
+    for subdir in ("agents", "tools", "knowledge", "prompts", "evaluations"):
         assert (project_dir / "app" / subdir / "__init__.py").is_file()
     for subdir in ("tests", "config"):
         assert (project_dir / subdir / "__init__.py").is_file()
     assert (project_dir / "db").is_dir()
+    assert (project_dir / "docs").is_dir()
     for name in ("pyproject.toml", "README.md", "main.py", ".gitignore", ".env"):
         assert (project_dir / name).is_file()
 

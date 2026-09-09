@@ -441,6 +441,91 @@ def test_memory_extraction_failure_degrades_gracefully() -> None:
     assert result.final_output == "ok"
 
 
+class _KnowledgeMatchStub:
+    """Just enough of `KnowledgeMatch` for `_knowledge_block` to format -- no `runa.knowledge`."""
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
+class _FakeKnowledge:
+    """A duck-typed `agent.knowledge` stand-in: records what the runner calls it with."""
+
+    def __init__(self, matches: list[Any] | None = None) -> None:
+        self.matches = matches or []
+        self.search_calls: list[str] = []
+
+    async def search(self, query: str, *, k: int = 5) -> list[Any]:
+        self.search_calls.append(query)
+        return self.matches
+
+
+def test_knowledge_is_searched_before_the_turn_and_injected_as_a_labeled_block() -> None:
+    """`agent.knowledge.search` runs with the user's message, and its matches reach the model."""
+    knowledge = _FakeKnowledge(matches=[_KnowledgeMatchStub("Refunds take 5 business days.")])
+    model = _ScriptedModel([_text_response("ok")])
+    agent = _agent(model=model, knowledge=knowledge)
+
+    result = asyncio.run(Runner.run(agent, "hi", run_config=_run_config()))
+
+    assert knowledge.search_calls == ["hi"]
+    sent = [(item.get("role"), item.get("content")) for item in model.calls[0]]
+    assert ("system", "Relevant knowledge:\n- Refunds take 5 business days.") in sent
+    assert result.final_output == "ok"
+
+
+def test_knowledge_with_no_matches_injects_nothing() -> None:
+    """An empty `search` result leaves the model's input exactly as it would be without it."""
+    knowledge = _FakeKnowledge(matches=[])
+    model = _ScriptedModel([_text_response("ok")])
+    agent = _agent(model=model, knowledge=knowledge)
+
+    asyncio.run(Runner.run(agent, "hi", run_config=_run_config()))
+
+    assert model.calls[0] == [{"role": "user", "content": "hi"}]
+
+
+def test_knowledge_and_memory_can_both_inject_blocks_before_the_final_message() -> None:
+    """Memory and knowledge blocks are both injected, in order, right before the user's message."""
+    memory = _FakeMemory(matches=[_MemoryMatchStub("User prefers Japanese.")])
+    knowledge = _FakeKnowledge(matches=[_KnowledgeMatchStub("Refunds take 5 business days.")])
+    model = _ScriptedModel([_text_response("ok")])
+    agent = _agent(model=model, memory=memory, knowledge=knowledge)
+
+    asyncio.run(Runner.run(agent, "hi", run_config=_run_config()))
+
+    contents = [item.get("content") for item in model.calls[0]]
+    assert contents == [
+        "Relevant memories:\n- User prefers Japanese.",
+        "Relevant knowledge:\n- Refunds take 5 business days.",
+        "hi",
+    ]
+
+
+def test_knowledge_retrieval_failure_degrades_gracefully() -> None:
+    """A broken `knowledge.search` doesn't fail the run; the turn proceeds without knowledge."""
+
+    class _BoomKnowledge:
+        async def search(self, query: str, *, k: int = 5) -> list[Any]:
+            raise RuntimeError("boom")
+
+    agent = _agent(model=_ScriptedModel([_text_response("ok")]), knowledge=_BoomKnowledge())
+
+    result = asyncio.run(Runner.run(agent, "hi", run_config=_run_config()))
+
+    assert result.final_output == "ok"
+
+
+def test_agent_without_knowledge_behaves_exactly_as_before() -> None:
+    """An agent with no `knowledge` attribute at all runs unaffected -- no lookup, no injection."""
+    agent = _agent(model=_ScriptedModel([_text_response("ok")]))
+    assert not hasattr(agent, "knowledge")
+
+    result = asyncio.run(Runner.run(agent, "hi", run_config=_run_config()))
+
+    assert result.final_output == "ok"
+
+
 def test_agent_without_memory_behaves_exactly_as_before() -> None:
     """An agent with no `memory` attribute at all runs unaffected -- no lookup, no injection."""
     agent = _agent(model=_ScriptedModel([_text_response("ok")]))

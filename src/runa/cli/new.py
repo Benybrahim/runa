@@ -1,14 +1,15 @@
 """cli/new.py: scaffold a new Runa application.
 
 Establishes the conventional project layout so a fresh project has somewhere obvious to put
-agents, tools, prompts, and eval cases (under `app/`), plus tests, shared config, and the
-SQLite database (at the project root) without any configuration.
+agents, tools, prompts, and eval cases (under `app/`), plus tests, shared config, the SQLite
+database, and developer docs (at the project root) without any configuration.
 """
 
 from pathlib import Path
 
-_APP_SUBDIRS = ("agents", "tools", "prompts", "evaluations")
+_APP_SUBDIRS = ("agents", "tools", "knowledge", "prompts", "evaluations")
 _ROOT_PACKAGE_SUBDIRS = ("tests", "config")
+_ROOT_PLAIN_SUBDIRS = ("db", "docs")
 
 _PYPROJECT_TEMPLATE = """[project]
 name = "{name}"
@@ -62,11 +63,13 @@ A Runa application.
 - `.env`: your model's API key, gitignored; fill it in before running
 - `app/agents/`: Agent subclasses
 - `app/tools/`: `@tool`-decorated functions
+- `app/knowledge/`: files (Markdown, PDF, text, CSV) a `Knowledge()` retrieves from automatically
 - `app/prompts/`: prompt text, kept out of Python source
 - `app/evaluations/`: eval cases, run with `runa eval`
 - `tests/`: deterministic tests, run with `runa test`
 - `config/`: shared config (clients, settings)
 - `db/runa.db`: conversation history and traces, see `runa chat --list`/`--show`; don't commit it
+- `docs/`: developer documentation -- for agent-retrievable knowledge, see `app/knowledge/` instead
 
 Generate scaffolding with:
 
@@ -99,7 +102,8 @@ def scaffold_project(name: str, *, root: Path) -> Path:
         package_dir.mkdir(parents=True)
         (package_dir / "__init__.py").write_text("")
 
-    (project_dir / "db").mkdir()
+    for subdir in _ROOT_PLAIN_SUBDIRS:
+        (project_dir / subdir).mkdir()
 
     (project_dir / "pyproject.toml").write_text(_PYPROJECT_TEMPLATE.format(name=name))
     (project_dir / "README.md").write_text(_README_TEMPLATE.format(name=name))

@@ -15,6 +15,7 @@ from runa import Agent
 from runa._types import ModelResponse, RunContextWrapper, Usage
 from runa.agent import Subagent
 from runa.exceptions import MaxTurnsExceeded, RunErrorDetails
+from runa.knowledge import Knowledge
 from runa.logging import LoggingRunHooks
 from runa.memory import Memory
 from runa.tool import FunctionTool, tool
@@ -376,6 +377,89 @@ def test_memory_rejects_an_unknown_string() -> None:
 
     with pytest.raises(UserError, match="memory"):
         BadMemory()
+
+
+def test_knowledge_defaults_to_none() -> None:
+    """Without `knowledge=`, an agent behaves exactly as if `runa.knowledge` didn't exist."""
+    agent = Researcher()
+
+    assert agent.knowledge is None
+    assert "search_knowledge" not in _tool_names(agent)
+
+
+def test_knowledge_auto_gives_a_default_knowledge_instance_and_no_tool() -> None:
+    """`knowledge="auto"` builds a default `Knowledge` for the run lifecycle to use, with no tool.
+
+    Automatic retrieval is the run lifecycle's job (see `test_runner.py`), not something
+    `Agent.__init__` does.
+    """
+
+    class AutoKnowledge(Agent):
+        name = "AutoKnowledge"
+        instructions = "auto knowledge"
+        knowledge = "auto"
+
+    agent = AutoKnowledge()
+
+    assert isinstance(agent.knowledge, Knowledge)
+    assert "search_knowledge" not in _tool_names(agent)
+
+
+def test_knowledge_llm_adds_a_tool_and_leaves_self_knowledge_none() -> None:
+    """`knowledge="llm"` gives the model a `search_knowledge` tool instead of automatic retrieval.
+
+    Automatic retrieval is the run lifecycle's job, not something `Agent.__init__` does.
+    """
+
+    class LLMKnowledge(Agent):
+        name = "LLMKnowledge"
+        instructions = "llm knowledge"
+        knowledge = "llm"
+
+    agent = LLMKnowledge()
+
+    assert agent.knowledge is None
+    assert "search_knowledge" in _tool_names(agent)
+
+
+def test_knowledge_accepts_a_custom_instance_for_auto_mode() -> None:
+    """A `Knowledge(...)` class attribute is used as-is, same as `"auto"` but with that instance."""
+    custom = Knowledge(dimensions=4)
+
+    class WithKnowledge(Agent):
+        name = "WithKnowledge"
+        instructions = "has knowledge"
+        knowledge = custom
+
+    agent = WithKnowledge()
+
+    assert agent.knowledge is custom
+    assert "search_knowledge" not in _tool_names(agent)
+
+
+def test_knowledge_kwarg_also_works_as_a_constructor_argument() -> None:
+    """`Agent(..., knowledge="auto")` works the same as setting it as a class attribute."""
+
+    class WithKnowledge(Agent):
+        name = "WithKnowledge"
+        instructions = "has knowledge"
+
+    agent = WithKnowledge(knowledge="auto")
+
+    assert isinstance(agent.knowledge, Knowledge)
+
+
+def test_knowledge_rejects_an_unknown_string() -> None:
+    """A `knowledge=` string other than `"auto"`/`"llm"` fails clearly instead of misbehaving."""
+    from runa.exceptions import UserError
+
+    class BadKnowledge(Agent):
+        name = "BadKnowledge"
+        instructions = "bad knowledge"
+        knowledge = "sometimes"
+
+    with pytest.raises(UserError, match="knowledge"):
+        BadKnowledge()
 
 
 def test_history_starts_empty() -> None:

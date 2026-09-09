@@ -16,6 +16,10 @@ from runa.exceptions import ModelBehaviorError, UserError
 
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 
+# Shared by `runa.memory` and `runa.knowledge`: the vector size each built-in model returns, so
+# `dimensions=` only needs setting explicitly for a model not listed here.
+EMBEDDING_DIMENSIONS = {"text-embedding-3-small": 1536, "text-embedding-3-large": 3072}
+
 _BASE_URL = "https://api.openai.com/v1/"
 _EMBEDDINGS_PATH = "embeddings"
 
@@ -45,4 +49,4 @@ async def embed(texts: list[str], *, model: str = DEFAULT_EMBEDDING_MODEL) -> li
     return [item["embedding"] for item in sorted(data, key=lambda item: item["index"])]
 
 
-__all__ = ["DEFAULT_EMBEDDING_MODEL", "embed"]
+__all__ = ["DEFAULT_EMBEDDING_MODEL", "EMBEDDING_DIMENSIONS", "embed"]

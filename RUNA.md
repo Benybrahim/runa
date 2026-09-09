@@ -6,13 +6,13 @@ shape, not a menu of equivalent options. Where the rule is enforced in
 code (a raised error, not just a docs recommendation), that's noted —
 breaking it isn't a style nit, it's a `TypeError` at runtime.
 
-13 primitives:
+14 primitives:
 
 1. [Agent](#1-agent) 2. [Tool](#2-tool) 3. [Guardrail](#3-guardrail)
 4. [Approval](#4-approval) 5. [Subagent](#5-subagent-handoffdelegate)
-6. [Session](#6-session) 7. [Memory](#7-memory) 8. [MCP Server](#8-mcp-server)
-9. [Model](#9-model) 10. [Hooks](#10-hooks) 11. [Test](#11-test)
-12. [Eval](#12-eval-caseDataset) 13. [Tracing](#13-tracing)
+6. [Session](#6-session) 7. [Memory](#7-memory) 8. [Knowledge](#8-knowledge)
+9. [MCP Server](#9-mcp-server) 10. [Model](#10-model) 11. [Hooks](#11-hooks)
+12. [Test](#12-test) 13. [Eval](#13-eval-caseDataset) 14. [Tracing](#14-tracing)
 
 ## 1. Agent
 
@@ -146,7 +146,39 @@ class SupportAgent(Agent):
 `forget`, nothing lower. This is long-term memory *across* conversations;
 for one conversation's own turns, see [Session](#6-session).
 
-## 8. MCP Server
+## 8. Knowledge
+
+**Opt in via `Agent(knowledge=...)`, one of `"auto"`, `"llm"`, a `Knowledge(...)` instance, or
+`None` (the default) -- the same four shapes as [Memory](#7-memory).**
+
+```python
+class SupportAgent(Agent):
+    name = "support_agent"
+    knowledge = "auto"
+```
+
+* `"auto"` (or a `Knowledge(...)` instance): `Runner` searches it before every turn, injecting
+  matches as a labeled block -- no manual `.search` calls.
+* `"llm"`: the model gets a `search_knowledge` tool and decides itself when to call it.
+* `None`: the agent behaves exactly as if `runa.knowledge` didn't exist.
+
+`"llm"` always uses a default `Knowledge()`; pass your own instance for `"auto"` mode if you need
+a non-default `directory`/`db_path`/`model`/`store`. `Knowledge()` means `app/knowledge/`,
+`db/runa.db` (`sqlite-vec`), OpenAI's `text-embedding-3-small` -- discovery, chunking, embeddings,
+and vector storage are entirely internal; put Markdown/PDF/text/CSV files under `app/knowledge/`
+and no manual `.ingest()` call is needed either (`.search` ingests lazily on first use). Pass
+`Knowledge("some/other/path")` for a non-default source directory.
+
+`Knowledge` is application-scoped, not `user_id`-scoped, and its source of truth is a directory
+of files, not calls to `.remember` -- do not conflate it with [Memory](#7-memory):
+
+```text
+Session   = conversation history
+Memory    = durable user/agent facts
+Knowledge = application/domain information
+```
+
+## 9. MCP Server
 
 **Always built as `MCPServer(...).http(...)` or `MCPServer(...).stdio(...)`,
 listed in `mcp=`/`mcp_servers=` — never `MCPServerStdio(...)`/
@@ -167,7 +199,7 @@ connection opens lazily and lives for the agent's whole lifetime, so
 there's no explicit `.connect()`/`.close()` for user code to call in the
 common case.
 
-## 9. Model
+## 10. Model
 
 **Always a plain string on `model`, never a constructed client.** The
 string's prefix (`claude-`, `gpt-`, `gemini-`, `llama-`, `deepseek-`,
@@ -183,7 +215,7 @@ answerer) is expected, not an edge case — `model` is per-agent by design.
 Tune sampling with `model_settings = ModelSettings(...)`, never
 provider-specific kwargs on `model` itself.
 
-## 10. Hooks
+## 11. Hooks
 
 **Override only the lifecycle methods you need; every other method stays
 a no-op.** Two scopes, chosen by what the callback should see, not by
@@ -200,7 +232,7 @@ Don't subclass `LoggingRunHooks`/`LoggingAgentHooks` to add behavior;
 subclass `RunHooks`/`AgentHooks` directly and pass your own — the
 `Logging*` classes are the framework's default, not a base to build on.
 
-## 11. Test
+## 12. Test
 
 **A test is a bare `test_*` function using plain `assert` — no pytest, no
 custom assertion helpers.** `runa test` is its own small runner, not a
@@ -216,7 +248,7 @@ def test_answers_politely():
 `async def test_*` is awaited automatically — don't wrap async tests in
 `asyncio.run` yourself.
 
-## 12. Eval (Case/Dataset)
+## 13. Eval (Case/Dataset)
 
 **A module under `app/evaluations/` declares exactly two module-level
 names, `agent` and `dataset`** (a list of `Case`); `runa eval` imports
@@ -235,7 +267,7 @@ a case doesn't need "for completeness." The judge model defaults to the
 agent's own `model`; override it with `judge=` only when a cheaper/
 different model should grade instead of the agent's own.
 
-## 13. Tracing
+## 14. Tracing
 
 **Never configured, never opted into — every `Agent.run`/`run_sync` is
 traced automatically**, and `Run.trace` is always populated. Reach for

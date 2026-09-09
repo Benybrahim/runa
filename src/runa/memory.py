@@ -24,13 +24,11 @@ from typing import Any, Protocol
 from runa._sqlite import DEFAULT_DB_PATH
 from runa._sqlite import connect as _connect_db
 from runa._types import ModelSettings
-from runa.embeddings import DEFAULT_EMBEDDING_MODEL, embed
+from runa.embeddings import DEFAULT_EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, embed
 from runa.tool import FunctionTool, tool
 
 _ITEMS_TABLE = "memory_items"
 _VECTORS_TABLE = "memory_vectors"
-
-_DIMENSIONS = {"text-embedding-3-small": 1536, "text-embedding-3-large": 3072}
 
 # L2 distance over the ~unit-norm vectors OpenAI's embedding models return: only a near-verbatim
 # restatement falls under this, not a merely related fact -- see `Memory.remember`.
@@ -216,7 +214,7 @@ class Memory:
         `dimensions` only needs setting for a model not in Runa's built-in size table.
         """
         self.model = model
-        resolved_dimensions = dimensions or _DIMENSIONS.get(model)
+        resolved_dimensions = dimensions or EMBEDDING_DIMENSIONS.get(model)
         if resolved_dimensions is None:
             raise ValueError(f"unknown embedding size for {model!r}; pass dimensions= explicitly")
         self.dimensions: int = resolved_dimensions

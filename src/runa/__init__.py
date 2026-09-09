@@ -12,6 +12,7 @@ from runa.eval import (
     Status,
 )
 from runa.guardrail import guardrail
+from runa.knowledge import Knowledge, KnowledgeMatch
 from runa.logging import AgentHooks, LoggingAgentHooks, LoggingRunHooks, RunHooks
 from runa.mcp import MCPServer, MCPServerStdio, MCPServerStreamableHttp
 from runa.memory import Memory, MemoryMatch
@@ -29,6 +30,8 @@ __all__ = [
     "ConsoleExporter",
     "Dataset",
     "EvaluationResult",
+    "Knowledge",
+    "KnowledgeMatch",
     "LoggingAgentHooks",
     "LoggingRunHooks",
     "MCPServer",
