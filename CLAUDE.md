@@ -28,6 +28,7 @@ Conventions: [Runa.md](./RUNA.md)
 
 ## Development principles
 
+- Rails way
 - Optimize for Developer Happiness
 - Convention Over Configuration
 - Don't Repeat Yourself
