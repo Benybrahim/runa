@@ -17,6 +17,12 @@ from runa.agent import _MODEL_PROVIDER, Agent
 _TRAILING_COMMA = re.compile(r",\s*([\]}])")
 
 
+class _JudgeAgent(Agent):
+    """A bare, tool-less agent for asking a judge model one prompt at a time."""
+
+    name = "Judge"
+
+
 class JudgeModel(Protocol):
     """The shape `eval/evaluation/semantic.py`'s metrics need from a judge: `ask()` a prompt.
 
@@ -37,7 +43,7 @@ class Judge:
 
     async def ask(self, prompt: str) -> str:
         """Send `prompt` to `self.model` through a bare, tool-less `Agent`."""
-        judge_agent = Agent(name="Judge", model=self.model, tools=[])
+        judge_agent = _JudgeAgent(model=self.model, tools=[])
         result = await Runner.run(
             judge_agent, prompt, run_config=RunConfig(model_provider=_MODEL_PROVIDER)
         )

@@ -62,9 +62,11 @@ own logic — logging, metrics, side effects.
 ```python
 from runa import RunHooks
 
+
 class MyHooks(RunHooks):
     async def on_tool_end(self, context, agent, tool, result):
         print(f"{tool.name} -> {result!r}")
+
 
 agent.run_sync("...", hooks=MyHooks())
 ```

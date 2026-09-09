@@ -1,8 +1,10 @@
 """Class-based Agent, built on Runa's own runtime (`runa._runner`)."""
 
 import inspect
+import re
 from collections.abc import AsyncIterator, Iterable
 from dataclasses import MISSING, dataclass, replace
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from runa._models import ModelProvider
@@ -69,6 +71,31 @@ def _adapt_instructions(instructions: Any) -> Any:
     return _resolved
 
 
+_CAMEL_CASE_BOUNDARY = re.compile(r"(?<!^)(?=[A-Z])")
+
+
+def _snake_case(name: str) -> str:
+    return _CAMEL_CASE_BOUNDARY.sub("_", name).lower()
+
+
+_NO_SOURCE_FILE = (TypeError, OSError)
+
+
+def _load_prompt(cls: type, name: str) -> str | None:
+    """Read `<name>.md` from the `prompts/` directory next to `cls`'s `app/agents/` module.
+
+    Mirrors `runa generate prompt`'s naming: `app/prompts/<snake_case(name)>.md`, a sibling of
+    the `agents/` directory the subclass is defined in. Returns `None` (leaving `instructions`
+    empty) when `cls` has no source file (e.g. defined at a REPL) or no matching prompt exists.
+    """
+    try:
+        module_file = Path(inspect.getfile(cls)).resolve()
+    except _NO_SOURCE_FILE:
+        return None
+    prompt_file = module_file.parent.parent / "prompts" / f"{_snake_case(name)}.md"
+    return prompt_file.read_text().strip() if prompt_file.is_file() else None
+
+
 SubagentsList = list["type[Agent] | Subagent"]
 SubagentsDict = dict[Literal["handoff", "delegate", "auto"], SubagentsList]
 
@@ -115,12 +142,17 @@ class Agent:
         `mcp=[...]` (as a constructor kwarg, or a `mcp` class attribute) is sugar for
         `mcp_servers=[...]`; both are merged into `mcp_servers` if given together.
         """
+        if type(self) is Agent:
+            raise TypeError("Agent must be subclassed, e.g. `class MyAgent(Agent): name = ...`")
+
         for field_name in _AGENT_FIELDS:
             value = getattr(type(self), field_name, MISSING)
             if value is not MISSING:
                 kwargs.setdefault(field_name, value)
         if "name" not in kwargs:
             raise TypeError(f"{type(self).__name__}(...) is missing the required 'name'")
+        if "instructions" not in kwargs:
+            kwargs["instructions"] = _load_prompt(type(self), kwargs["name"])
 
         handoffs = list(kwargs.get("handoffs") or [])
         tools = list(kwargs.get("tools") or [])

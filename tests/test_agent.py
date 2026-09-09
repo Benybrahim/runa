@@ -1,8 +1,12 @@
 """Tests for the handoff / delegate / auto subagent wiring, and `Agent.run`/`run_sync`."""
 
 import asyncio
+import importlib.util
+import sys
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from pathlib import Path
+from types import ModuleType
 from typing import Any, cast
 
 import pytest
@@ -37,6 +41,70 @@ class Translator(Agent):
 
     name = "Translator"
     instructions = "You translate text."
+
+
+def _import_module_from_file(module_name: str, path: Path) -> ModuleType:
+    """Import `path` as `module_name`, registered in `sys.modules` like a real package import.
+
+    `inspect.getfile` (which `Agent`'s prompt auto-load relies on) needs the module registered
+    there to resolve its source file; a bare `module_from_spec` without this leaves it unable to.
+    """
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_agent_cannot_be_instantiated_directly() -> None:
+    """`Agent` itself must be subclassed; it isn't a usable agent on its own."""
+    with pytest.raises(TypeError):
+        Agent(name="Bare")
+
+
+def test_instructions_auto_load_from_a_sibling_prompts_file(tmp_path: Path) -> None:
+    """Omitting `instructions` loads it from `app/prompts/<name>.md` next to the agent's module."""
+    agents_dir = tmp_path / "app" / "agents"
+    prompts_dir = tmp_path / "app" / "prompts"
+    agents_dir.mkdir(parents=True)
+    prompts_dir.mkdir(parents=True)
+    (agents_dir / "greeter_agent.py").write_text(
+        "from runa import Agent\n\n\nclass GreeterAgent(Agent):\n    name = 'greeter_agent'\n"
+    )
+    (prompts_dir / "greeter_agent.md").write_text("You greet warmly.\n")
+
+    module = _import_module_from_file("greeter_agent", agents_dir / "greeter_agent.py")
+
+    assert module.GreeterAgent().instructions == "You greet warmly."
+
+
+def test_instructions_stay_empty_without_a_matching_prompt_file() -> None:
+    """No `prompts/<name>.md` and no explicit `instructions` leaves it `None`."""
+
+    class NoPrompt(Agent):
+        name = "no_prompt_agent"
+
+    assert NoPrompt().instructions is None
+
+
+def test_explicit_instructions_skip_the_prompt_file(tmp_path: Path) -> None:
+    """An explicit `instructions` attribute wins even when a matching prompt file exists."""
+    agents_dir = tmp_path / "app" / "agents"
+    prompts_dir = tmp_path / "app" / "prompts"
+    agents_dir.mkdir(parents=True)
+    prompts_dir.mkdir(parents=True)
+    (prompts_dir / "greeter_agent.md").write_text("From the file.\n")
+    (agents_dir / "greeter_agent.py").write_text(
+        "from runa import Agent\n\n\n"
+        "class GreeterAgent(Agent):\n"
+        "    name = 'greeter_agent'\n"
+        "    instructions = 'From the class.'\n"
+    )
+
+    module = _import_module_from_file("greeter_agent_explicit", agents_dir / "greeter_agent.py")
+
+    assert module.GreeterAgent().instructions == "From the class."
 
 
 def test_handoff_adds_only_to_handoffs() -> None:

@@ -53,7 +53,7 @@ Runa is an opinionated Python framework for agentic AI.
    running.
 
 
-5. Follow the guides to keep building your application. You may find the following ressources these handy:
+5. Follow the guides to keep building your application. You may find the following resources handy:
    * [Getting Started with Runa](docs/getting_started.md)
    * [Runa Guides](docs/guides.md)
    * [CLI Reference](docs/cli.md)
@@ -61,7 +61,7 @@ Runa is an opinionated Python framework for agentic AI.
 ## Read the Zen of Runa
 
 ```bash
-python -c "import runa.this"
+python -c "from runa import this"
 ```
 
 ## Contributing

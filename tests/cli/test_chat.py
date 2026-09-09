@@ -19,6 +19,12 @@ def _write_agent(project_dir: Path, filename: str, source: str) -> None:
     (project_dir / "app" / "agents" / filename).write_text(source)
 
 
+class _SupportAgentStub(Agent):
+    """A stand-in for an `Interruption.agent`; never actually run."""
+
+    name = "SupportAgent"
+
+
 def test_find_agent_class_matches_the_declared_name(tmp_path: Path) -> None:
     """`find_agent_class` finds an Agent subclass by its declared `name` attribute."""
     project_dir = scaffold_project("demo", root=tmp_path)
@@ -286,7 +292,7 @@ def test_run_agent_repl_approves_a_pending_tool_call_when_the_operator_says_yes(
 ) -> None:
     """Answering `y` to the approval prompt resumes the run with the item approved."""
     project_dir = _scaffold_with_agent(tmp_path)
-    agent = Agent(name="SupportAgent")
+    agent = _SupportAgentStub()
     interruption = Interruption(
         name="delete_file", arguments="{}", call_id="call_1", tool=cast(Any, None), agent=agent
     )
@@ -321,7 +327,7 @@ def test_run_agent_repl_rejects_a_pending_tool_call_by_default(
 ) -> None:
     """Any answer other than `y` rejects the tool call rather than approving it."""
     project_dir = _scaffold_with_agent(tmp_path)
-    agent = Agent(name="SupportAgent")
+    agent = _SupportAgentStub()
     interruption = Interruption(
         name="delete_file", arguments="{}", call_id="call_1", tool=cast(Any, None), agent=agent
     )

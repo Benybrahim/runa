@@ -38,6 +38,7 @@ lives at `runa._types` (not yet re-exported from `runa` itself):
 from runa import Agent
 from runa._types import ModelSettings
 
+
 class SupportAgent(Agent):
     name = "support_agent"
     model_settings = ModelSettings(temperature=0.2, max_tokens=500)

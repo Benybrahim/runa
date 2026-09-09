@@ -93,8 +93,8 @@ updates `agent.history` only once the stream is fully consumed.
 ## Usage
 
 ```python
-agent.last_usage   # tokens used by the most recent call
-agent.usage        # accumulated across every call on this instance
+agent.last_usage  # tokens used by the most recent call
+agent.usage  # accumulated across every call on this instance
 ```
 
 Both are populated regardless of whether the run succeeded, used a

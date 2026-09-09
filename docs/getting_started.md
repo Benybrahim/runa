@@ -173,6 +173,16 @@ class GreeterAgent(Agent):
 The model decides on its own when to call `current_time` — you never call
 it yourself.
 
+Omit `instructions` and it's loaded automatically from
+`app/prompts/greeter_agent.md` (matching the `name`) if that file exists,
+or left empty otherwise:
+
+```python
+class GreeterAgent(Agent):
+    name = "greeter_agent"
+    tools = [current_time]
+```
+
 ## Adding Guardrails
 
 A guardrail is a predicate: `(value) -> bool`, tripping the run when it
@@ -339,5 +349,6 @@ runa traces show TRACE_ID
 * Read the source under `app/agents/`, `app/tools/`, and
   `app/evaluations/` in your generated project — the generated comments
   and docstrings double as reference documentation.
-* Keep prompts that grow beyond a line or two in `app/prompts/`, and load
-  them from `instructions` instead of inlining them in Python.
+* Keep prompts that grow beyond a line or two in `app/prompts/<name>.md`
+  instead of inlining them in Python — omit `instructions` and it's loaded
+  from there automatically.
