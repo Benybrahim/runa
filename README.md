@@ -59,10 +59,9 @@ Runa is an opinionated Python framework for agentic AI.
 
 
 5. Follow the guides to keep building your application. You may find the following resources handy:
-   * [Runa Docs](docs/index.md)
-   * [Getting Started with Runa](docs/getting_started.md)
-   * [Runa Guides](docs/guides.md)
-   * [CLI Reference](docs/cli.md)
+   * [Getting Started with Runa](https://benybrahim.github.io/runa/getting_started/)
+   * [Runa Guides](https://benybrahim.github.io/runa/guides/)
+   * [CLI Reference](https://benybrahim.github.io/runa/cli/)
 
 ## Read the Zen of Runa
 
