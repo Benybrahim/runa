@@ -80,20 +80,38 @@ def _snake_case(name: str) -> str:
 
 _NO_SOURCE_FILE = (TypeError, OSError)
 
+_PROMPT_TEMPLATE = """# {name}
+
+TODO: write the prompt {name} uses.
+"""
+
 
 def _load_prompt(cls: type, name: str) -> str | None:
     """Read `<name>.md` from the `prompts/` directory next to `cls`'s `app/agents/` module.
 
     Mirrors `runa generate prompt`'s naming: `app/prompts/<snake_case(name)>.md`, a sibling of
-    the `agents/` directory the subclass is defined in. Returns `None` (leaving `instructions`
-    empty) when `cls` has no source file (e.g. defined at a REPL) or no matching prompt exists.
+    the `agents/` directory the subclass is defined in. Missing, it's created from
+    `_PROMPT_TEMPLATE` — the same stub `runa generate prompt` (`cli/generate.py`, which imports
+    this constant rather than duplicating it) would write — so a fresh agent always has a prompt
+    file ready to edit instead of silently running with empty instructions.
+
+    Returns `None` (leaving `instructions` empty) when `cls` has no source file (e.g. defined at
+    a REPL) or its module doesn't live in an `agents/` directory — nothing is ever created outside
+    the one location `runa new`'s convention establishes for prompts.
     """
     try:
         module_file = Path(inspect.getfile(cls)).resolve()
     except _NO_SOURCE_FILE:
         return None
-    prompt_file = module_file.parent.parent / "prompts" / f"{_snake_case(name)}.md"
-    return prompt_file.read_text().strip() if prompt_file.is_file() else None
+    if module_file.parent.name != "agents":
+        return None
+    stem = _snake_case(name)
+    prompts_dir = module_file.parent.parent / "prompts"
+    prompt_file = prompts_dir / f"{stem}.md"
+    if not prompt_file.is_file():
+        prompts_dir.mkdir(parents=True, exist_ok=True)
+        prompt_file.write_text(_PROMPT_TEMPLATE.format(name=stem))
+    return prompt_file.read_text().strip()
 
 
 SubagentsList = list["type[Agent] | Subagent"]

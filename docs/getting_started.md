@@ -174,8 +174,9 @@ The model decides on its own when to call `current_time` — you never call
 it yourself.
 
 Omit `instructions` and it's loaded automatically from
-`app/prompts/greeter_agent.md` (matching the `name`) if that file exists,
-or left empty otherwise:
+`app/prompts/greeter_agent.md` (matching the `name`); if that file doesn't
+exist yet, it's created with a `TODO` stub — the same one `runa generate
+prompt` writes — ready for you to fill in:
 
 ```python
 class GreeterAgent(Agent):
@@ -351,4 +352,5 @@ runa traces show TRACE_ID
   and docstrings double as reference documentation.
 * Keep prompts that grow beyond a line or two in `app/prompts/<name>.md`
   instead of inlining them in Python — omit `instructions` and it's loaded
-  from there automatically.
+  from there automatically, creating the file with a `TODO` stub first if
+  it doesn't exist yet.

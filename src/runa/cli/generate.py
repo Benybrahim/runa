@@ -15,6 +15,7 @@ fills in the TODOs.
 import re
 from pathlib import Path
 
+from runa.agent import _PROMPT_TEMPLATE
 from runa.cli._project import NotARunaProject
 
 _AGENT_TEMPLATE = '''from runa import Agent
@@ -35,11 +36,6 @@ def {func_name}() -> str:
     """TODO: describe what this tool does."""
     raise NotImplementedError
 '''
-
-_PROMPT_TEMPLATE = """# {name}
-
-TODO: write the prompt {name} uses.
-"""
 
 _EVALUATION_TEMPLATE = """from runa import Agent, Case
 
