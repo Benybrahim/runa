@@ -21,9 +21,9 @@ class SupportAgent(Agent):
 | `instructions` | `None`           | A system prompt string, or a `(context) -> str` callable |
 | `model`        | `"gpt-5.4-nano"` | Which model to call — see [Model Providers](models.md) |
 | `model_settings` | `ModelSettings()` | Temperature, max tokens, etc. |
-| `tools`        | `[]`             | `@tool`-decorated functions — see [Tools and Guardrails](tools_and_guardrails.md) |
+| `tools`        | `[]`             | `@tool`-decorated functions — see [Tools](tools.md) |
 | `subagents`    | `[]`             | Other agents to hand off or delegate to — see [Subagents](subagents.md) |
-| `guardrails`   | `[]`             | Input/output checks — see [Tools and Guardrails](tools_and_guardrails.md) |
+| `guardrails`   | `[]`             | Input/output checks — see [Guardrails](guardrails.md) |
 | `mcp`/`mcp_servers` | `[]`        | MCP servers whose tools this agent can call — see [MCP Servers](mcp.md) |
 | `output_type`  | `None`           | A type the final output must parse as |
 | `hooks`        | `None`           | An `AgentHooks` instance scoped to this agent |

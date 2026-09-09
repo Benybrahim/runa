@@ -14,9 +14,11 @@ Each one stands alone — read whichever covers what you're building today.
   The `Agent` class: attributes, `instructions`, `run`/`run_sync`/`run_streamed`,
   history, usage, and context.
 
-* **[Tools and Guardrails](tools_and_guardrails.md).**
-  Exposing functions to the model with `@tool`, and checking input/output
-  with `@guardrail`.
+* **[Tools](tools.md).**
+  Exposing functions to the model with `@tool`.
+
+* **[Guardrails](guardrails.md).**
+  Checking input/output with `@guardrail`.
 
 * **[Subagents](subagents.md).**
   Composing agents with `.handoff` and `.delegate`.
@@ -41,8 +43,11 @@ Each one stands alone — read whichever covers what you're building today.
 
 ## Testing and Evaluation
 
-* **[Testing and Evaluating Agents](testing_and_evaluation.md).**
-  Deterministic tests with `runa test`, behavioral evals with `runa eval`.
+* **[Testing](testing.md).**
+  Deterministic tests with `runa test`.
+
+* **[Evaluation](evaluation.md).**
+  Behavioral evals with `runa eval`.
 
 ## Observability
 

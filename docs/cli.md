@@ -39,13 +39,12 @@ runa chat --show SESSION_ID                   # replay one session's history
 
 ## `runa test`
 
-Run every `test_*` function under `tests/` — see
-[Testing and Evaluating Agents](testing_and_evaluation.md).
+Run every `test_*` function under `tests/` — see [Testing](testing.md).
 
 ## `runa eval`
 
 Run every dataset under `app/evaluations/` against its agent — see
-[Testing and Evaluating Agents](testing_and_evaluation.md).
+[Evaluation](evaluation.md).
 
 ## `runa traces SUBCOMMAND`
 
