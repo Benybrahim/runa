@@ -10,6 +10,8 @@ from runa._models import StreamDelta
 from runa._runner import RunConfig, Runner, gen_trace_id
 from runa._types import ModelResponse, ModelSettings, Usage
 from runa.exceptions import (
+    ApprovalRequiredError,
+    DuplicateToolCallError,
     InputGuardrailTripwireTriggered,
     MaxTurnsExceeded,
     OutputGuardrailTripwireTriggered,
@@ -94,6 +96,25 @@ class _ScriptedStreamingModel:
         self, system_instructions, input, model_settings, tools, output_schema, handoffs
     ):  # noqa: ANN001, ARG002
         for delta in self._deltas:
+            yield delta
+
+
+class _SequentialStreamingModel:
+    """A streaming `Model` stand-in that yields a different pre-scripted delta list per call.
+
+    Unlike `_ScriptedStreamingModel` (which replays the same deltas forever), this pops one
+    delta list per `stream_response` call -- needed for multi-turn streaming tests where each
+    turn must look different (e.g. a tool call, then a final text reply).
+    """
+
+    def __init__(self, delta_lists: list[list[StreamDelta]]) -> None:
+        self._delta_lists = list(delta_lists)
+
+    async def get_response(self, *args: Any, **kwargs: Any):  # noqa: ANN001, ANN002, ANN003
+        raise NotImplementedError
+
+    async def stream_response(self, *args: Any, **kwargs: Any):  # noqa: ANN001, ANN002, ANN003
+        for delta in self._delta_lists.pop(0):
             yield delta
 
 
@@ -264,7 +285,7 @@ def test_max_turns_exceeded() -> None:
         """Always return the same thing."""
         return "again"
 
-    responses = [_tool_call_response("loop_tool", "{}") for _ in range(5)]
+    responses = [_tool_call_response("loop_tool", "{}", call_id=f"call_{i}") for i in range(5)]
     agent = _agent(tools=[loop_tool], model=_ScriptedModel(responses))
 
     with pytest.raises(MaxTurnsExceeded):
@@ -321,6 +342,220 @@ def test_needs_approval_rejected_feeds_back_and_continues() -> None:
     assert resumed.final_output == "okay, skipped it"
 
 
+def test_needs_approval_always_approve_skips_future_prompts_for_the_same_tool() -> None:
+    """Approving with `always=True` sticks; a later call to the same tool doesn't re-prompt."""
+
+    @tool(needs_approval=True)
+    def dangerous() -> str:
+        """Do something that needs a human's OK."""
+        return "done"
+
+    agent = _agent(
+        tools=[dangerous],
+        model=_ScriptedModel(
+            [
+                _tool_call_response("dangerous", "{}", call_id="call_1"),
+                _tool_call_response("dangerous", "{}", call_id="call_2"),
+                _text_response("all done"),
+            ]
+        ),
+    )
+
+    result = asyncio.run(Runner.run(agent, "do it", run_config=_run_config()))
+    state = result.to_state()
+    state.approve(result.interruptions[0], always=True)
+
+    resumed = asyncio.run(Runner.run(agent, state, run_config=_run_config()))
+
+    assert resumed.interruptions == []
+    assert resumed.final_output == "all done"
+
+
+def test_reject_with_a_custom_rejection_message_feeds_the_custom_text_back() -> None:
+    """A custom `rejection_message` is fed back to the model instead of the default text."""
+
+    @tool(needs_approval=True)
+    def dangerous() -> str:
+        """Do something that needs a human's OK."""
+        return "should not run"
+
+    agent = _agent(
+        tools=[dangerous],
+        model=_ScriptedModel(
+            [_tool_call_response("dangerous", "{}"), _text_response("okay, skipped it")]
+        ),
+    )
+
+    result = asyncio.run(Runner.run(agent, "do it", run_config=_run_config()))
+    state = result.to_state()
+    state.reject(result.interruptions[0], rejection_message="not allowed today")
+    resumed = asyncio.run(Runner.run(agent, state, run_config=_run_config()))
+
+    tool_messages = [
+        item["content"] for item in resumed.to_input_list() if item.get("role") == "tool"
+    ]
+    assert "not allowed today" in tool_messages
+
+
+def test_needs_approval_always_reject_feeds_back_the_sticky_message_for_later_calls() -> None:
+    """Rejecting with `always=True` + a message sticks; a later call reuses that message too."""
+
+    @tool(needs_approval=True)
+    def dangerous() -> str:
+        """Do something that needs a human's OK."""
+        return "should not run"
+
+    agent = _agent(
+        tools=[dangerous],
+        model=_ScriptedModel(
+            [
+                _tool_call_response("dangerous", "{}", call_id="call_1"),
+                _tool_call_response("dangerous", "{}", call_id="call_2"),
+                _text_response("noted twice"),
+            ]
+        ),
+    )
+
+    result = asyncio.run(Runner.run(agent, "do it", run_config=_run_config()))
+    state = result.to_state()
+    state.reject(result.interruptions[0], always=True, rejection_message="not allowed, ever")
+
+    resumed = asyncio.run(Runner.run(agent, state, run_config=_run_config()))
+
+    assert resumed.interruptions == []
+    tool_messages = [
+        item["content"] for item in resumed.to_input_list() if item.get("role") == "tool"
+    ]
+    assert tool_messages.count("not allowed, ever") == 2
+
+
+def test_resuming_the_same_state_twice_raises_duplicate_call_id_error() -> None:
+    """Resuming the same paused `RunState` a second time doesn't silently re-run the tool."""
+
+    @tool(needs_approval=True)
+    def dangerous() -> str:
+        """Do something that needs a human's OK."""
+        return "done"
+
+    agent = _agent(
+        tools=[dangerous],
+        model=_ScriptedModel([_tool_call_response("dangerous", "{}"), _text_response("all done")]),
+    )
+
+    result = asyncio.run(Runner.run(agent, "do it", run_config=_run_config()))
+    state = result.to_state()
+    state.approve(result.interruptions[0])
+
+    asyncio.run(Runner.run(agent, state, run_config=_run_config()))
+
+    with pytest.raises(DuplicateToolCallError):
+        asyncio.run(Runner.run(agent, state, run_config=_run_config()))
+
+
+def test_passing_input_guardrails_are_recorded_even_though_nothing_tripped() -> None:
+    """A guardrail that runs and doesn't trip still shows up in `input_guardrail_results`."""
+
+    async def _pass(ctx: Any, agent: Any, value: Any) -> GuardrailFunctionOutput:
+        return GuardrailFunctionOutput(output_info="ok", tripwire_triggered=False)
+
+    agent = _agent(
+        input_guardrails=[InputGuardrail(guardrail_function=_pass, name="check")],
+        model=_ScriptedModel([_text_response("hi")]),
+    )
+
+    result = asyncio.run(Runner.run(agent, "hi", run_config=_run_config()))
+
+    assert len(result.input_guardrail_results) == 1
+    assert result.input_guardrail_results[0].tripped is False
+
+
+def test_a_tripped_input_guardrail_still_records_the_guardrails_that_passed_before_it() -> None:
+    """Earlier passing guardrails aren't lost when a later one trips and raises."""
+
+    async def _pass(ctx: Any, agent: Any, value: Any) -> GuardrailFunctionOutput:
+        return GuardrailFunctionOutput(output_info="ok", tripwire_triggered=False)
+
+    async def _trip(ctx: Any, agent: Any, value: Any) -> GuardrailFunctionOutput:
+        return GuardrailFunctionOutput(output_info="blocked", tripwire_triggered=True)
+
+    agent = _agent(
+        input_guardrails=[
+            InputGuardrail(guardrail_function=_pass, name="first"),
+            InputGuardrail(guardrail_function=_trip, name="second"),
+        ],
+        model=_ScriptedModel([_text_response("should not be reached")]),
+    )
+
+    with pytest.raises(InputGuardrailTripwireTriggered) as exc_info:
+        asyncio.run(Runner.run(agent, "hi", run_config=_run_config()))
+
+    run_data = exc_info.value.run_data
+    assert run_data is not None
+    assert len(run_data.input_guardrail_results) == 2
+    assert [r.tripped for r in run_data.input_guardrail_results] == [False, True]
+
+
+def test_tool_input_guardrail_results_are_recorded_even_when_they_pass() -> None:
+    """A tool input guardrail that passes still shows up in `tool_input_guardrail_results`."""
+    from runa.guardrail import guardrail
+
+    @guardrail
+    def allow_all(args: dict[str, Any]) -> bool:
+        """Never trip."""
+        return False
+
+    @tool(guardrails=[allow_all.input])
+    def search(query: str) -> str:
+        """Search for something."""
+        return "results"
+
+    agent = _agent(
+        tools=[search],
+        model=_ScriptedModel(
+            [_tool_call_response("search", '{"query": "x"}'), _text_response("ok")]
+        ),
+    )
+
+    result = asyncio.run(Runner.run(agent, "search for x", run_config=_run_config()))
+
+    assert len(result.tool_input_guardrail_results) == 1
+    assert result.tool_input_guardrail_results[0].tripped is False
+
+
+def test_a_paused_run_states_guardrail_results_reflect_what_ran_before_the_pause() -> None:
+    """A paused `RunState`'s guardrail results only include what ran before the interruption."""
+    from runa.guardrail import guardrail
+
+    @guardrail
+    def allow_all(args: dict[str, Any]) -> bool:
+        """Never trip."""
+        return False
+
+    @tool(guardrails=[allow_all.input], needs_approval=True)
+    def dangerous(query: str) -> str:
+        """Needs approval."""
+        return "done"
+
+    agent = _agent(
+        tools=[dangerous],
+        model=_ScriptedModel(
+            [_tool_call_response("dangerous", '{"query": "x"}'), _text_response("done")]
+        ),
+    )
+
+    result = asyncio.run(Runner.run(agent, "do it", run_config=_run_config()))
+
+    # The tool input guardrail only runs once the call is actually executed (i.e. after
+    # approval), so pausing on `needs_approval` records nothing yet.
+    assert result.tool_input_guardrail_results == []
+
+    state = result.to_state()
+    state.approve(result.interruptions[0])
+    resumed = asyncio.run(Runner.run(agent, state, run_config=_run_config()))
+
+    assert len(resumed.tool_input_guardrail_results) == 1
+
+
 def test_stream_response_yields_text_and_final_message() -> None:
     """Streaming a plain-text reply yields raw deltas, then a `message_output_created` item."""
     from runa._runner import RawResponsesStreamEvent, RunItemStreamEvent
@@ -342,6 +577,101 @@ def test_stream_response_yields_text_and_final_message() -> None:
         if isinstance(e, RunItemStreamEvent) and e.name == "message_output_created"
     ]
     assert final.item["content"] == "Hi there"
+
+
+def test_stream_response_runs_a_sticky_approved_tool_without_raising() -> None:
+    """A tool with a sticky `always=True` approval already on the context runs during streaming."""
+    from runa._runner import RunItemStreamEvent
+
+    @tool(needs_approval=True)
+    def dangerous() -> str:
+        """Needs approval."""
+        return "done"
+
+    agent = _agent(
+        tools=[dangerous],
+        model=_SequentialStreamingModel(
+            [
+                [
+                    StreamDelta(
+                        tool_call_index=0, tool_call_id="call_1", tool_call_name="dangerous"
+                    ),
+                    StreamDelta(tool_call_index=0, tool_call_arguments="{}"),
+                ],
+                [StreamDelta(text="all done")],
+            ]
+        ),
+    )
+
+    result = Runner.run_streamed(agent, "do it", run_config=_run_config())
+    result.context_wrapper.approval_ledger["dangerous"] = True
+
+    async def collect() -> list[Any]:
+        return [event async for event in result]
+
+    events = asyncio.run(collect())
+
+    tool_outputs = [
+        e for e in events if isinstance(e, RunItemStreamEvent) and e.name == "tool_output"
+    ]
+    assert tool_outputs[0].item["content"] == "done"
+
+
+def test_stream_response_raises_approval_required_for_an_unresolved_needs_approval_tool() -> None:
+    """`run_streamed` can't pause for approval; it raises instead of silently bypassing the gate."""
+
+    @tool(needs_approval=True)
+    def dangerous() -> str:
+        """Needs approval."""
+        return "done"
+
+    agent = _agent(
+        tools=[dangerous],
+        model=_SequentialStreamingModel(
+            [
+                [
+                    StreamDelta(
+                        tool_call_index=0, tool_call_id="call_1", tool_call_name="dangerous"
+                    ),
+                    StreamDelta(tool_call_index=0, tool_call_arguments="{}"),
+                ]
+            ]
+        ),
+    )
+
+    async def collect() -> list[Any]:
+        return [
+            event async for event in Runner.run_streamed(agent, "do it", run_config=_run_config())
+        ]
+
+    with pytest.raises(ApprovalRequiredError):
+        asyncio.run(collect())
+
+
+def test_stream_response_raises_duplicate_call_id_error_on_a_replayed_call_id() -> None:
+    """A replayed `call_id` across turns doesn't silently re-run the tool during streaming."""
+
+    @tool
+    def now() -> str:
+        """Return a fixed time."""
+        return "2024-01-01"
+
+    same_call = [
+        StreamDelta(tool_call_index=0, tool_call_id="call_1", tool_call_name="now"),
+        StreamDelta(tool_call_index=0, tool_call_arguments="{}"),
+    ]
+    agent = _agent(tools=[now], model=_SequentialStreamingModel([same_call, list(same_call)]))
+
+    async def collect() -> list[Any]:
+        return [
+            event
+            async for event in Runner.run_streamed(
+                agent, "what time is it?", run_config=_run_config()
+            )
+        ]
+
+    with pytest.raises(DuplicateToolCallError):
+        asyncio.run(collect())
 
 
 def test_gen_trace_id_returns_a_fresh_id_each_time() -> None:

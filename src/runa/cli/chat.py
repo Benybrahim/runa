@@ -151,8 +151,12 @@ def run_agent_repl(
             while result.interruptions:
                 state = result.to_state()
                 for item in result.interruptions:
-                    answer = input(f"approve {item.name}({item.arguments})? [y/N] ").strip().lower()
-                    if answer in {"y", "yes"}:
+                    answer = (
+                        input(f"approve {item.name}({item.arguments})? [y/N/a] ").strip().lower()
+                    )
+                    if answer in {"a", "always"}:
+                        state.approve(item, always=True)
+                    elif answer in {"y", "yes"}:
                         state.approve(item)
                     else:
                         state.reject(item)

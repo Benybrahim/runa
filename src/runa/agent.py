@@ -305,6 +305,8 @@ class Agent:
         context: Any = None,
         hooks: RunHooks[Any] | None = None,
         session: SessionABC | None = None,
+        *,
+        _context_wrapper: RunContextWrapper[Any] | None = None,
     ) -> Run:
         """Run a turn asynchronously, appending it to the conversation history.
 
@@ -324,6 +326,10 @@ class Agent:
 
         Token usage for this call is recorded to `self.last_usage` and accumulated into
         `self.usage`, regardless of `session`, `hooks`, or whether the run errored.
+
+        `_context_wrapper` is internal, used by `agent_as_tool`'s nested delegate calls to share
+        a forked `RunContextWrapper` with the caller instead of building a fresh one; `context`
+        is ignored when it's given. Don't pass it directly.
         """
         turn_input = (
             message
@@ -339,6 +345,7 @@ class Agent:
                 hooks=run_hooks,
                 run_config=self._run_config(session),
                 session=session,
+                _context_wrapper=_context_wrapper,
             )
         except RunaError as exc:
             self.last_usage = _usage_from_exception(exc)

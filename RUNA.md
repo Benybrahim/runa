@@ -90,6 +90,47 @@ def large_refund(amount: float) -> bool:
 def issue_refund(amount: float) -> str: ...
 ```
 
+**Pausing and resuming.** A call that needs approval doesn't run: it pauses the run, surfaced
+as `result.interruptions`. Resolve each one against `result.to_state()`, then resume by
+passing that `RunState` back into `Runner.run`/`run_sync` in place of the original input.
+
+```python
+result = Runner.run_sync(agent, "issue a $75 refund")
+state = result.to_state()
+for item in result.interruptions:
+    state.approve(item)   # or state.reject(item, rejection_message="not authorized")
+result = Runner.run_sync(agent, state)
+```
+
+`approve`/`reject` also take `always=True`: the decision sticks for every future call to that
+tool (by name, not just this one call id) — an operator answering "always" instead of "yes" in
+`runa chat`'s `[y/N/a]` prompt, or the same choice made programmatically. A rejection can carry
+a custom `rejection_message`, fed back to the model instead of the default text; with
+`always=True` it's reused for every later rejected call to that tool too. A `call_id` that
+already executed once can't be submitted again — resuming the same `RunState` twice raises
+`DuplicateToolCallError` rather than silently re-running the tool.
+
+`run_streamed` has no pause/resume machinery: a tool that actually needs approval (i.e. no
+sticky decision already covers it) raises `ApprovalRequiredError` instead of silently running
+or silently blocking. Use `Runner.run`/`run_sync` for approval-gated tools, or pre-approve them
+with `always=True` before streaming.
+
+**Durability.** `RunState` survives a process restart: `state.to_json()`/`.to_string()`
+serialize it (as a plain dict, or a JSON string); `RunState.from_json(agent, blob)`/
+`.from_string(agent, blob)` rebuild it, given a fresh instance of the agent the run started
+with (used to re-resolve the current agent and each pending tool by name — a live `Agent`
+instance and a tool's closure can't round-trip through JSON themselves). A `context` that was a
+dataclass comes back as a plain dict, not its original class; the run's guardrail-result audit
+trail (see below) and trace spans aren't included in the serialized blob — spans are already
+durably persisted separately (see [Tracing](#14-tracing)). An unrecognized `schema_version`
+raises `UserError` rather than resuming from a blob a different, incompatible version of Runa
+produced.
+
+**Guardrail audit trail.** Every guardrail that ran this run — tripped or not — is recorded on
+`result.input_guardrail_results`/`.output_guardrail_results`/`.tool_input_guardrail_results`/
+`.tool_output_guardrail_results` (and the same four on a paused `RunState`, reflecting only
+what ran before the pause), not just whichever one stopped the run.
+
 ## 5. Subagent (handoff/delegate)
 
 ```python
@@ -101,6 +142,14 @@ class MyAgent:
 * `.delegate/.d`: the subagent does the task and returns its result to the
   main agent, like a tool call — the main agent stays in control.
 * `None`: main agent will choose automatically to handoff or delegate
+
+A `.delegate` call shares the caller's [approval](#4-human-approval) ledger and usage
+accounting — a sticky (`always=True`) decision on the caller's side already covers a matching
+tool the delegate calls. **Known limitation:** a delegate call that pauses on a *non-sticky*
+approval isn't surfaced back to the caller as an interruption — it comes back as a plain `None`
+result instead, since a single delegate call has no pause/resume state of its own. Cover
+approval-gated tools reachable from a delegate with a sticky decision ahead of time if the
+delegate might call them.
 
 
 ## 6. Session

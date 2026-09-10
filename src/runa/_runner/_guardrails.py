@@ -24,9 +24,12 @@ async def _run_input_guardrails(
     for guardrail in agent.input_guardrails:
         span = _new_span(trace, parent_id, guardrail.name or "guardrail", "guardrail")
         result = await guardrail.guardrail_function(context_wrapper, agent, turn_input)
-        _close_span(span, error="tripwire triggered" if result.tripwire_triggered else None)
-        if result.tripwire_triggered:
-            raise InputGuardrailTripwireTriggered(GuardrailResult(guardrail, result))
+        tripped = result.tripwire_triggered
+        _close_span(span, error="tripwire triggered" if tripped else None)
+        guardrail_result = GuardrailResult(guardrail, result, tripped)
+        context_wrapper.input_guardrail_results.append(guardrail_result)
+        if tripped:
+            raise InputGuardrailTripwireTriggered(guardrail_result)
 
 
 async def _run_output_guardrails(
@@ -35,13 +38,21 @@ async def _run_output_guardrails(
     for guardrail in agent.output_guardrails:
         span = _new_span(trace, parent_id, guardrail.name or "guardrail", "guardrail")
         result = await guardrail.guardrail_function(context_wrapper, agent, output)
-        _close_span(span, error="tripwire triggered" if result.tripwire_triggered else None)
-        if result.tripwire_triggered:
-            raise OutputGuardrailTripwireTriggered(GuardrailResult(guardrail, result))
+        tripped = result.tripwire_triggered
+        _close_span(span, error="tripwire triggered" if tripped else None)
+        guardrail_result = GuardrailResult(guardrail, result, tripped)
+        context_wrapper.output_guardrail_results.append(guardrail_result)
+        if tripped:
+            raise OutputGuardrailTripwireTriggered(guardrail_result)
 
 
 async def _run_tool_input_guardrails(
-    tool: FunctionTool, args_json: str, call_id: str, trace: Trace, parent_id: str
+    tool: FunctionTool,
+    args_json: str,
+    call_id: str,
+    context_wrapper: RunContextWrapper,
+    trace: Trace,
+    parent_id: str,
 ) -> None:
     for guardrail in tool.tool_input_guardrails or []:
         span = _new_span(trace, parent_id, guardrail.get_name(), "guardrail")
@@ -51,12 +62,21 @@ async def _run_tool_input_guardrails(
         result = await guardrail.guardrail_function(data)
         tripped = result.behavior["type"] == "raise_exception"
         _close_span(span, error="tripwire triggered" if tripped else None)
+        context_wrapper.tool_input_guardrail_results.append(
+            GuardrailResult(guardrail, result, tripped)
+        )
         if tripped:
             raise ToolInputGuardrailTripwireTriggered(guardrail, result)
 
 
 async def _run_tool_output_guardrails(
-    tool: FunctionTool, args_json: str, call_id: str, output: Any, trace: Trace, parent_id: str
+    tool: FunctionTool,
+    args_json: str,
+    call_id: str,
+    output: Any,
+    context_wrapper: RunContextWrapper,
+    trace: Trace,
+    parent_id: str,
 ) -> None:
     for guardrail in tool.tool_output_guardrails or []:
         span = _new_span(trace, parent_id, guardrail.get_name(), "guardrail")
@@ -67,6 +87,9 @@ async def _run_tool_output_guardrails(
         result = await guardrail.guardrail_function(data)
         tripped = result.behavior["type"] == "raise_exception"
         _close_span(span, error="tripwire triggered" if tripped else None)
+        context_wrapper.tool_output_guardrail_results.append(
+            GuardrailResult(guardrail, result, tripped)
+        )
         if tripped:
             raise ToolOutputGuardrailTripwireTriggered(guardrail, result)
 

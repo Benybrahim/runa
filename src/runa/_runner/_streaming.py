@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator
 from typing import Any
 
 from runa._runner._helpers import (
     _agent_tools,
     _find_tool,
+    _gate_tool_call,
     _model_settings,
     _normalized_handoffs,
     _resolve_instructions,
@@ -21,7 +23,7 @@ from runa._runner._state import (
     StreamEvent,
 )
 from runa._types import RunContextWrapper, TResponseInputItem, Usage
-from runa.exceptions import MaxTurnsExceeded
+from runa.exceptions import ApprovalRequiredError, DuplicateToolCallError, MaxTurnsExceeded
 from runa.logging import RunHooks
 
 
@@ -136,12 +138,25 @@ async def _stream_async(
                     }
                 )
                 continue
+            call_id = call["id"]
             args_json = call["function"]["arguments"] or "{}"
+            args = json.loads(args_json) if args_json else {}
+            gate = await _gate_tool_call(tool, args, call_id, context_wrapper)
+            if gate.action == "interrupt":
+                raise ApprovalRequiredError(tool.name, call_id)
+            if gate.action == "reject":
+                tool_result = {"role": "tool", "tool_call_id": call_id, "content": gate.message}
+                items.append(tool_result)
+                yield RunItemStreamEvent(name="tool_output", item=tool_result)
+                continue
+            if call_id in context_wrapper.executed_call_ids:
+                raise DuplicateToolCallError(call_id, tool.name)
+            context_wrapper.executed_call_ids.add(call_id)
             try:
-                result = await tool.on_invoke_tool(context_wrapper, args_json, call["id"])
+                result = await tool.on_invoke_tool(context_wrapper, args_json, call_id)
             except Exception as exc:  # noqa: BLE001 -- fed back to the model, not a run-ending error
                 result = f"error: {exc}"
-            tool_result = {"role": "tool", "tool_call_id": call["id"], "content": str(result)}
+            tool_result = {"role": "tool", "tool_call_id": call_id, "content": str(result)}
             items.append(tool_result)
             yield RunItemStreamEvent(name="tool_output", item=tool_result)
 

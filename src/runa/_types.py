@@ -111,10 +111,44 @@ class RunContextWrapper[TContext]:
 
     `context` is never sent to the model; it's how tools, guardrails, `needs_approval`, and a
     single-argument `instructions` callable receive whatever the caller passed to `run`/`run_sync`.
+
+    `approval_ledger`/`approval_ledger_messages` hold sticky ("always approve"/"always reject")
+    per-tool-name decisions; `executed_call_ids` guards against executing the same tool-call id
+    twice (e.g. from resuming a stale `RunState`). The four `*_guardrail_results` lists are every
+    `GuardrailResult` produced this run, tripped or not -- an audit trail, not just the one that
+    stopped the run.
     """
 
     context: TContext = None  # pyright: ignore[reportAssignmentType]
     usage: Usage = field(default_factory=Usage)
+    approval_ledger: dict[str, bool] = field(default_factory=dict)
+    approval_ledger_messages: dict[str, str] = field(default_factory=dict)
+    executed_call_ids: set[str] = field(default_factory=set)
+    input_guardrail_results: list[Any] = field(default_factory=list)
+    output_guardrail_results: list[Any] = field(default_factory=list)
+    tool_input_guardrail_results: list[Any] = field(default_factory=list)
+    tool_output_guardrail_results: list[Any] = field(default_factory=list)
+
+    def fork(self) -> RunContextWrapper[TContext]:
+        """Build a child context for a nested delegate-agent call (`agent_as_tool`).
+
+        Shares `context` and every governance list/dict by reference -- so an approval, a
+        replayed call id, or a guardrail result recorded in either the parent or the delegate is
+        visible to both -- but starts `usage` at zero: the caller merges the delegate's usage
+        back explicitly (`ctx.usage.add(forked.usage)`), so it isn't double-counted against
+        `Agent.run`'s own usage accumulation.
+        """
+        return RunContextWrapper(
+            context=self.context,
+            usage=Usage(),
+            approval_ledger=self.approval_ledger,
+            approval_ledger_messages=self.approval_ledger_messages,
+            executed_call_ids=self.executed_call_ids,
+            input_guardrail_results=self.input_guardrail_results,
+            output_guardrail_results=self.output_guardrail_results,
+            tool_input_guardrail_results=self.tool_input_guardrail_results,
+            tool_output_guardrail_results=self.tool_output_guardrail_results,
+        )
 
 
 __all__ = [

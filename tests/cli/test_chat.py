@@ -277,12 +277,17 @@ class _FakeApprovalState:
 
     approved: list[Any] = field(default_factory=list)
     rejected: list[Any] = field(default_factory=list)
+    always_approved: list[Any] = field(default_factory=list)
 
-    def approve(self, item: Any) -> None:
+    def approve(self, item: Any, *, always: bool = False) -> None:
         """Record `item` as approved, mirroring `RunState.approve()`."""
         self.approved.append(item)
+        if always:
+            self.always_approved.append(item)
 
-    def reject(self, item: Any) -> None:
+    def reject(
+        self, item: Any, *, always: bool = False, rejection_message: str | None = None
+    ) -> None:
         """Record `item` as rejected, mirroring `RunState.reject()`."""
         self.rejected.append(item)
 
@@ -355,3 +360,39 @@ def test_run_agent_repl_rejects_a_pending_tool_call_by_default(
 
     assert state.rejected == [interruption]
     assert state.approved == []
+
+
+def test_run_agent_repl_always_approves_a_pending_tool_call_when_the_operator_says_a(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Answering `a` approves the item with `always=True`, not just a one-off approval."""
+    project_dir = _scaffold_with_agent(tmp_path)
+    agent = _SupportAgentStub()
+    interruption = Interruption(
+        name="delete_file", arguments="{}", call_id="call_1", tool=cast(Any, None), agent=agent
+    )
+    _feed_input(monkeypatch, ["delete it", "a"])
+    state = _FakeApprovalState()
+
+    @dataclass
+    class _InterruptedResult:
+        final_output: Any = None
+        interruptions: list[Any] = field(default_factory=list)
+
+        def to_state(self) -> _FakeApprovalState:
+            return state
+
+    results = iter(
+        [_InterruptedResult(interruptions=[interruption]), _InterruptedResult(final_output="done")]
+    )
+
+    def fake_run_sync(agent: Any, message: Any, **kwargs: Any) -> Any:
+        return next(results)
+
+    monkeypatch.setattr("runa.cli.chat.Runner.run_sync", staticmethod(fake_run_sync))
+
+    run_agent_repl("Support", root=project_dir)
+
+    assert state.approved == [interruption]
+    assert state.always_approved == [interruption]
+    assert state.rejected == []

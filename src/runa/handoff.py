@@ -59,13 +59,22 @@ def agent_as_tool(agent: Any, tool_name: str | None, tool_description: str | Non
     same way any other tool call's arguments are generated. A nested run that errors surfaces its
     error message as the tool's return value instead of raising, so the calling agent's turn can
     still continue and decide how to respond.
+
+    The delegate's context is `ctx.fork()`ed, not just `ctx.context` unwrapped: this shares the
+    sticky approval ledger, the call-id replay guard, and the guardrail-result audit trail with
+    the delegate (and back), and merges the delegate's usage into the caller's afterward. A
+    delegate run that pauses on a *non-sticky* approval still isn't surfaced here, though --
+    `Run.status` has no "paused" state, so its `Interruption` is silently lost as `output=None`;
+    a known limitation, not something this fork() change fixes.
     """
     resolved_name = tool_name or _slugify(agent.name)
     resolved_description = tool_description or f"Delegate a task to {agent.name}."
 
     async def on_invoke_tool(ctx: RunContextWrapper, arguments_json: str, call_id: str) -> Any:
         args = json.loads(arguments_json) if arguments_json else {}
-        run = await agent.run(args.get("input", ""), context=ctx.context)
+        forked = ctx.fork()
+        run = await agent.run(args.get("input", ""), _context_wrapper=forked)
+        ctx.usage.add(forked.usage)
         return run.output if run.status == "completed" else f"error: {run.error}"
 
     return FunctionTool(

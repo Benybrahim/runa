@@ -121,14 +121,21 @@ async def _run_turns(
     agent_span_id: str,
     *,
     max_turns: int,
-    pending_resume: tuple[TResponseInputItem, dict[str, bool]] | None = None,
+    pending_resume: tuple[TResponseInputItem, dict[str, bool], dict[str, str]] | None = None,
 ) -> _TurnOutcome:
     generated: list[TResponseInputItem] = []
 
     if pending_resume is not None:
-        last_message, approvals = pending_resume
+        last_message, approvals, rejection_messages = pending_resume
         results, interruptions, switched = await _run_message_tool_calls(
-            last_message, current_agent, context_wrapper, hooks, trace, agent_span_id, approvals
+            last_message,
+            current_agent,
+            context_wrapper,
+            hooks,
+            trace,
+            agent_span_id,
+            approvals,
+            rejection_messages,
         )
         if interruptions:
             return _TurnOutcome(None, [], interruptions, results, current_agent)
@@ -199,6 +206,7 @@ async def _run_async(
     hooks: RunHooks[Any] | None = None,
     run_config: RunConfig | None = None,
     session: SessionABC | None = None,
+    _context_wrapper: RunContextWrapper[Any] | None = None,
 ) -> RunResult:
     run_config = run_config or RunConfig()
     hooks = hooks or _default_hooks()
@@ -206,7 +214,9 @@ async def _run_async(
     if isinstance(input, RunState):
         return await _resume(input, hooks, run_config)
 
-    context_wrapper = RunContextWrapper(context=context)
+    context_wrapper = (
+        _context_wrapper if _context_wrapper is not None else RunContextWrapper(context=context)
+    )
     trace = Trace(id=gen_trace_id(), name=run_config.workflow_name, start_time=time.time())
     if run_config.group_id is not None or run_config.trace_metadata is not None:
         trace.metadata = {**(run_config.trace_metadata or {}), "group_id": run_config.group_id}
@@ -282,8 +292,10 @@ async def _run_async(
             raw_responses=[],
             last_agent=agent,
             context_wrapper=context_wrapper,
-            input_guardrail_results=[],
-            output_guardrail_results=[],
+            input_guardrail_results=list(context_wrapper.input_guardrail_results),
+            output_guardrail_results=list(context_wrapper.output_guardrail_results),
+            tool_input_guardrail_results=list(context_wrapper.tool_input_guardrail_results),
+            tool_output_guardrail_results=list(context_wrapper.tool_output_guardrail_results),
             trace=trace,
         )
         raise
@@ -302,6 +314,10 @@ async def _run_async(
             pending=outcome.interruptions,
             context_wrapper=context_wrapper,
             trace=trace,
+            input_guardrail_results=list(context_wrapper.input_guardrail_results),
+            output_guardrail_results=list(context_wrapper.output_guardrail_results),
+            tool_input_guardrail_results=list(context_wrapper.tool_input_guardrail_results),
+            tool_output_guardrail_results=list(context_wrapper.tool_output_guardrail_results),
         )
         _export(trace)
         return RunResult(
@@ -312,6 +328,10 @@ async def _run_async(
             _generated_items=outcome.generated,
             interruptions=outcome.interruptions,
             _state=state,
+            input_guardrail_results=list(context_wrapper.input_guardrail_results),
+            output_guardrail_results=list(context_wrapper.output_guardrail_results),
+            tool_input_guardrail_results=list(context_wrapper.tool_input_guardrail_results),
+            tool_output_guardrail_results=list(context_wrapper.tool_output_guardrail_results),
         )
 
     if session is not None:
@@ -356,6 +376,10 @@ async def _run_async(
         trace=trace,
         _original_input=original_input,
         _generated_items=outcome.generated,
+        input_guardrail_results=list(context_wrapper.input_guardrail_results),
+        output_guardrail_results=list(context_wrapper.output_guardrail_results),
+        tool_input_guardrail_results=list(context_wrapper.tool_input_guardrail_results),
+        tool_output_guardrail_results=list(context_wrapper.tool_output_guardrail_results),
     )
 
 
@@ -374,7 +398,7 @@ async def _resume(state: RunState, hooks: RunHooks[Any], run_config: RunConfig) 
             state.trace,
             agent_span.id,
             max_turns=run_config.max_turns,
-            pending_resume=(pending_message, state.approvals),
+            pending_resume=(pending_message, state.approvals, state.rejection_messages),
         )
     except RunaError as exc:
         _close_span(agent_span, error=str(exc))
@@ -388,8 +412,10 @@ async def _resume(state: RunState, hooks: RunHooks[Any], run_config: RunConfig) 
             raw_responses=[],
             last_agent=state.agent,
             context_wrapper=state.context_wrapper,
-            input_guardrail_results=[],
-            output_guardrail_results=[],
+            input_guardrail_results=list(state.context_wrapper.input_guardrail_results),
+            output_guardrail_results=list(state.context_wrapper.output_guardrail_results),
+            tool_input_guardrail_results=list(state.context_wrapper.tool_input_guardrail_results),
+            tool_output_guardrail_results=list(state.context_wrapper.tool_output_guardrail_results),
             trace=state.trace,
         )
         raise
@@ -406,6 +432,10 @@ async def _resume(state: RunState, hooks: RunHooks[Any], run_config: RunConfig) 
             pending=outcome.interruptions,
             context_wrapper=state.context_wrapper,
             trace=state.trace,
+            input_guardrail_results=list(state.context_wrapper.input_guardrail_results),
+            output_guardrail_results=list(state.context_wrapper.output_guardrail_results),
+            tool_input_guardrail_results=list(state.context_wrapper.tool_input_guardrail_results),
+            tool_output_guardrail_results=list(state.context_wrapper.tool_output_guardrail_results),
         )
         _export(state.trace)
         return RunResult(
@@ -416,6 +446,10 @@ async def _resume(state: RunState, hooks: RunHooks[Any], run_config: RunConfig) 
             _generated_items=outcome.generated,
             interruptions=outcome.interruptions,
             _state=new_state,
+            input_guardrail_results=list(state.context_wrapper.input_guardrail_results),
+            output_guardrail_results=list(state.context_wrapper.output_guardrail_results),
+            tool_input_guardrail_results=list(state.context_wrapper.tool_input_guardrail_results),
+            tool_output_guardrail_results=list(state.context_wrapper.tool_output_guardrail_results),
         )
 
     await hooks.on_agent_end(state.context_wrapper, outcome.current_agent, outcome.final_output)
@@ -426,6 +460,10 @@ async def _resume(state: RunState, hooks: RunHooks[Any], run_config: RunConfig) 
         trace=state.trace,
         _original_input=state.original_input,
         _generated_items=[*state.generated_items[:-1], *outcome.generated],
+        input_guardrail_results=list(state.context_wrapper.input_guardrail_results),
+        output_guardrail_results=list(state.context_wrapper.output_guardrail_results),
+        tool_input_guardrail_results=list(state.context_wrapper.tool_input_guardrail_results),
+        tool_output_guardrail_results=list(state.context_wrapper.tool_output_guardrail_results),
     )
 
 
@@ -441,10 +479,22 @@ class Runner:
         hooks: RunHooks[Any] | None = None,
         run_config: RunConfig | None = None,
         session: SessionABC | None = None,
+        _context_wrapper: RunContextWrapper[Any] | None = None,
     ) -> RunResult:
-        """Run `agent` on `input` (or resume a paused `RunState`) and return the final result."""
+        """Run `agent` on `input` (or resume a paused `RunState`) and return the final result.
+
+        `_context_wrapper` is internal: used by `agent_as_tool`'s nested delegate calls to pass
+        a forked `RunContextWrapper` through instead of building a fresh one from `context`; not
+        meant to be passed directly.
+        """
         return await _run_async(
-            agent, input, context=context, hooks=hooks, run_config=run_config, session=session
+            agent,
+            input,
+            context=context,
+            hooks=hooks,
+            run_config=run_config,
+            session=session,
+            _context_wrapper=_context_wrapper,
         )
 
     @staticmethod

@@ -1140,6 +1140,7 @@ dependencies = [
     { name = "httpx2" },
     { name = "mcp" },
     { name = "mkdocs-material" },
+    { name = "pydantic" },
     { name = "pypdf" },
     { name = "sqlite-vec" },
 ]
@@ -1178,6 +1179,7 @@ requires-dist = [
     { name = "mcp", specifier = ">=2.1.1" },
     { name = "mkdocs-material", specifier = ">=9.7.7" },
     { name = "pgvector", marker = "extra == 'postgres'", specifier = ">=0.3.6" },
+    { name = "pydantic", specifier = ">=2.9.0" },
     { name = "pypdf", specifier = ">=6.0.0" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=5.2.0" },
     { name = "sqlite-vec", specifier = ">=0.1.9" },

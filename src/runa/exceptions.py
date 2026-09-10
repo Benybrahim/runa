@@ -121,7 +121,41 @@ class ToolOutputGuardrailTripwireTriggered(RunaError):
         super().__init__(f"Tool output guardrail {guardrail.name} triggered tripwire")
 
 
+class DuplicateToolCallError(RunaError):
+    """Raised when a tool-call id that already executed once is submitted for execution again.
+
+    Guards against silently re-running a tool -- e.g. resuming the same `RunState` twice, or a
+    model retry that reuses a call id.
+    """
+
+    def __init__(self, call_id: str, tool_name: str) -> None:
+        """Store the offending `call_id`/`tool_name` and build a message from them."""
+        self.call_id = call_id
+        self.tool_name = tool_name
+        super().__init__(f"tool call {call_id!r} for {tool_name!r} was already executed")
+
+
+class ApprovalRequiredError(RunaError):
+    """Raised by `run_streamed` when a tool call needs approval it has no way to pause for.
+
+    `run_streamed` has no pause/resume machinery -- use `Runner.run`/`run_sync` for a
+    approval-gated tool, or pre-approve it via `RunState.approve(interruption, always=True)`.
+    """
+
+    def __init__(self, tool_name: str, call_id: str) -> None:
+        """Store the `tool_name`/`call_id` that needed approval and build a message from them."""
+        self.tool_name = tool_name
+        self.call_id = call_id
+        super().__init__(
+            f"tool {tool_name!r} (call {call_id!r}) needs approval; run_streamed cannot pause "
+            "for it -- use Runner.run/run_sync, or pre-approve it via "
+            "RunState.approve(interruption, always=True)"
+        )
+
+
 __all__ = [
+    "ApprovalRequiredError",
+    "DuplicateToolCallError",
     "InputGuardrailTripwireTriggered",
     "MaxTurnsExceeded",
     "ModelBehaviorError",

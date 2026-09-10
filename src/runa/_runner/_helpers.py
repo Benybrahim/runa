@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 
 from runa._models import Model, ModelProvider
 from runa._types import ModelSettings, RunContextWrapper
+from runa.exceptions import UserError
 from runa.handoff import Handoff
 from runa.tool import FunctionTool
 
@@ -18,6 +20,29 @@ def _normalized_handoffs(handoffs: list[Any]) -> dict[str, Handoff]:
         handoff = entry if isinstance(entry, Handoff) else Handoff.from_agent(entry)
         result[handoff.tool_name] = handoff
     return result
+
+
+def _find_agent_by_name(root: Any, name: str) -> Any:
+    """BFS `root` and everything reachable via its `.handoffs`, matching on `.name`.
+
+    Needed to resolve a `RunState`/`Interruption`'s current agent from a name string after
+    deserialization: a handoff may have switched the current agent before the pause, so the
+    match isn't necessarily `root` itself.
+    """
+    seen: set[int] = set()
+    queue: list[Any] = [root]
+    while queue:
+        candidate = queue.pop(0)
+        if id(candidate) in seen:
+            continue
+        seen.add(id(candidate))
+        if getattr(candidate, "name", None) == name:
+            return candidate
+        queue.extend(
+            handoff.agent
+            for handoff in _normalized_handoffs(getattr(candidate, "handoffs", [])).values()
+        )
+    raise UserError(f"no agent named {name!r} reachable from {getattr(root, 'name', root)!r}")
 
 
 async def _agent_tools(agent: Any) -> list[FunctionTool]:
@@ -47,6 +72,50 @@ async def _needs_approval(
     return bool(await _maybe_await(tool.needs_approval(context_wrapper, args, call_id)))
 
 
+@dataclass
+class _ApprovalGate:
+    """What `_gate_tool_call` decided for one tool call."""
+
+    action: Literal["run", "reject", "interrupt"]
+    message: str | None = None
+
+
+async def _gate_tool_call(
+    tool: FunctionTool,
+    args: dict[str, Any],
+    call_id: str,
+    context_wrapper: RunContextWrapper,
+    approvals: dict[str, bool] | None = None,
+    rejection_messages: dict[str, str] | None = None,
+) -> _ApprovalGate:
+    """Decide whether a tool call should run, be rejected, or pause for approval.
+
+    Consults `context_wrapper.approval_ledger` first -- the sticky "always approve"/"always
+    reject" decisions set via `RunState.approve`/`.reject(..., always=True)` -- before falling
+    back to `_needs_approval` and the per-call-id `approvals` dict. Shared by `_tool_calls.py`
+    (turn-based runs) and `_streaming.py` (`run_streamed`), so there's exactly one sanctioned
+    approval-gating path rather than two that could drift apart.
+    """
+    sticky = context_wrapper.approval_ledger.get(tool.name)
+    if sticky is True:
+        return _ApprovalGate("run")
+    if sticky is False:
+        return _ApprovalGate(
+            "reject",
+            context_wrapper.approval_ledger_messages.get(tool.name, "rejected by the operator"),
+        )
+    if not await _needs_approval(tool, context_wrapper, args, call_id):
+        return _ApprovalGate("run")
+    verdict = (approvals or {}).get(call_id)
+    if verdict is None:
+        return _ApprovalGate("interrupt")
+    if verdict is False:
+        return _ApprovalGate(
+            "reject", (rejection_messages or {}).get(call_id, "rejected by the operator")
+        )
+    return _ApprovalGate("run")
+
+
 def _model_settings(agent: Any) -> ModelSettings:
     settings = getattr(agent, "model_settings", None)
     return settings if isinstance(settings, ModelSettings) else ModelSettings()
@@ -67,8 +136,11 @@ async def _resolve_instructions(agent: Any, context_wrapper: RunContextWrapper) 
 
 
 __all__ = [
+    "_ApprovalGate",
     "_agent_tools",
+    "_find_agent_by_name",
     "_find_tool",
+    "_gate_tool_call",
     "_maybe_await",
     "_model_settings",
     "_needs_approval",
