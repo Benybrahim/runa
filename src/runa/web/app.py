@@ -42,8 +42,8 @@ def create_app(root: Path) -> FastAPI:
     def session_detail(session_id: str) -> HTMLResponse:
         try:
             return HTMLResponse(sessions_page.render_detail(session_id, root=root))
-        except sessions_page.SessionNotFound as exc:
-            return HTMLResponse(_error_page("Sessions", str(exc)), status_code=404)
+        except sessions_page.SessionNotFound:
+            return HTMLResponse(_error_page("Sessions", "Session not found."), status_code=404)
 
     @app.get("/traces", response_class=HTMLResponse, include_in_schema=False)
     def traces_list(status: str | None = None) -> str:
@@ -53,8 +53,8 @@ def create_app(root: Path) -> FastAPI:
     def trace_detail(trace_id: str) -> HTMLResponse:
         try:
             return HTMLResponse(traces_page.render_detail(trace_id, root=root))
-        except traces_page.TraceNotFound as exc:
-            return HTMLResponse(_error_page("Traces", str(exc)), status_code=404)
+        except traces_page.TraceNotFound:
+            return HTMLResponse(_error_page("Traces", "Trace not found."), status_code=404)
 
     @app.get("/evaluations", response_class=HTMLResponse, include_in_schema=False)
     def evaluations_list() -> str:
@@ -64,16 +64,15 @@ def create_app(root: Path) -> FastAPI:
     def evaluation_detail(run_id: int) -> HTMLResponse:
         try:
             return HTMLResponse(evaluations_page.render_detail(run_id, root=root))
-        except evaluations_page.EvalRunNotFound as exc:
-            return HTMLResponse(_error_page("Evaluations", str(exc)), status_code=404)
+        except evaluations_page.EvalRunNotFound:
+            return HTMLResponse(_error_page("Evaluations", "Evaluation run not found."), status_code=404)
 
     @app.exception_handler(NotARunaProject)
-    def _not_a_project(_request: Request, exc: NotARunaProject) -> HTMLResponse:
-        return HTMLResponse(_error_page("Agents", str(exc)), status_code=400)
+    def _not_a_project(_request: Request, _exc: NotARunaProject) -> HTMLResponse:
+        return HTMLResponse(_error_page("Agents", "Not a runa project."), status_code=400)
 
     @app.exception_handler(AppLoadError)
-    def _app_load_error(_request: Request, exc: AppLoadError) -> HTMLResponse:
-        message = f"failed to load main.py: {exc}"
-        return HTMLResponse(_error_page("Agents", message), status_code=500)
+    def _app_load_error(_request: Request, _exc: AppLoadError) -> HTMLResponse:
+        return HTMLResponse(_error_page("Agents", "Failed to load application."), status_code=500)
 
     return app
