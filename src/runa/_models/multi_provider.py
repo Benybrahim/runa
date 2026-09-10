@@ -1,4 +1,4 @@
-"""_provider.py: `ModelProvider`, routing a model name to one of the two backends by its prefix."""
+"""multi_provider.py: `ModelProvider`, routing a model name to one of two backends by its prefix."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from dataclasses import dataclass
 import httpx2 as httpx
 from anthropic import AsyncAnthropic
 
-from runa._models._anthropic import AnthropicModel
-from runa._models._base import Model
-from runa._models._openai import OpenAICompatibleModel
+from runa._models.anthropic import AnthropicModel
+from runa._models.interface import Model
+from runa._models.openai_chatcompletions import OpenAICompatibleModel
 from runa.exceptions import UserError
 
 _DEFAULT_MODEL = "gpt-5.4-nano"

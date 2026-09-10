@@ -8,8 +8,8 @@ is a directory of files on disk (`app/knowledge/` by default), not calls to `rem
 
 Kept deliberately separate from `Memory`: `Memory` is durable facts about a user/agent, learned
 from conversations; `Knowledge` is the application's own domain documents, put there by whoever
-built the app. `_runner._core._run_async` is what makes retrieval automatic during `run` -- see
-its `knowledge`/`_knowledge_block` handling, the same shape as its `memory` handling.
+built the app. `run_internal.run_loop._run_async` is what makes retrieval automatic during `run`
+-- see its `knowledge`/`_knowledge_block` handling, the same shape as its `memory` handling.
 `KnowledgeLike` is the contract a wholesale custom `knowledge=` object needs, as opposed to
 `Knowledge(store=...)`'s narrower escape hatch of swapping just the storage backend.
 """

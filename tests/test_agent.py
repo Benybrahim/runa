@@ -16,7 +16,7 @@ from runa._types import ModelResponse, RunContextWrapper, Usage
 from runa.agent import Subagent
 from runa.exceptions import MaxTurnsExceeded, RunErrorDetails
 from runa.knowledge import Knowledge
-from runa.logging import LoggingRunHooks
+from runa.lifecycle import LoggingRunHooks
 from runa.memory import Memory
 from runa.tool import FunctionTool, tool
 
@@ -539,7 +539,7 @@ def _two_arg_instructions(context: RunContextWrapper[_Ctx], agent: Any) -> str:
 
 def test_single_arg_instructions_resolves_from_run_context() -> None:
     """A one-parameter `(context) -> str` `instructions` is adapted to the runner's 2-arg shape."""
-    from runa._runner import _resolve_instructions
+    from runa.run_internal.agent_runner_helpers import _resolve_instructions
 
     class Dynamic(Agent):
         name = "Dynamic"
@@ -554,7 +554,7 @@ def test_single_arg_instructions_resolves_from_run_context() -> None:
 
 def test_two_arg_instructions_still_supported() -> None:
     """A native runner-style `(context, agent) -> str` `instructions` passes through unadapted."""
-    from runa._runner import _resolve_instructions
+    from runa.run_internal.agent_runner_helpers import _resolve_instructions
 
     class Dynamic(Agent):
         name = "Dynamic"

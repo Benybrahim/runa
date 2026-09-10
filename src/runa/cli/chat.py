@@ -14,7 +14,6 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-from runa._runner import Runner
 from runa.agent import Agent, _default_hooks
 from runa.cli._project import (
     iter_agent_classes,
@@ -23,6 +22,7 @@ from runa.cli._project import (
     resolve_db_path,
 )
 from runa.cli.sessions import list_sessions_for_agent
+from runa.runner import Runner
 from runa.session import SQLiteSession
 
 

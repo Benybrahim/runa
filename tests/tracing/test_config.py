@@ -4,8 +4,9 @@ import asyncio
 from types import SimpleNamespace
 from typing import Any
 
-from runa._runner import RunConfig, Runner
 from runa._types import ModelResponse, ModelSettings, Usage
+from runa.run_config import RunConfig
+from runa.runner import Runner
 from runa.tool import tool
 from runa.tracing import config, observe
 

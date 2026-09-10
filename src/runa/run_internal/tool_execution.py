@@ -1,4 +1,4 @@
-"""_tool_calls.py: executing one message's tool calls — handoffs, approval gating, guardrails."""
+"""tool_execution.py: executing one message's tool calls — handoffs, approval gating, guardrails."""
 
 from __future__ import annotations
 
@@ -6,15 +6,20 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from runa._runner._guardrails import _run_tool_input_guardrails, _run_tool_output_guardrails
-from runa._runner._helpers import _agent_tools, _find_tool, _gate_tool_call, _normalized_handoffs
-from runa._runner._spans import _close_span, _new_span
-from runa._runner._state import Interruption
 from runa._types import RunContextWrapper, TResponseInputItem
 from runa.exceptions import DuplicateToolCallError
-from runa.logging import RunHooks
+from runa.lifecycle import RunHooks
+from runa.run_internal.agent_runner_helpers import (
+    _agent_tools,
+    _find_tool,
+    _gate_tool_call,
+    _normalized_handoffs,
+)
+from runa.run_internal.guardrails import _run_tool_input_guardrails, _run_tool_output_guardrails
+from runa.run_internal.spans import _close_span, _new_span
+from runa.run_state import Interruption
 from runa.tool import FunctionTool
-from runa.tracing._trace import Trace
+from runa.tracing.traces import Trace
 
 
 async def _run_tool_call(

@@ -7,11 +7,11 @@ from typing import Any, cast
 
 import pytest
 
-from runa._runner import Interruption
 from runa.agent import Agent
 from runa.cli._project import NotARunaProject, loaded_app
 from runa.cli.chat import AgentNotFound, find_agent_class, run_agent_repl
 from runa.cli.new import scaffold_project
+from runa.run_state import Interruption
 from runa.session import SQLiteSession
 
 

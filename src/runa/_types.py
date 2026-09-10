@@ -1,8 +1,8 @@
 """_types.py: the provider-neutral request/response shapes Runa's own runtime is built on.
 
-No OpenAI (or Anthropic) SDK type leaks past `_models.py` — everywhere else in Runa speaks these
+No OpenAI (or Anthropic) SDK type leaks past `_models` — everywhere else in Runa speaks these
 types instead: a plain dict for one turn of conversation, a token-usage tally, and per-call model
-settings. `_runner.py` builds and consumes these; each `Model` implementation translates them to
+settings. `run_internal` builds and consumes these; each `Model` implementation translates them to
 and from whatever shape its own provider's wire format actually wants.
 """
 

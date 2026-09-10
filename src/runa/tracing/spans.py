@@ -1,4 +1,4 @@
-"""tracing/span.py: `Span`, one meaningful operation inside a `Trace`.
+"""tracing/spans.py: `Span`, one meaningful operation inside a `Trace`.
 
 Deliberately restricted to the controlled vocabulary the design calls for (`SpanType`) instead of
 inventing separate classes per operation kind: an agent turn, an LLM call, a tool call, a

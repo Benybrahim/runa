@@ -1,4 +1,4 @@
-"""Tests for `runa._runner`: the in-house agent loop that replaces `agents.Runner`."""
+"""Tests for `runa.runner`: the in-house agent loop that replaces `agents.Runner`."""
 
 import asyncio
 from types import SimpleNamespace
@@ -7,7 +7,6 @@ from typing import Any
 import pytest
 
 from runa._models import StreamDelta
-from runa._runner import RunConfig, Runner, gen_trace_id
 from runa._types import ModelResponse, ModelSettings, Usage
 from runa.exceptions import (
     ApprovalRequiredError,
@@ -19,7 +18,10 @@ from runa.exceptions import (
 )
 from runa.guardrail import GuardrailFunctionOutput, InputGuardrail, OutputGuardrail
 from runa.handoff import Handoff
+from runa.run_config import RunConfig
+from runa.runner import Runner
 from runa.tool import tool
+from runa.tracing.util import gen_trace_id
 
 
 def _agent(**overrides: Any) -> Any:
@@ -558,7 +560,7 @@ def test_a_paused_run_states_guardrail_results_reflect_what_ran_before_the_pause
 
 def test_stream_response_yields_text_and_final_message() -> None:
     """Streaming a plain-text reply yields raw deltas, then a `message_output_created` item."""
-    from runa._runner import RawResponsesStreamEvent, RunItemStreamEvent
+    from runa.stream_events import RawResponsesStreamEvent, RunItemStreamEvent
 
     agent = _agent(
         model=_ScriptedStreamingModel([StreamDelta(text="Hi"), StreamDelta(text=" there")])
@@ -581,7 +583,7 @@ def test_stream_response_yields_text_and_final_message() -> None:
 
 def test_stream_response_runs_a_sticky_approved_tool_without_raising() -> None:
     """A tool with a sticky `always=True` approval already on the context runs during streaming."""
-    from runa._runner import RunItemStreamEvent
+    from runa.stream_events import RunItemStreamEvent
 
     @tool(needs_approval=True)
     def dangerous() -> str:

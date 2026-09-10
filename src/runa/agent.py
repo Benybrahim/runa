@@ -1,4 +1,4 @@
-"""Class-based Agent, built on Runa's own runtime (`runa._runner`)."""
+"""Class-based Agent, built on Runa's own runtime (`runa.runner`/`runa.run_internal`)."""
 
 import inspect
 import re
@@ -8,16 +8,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from runa._models import ModelProvider
-from runa._runner import RunConfig, Runner, RunState, StreamEvent
 from runa._types import ModelSettings, RunContextWrapper, TResponseInputItem, Usage
 from runa.exceptions import RunaError, UserError
 from runa.guardrail import flatten_agent_guardrails
 from runa.handoff import agent_as_tool
 from runa.knowledge import Knowledge
-from runa.logging import LoggingRunHooks, RunHooks
+from runa.lifecycle import LoggingRunHooks, RunHooks
 from runa.memory import Memory
 from runa.run import Run
+from runa.run_config import RunConfig
+from runa.run_state import RunState
+from runa.runner import Runner
 from runa.session import SessionABC
+from runa.stream_events import StreamEvent
 from runa.tool import FunctionTool
 
 if TYPE_CHECKING:
@@ -56,8 +59,8 @@ def _usage_from_exception(exc: RunaError) -> Usage:
 def _adapt_instructions(instructions: Any) -> Any:
     """Let `instructions` be a `(context) -> str` callable instead of the runner's 2-arg shape.
 
-    `_runner.py` calls `instructions(run_context, agent)` when it's callable, mirroring the
-    two-parameter shape a handful of tests rely on. A single-parameter callable is wrapped so it
+    `run_internal.run_loop` calls `instructions(run_context, agent)` when it's callable, mirroring
+    the two-parameter shape a handful of tests rely on. A single-parameter callable is wrapped so it
     receives just `run_context.context`, the object passed to `Agent.run`/`run_sync`; anything
     else (a string, `None`, or an already two-parameter callable) passes through unchanged.
     """
@@ -145,8 +148,8 @@ def _resolve_retrieval_setting(
     `Agent.__init__`: `None` passes through, `"auto"` builds a default instance, `"llm"` appends
     a search tool and leaves the attribute `None`. Anything else -- a `Memory`/`Knowledge`, or any
     other object shaped like `MemoryLike`/`KnowledgeLike` -- passes through untouched too, since
-    `_runner._core` only ever calls its methods, never checks its type: this is the escape hatch
-    for a wholesale custom `memory=`/`knowledge=` object. Only an unrecognized *string* is
+    `run_internal.run_loop` only ever calls its methods, never checks its type: this is the escape
+    hatch for a wholesale custom `memory=`/`knowledge=` object. Only an unrecognized *string* is
     rejected, so a typo fails clearly instead of being silently treated as a custom object.
     """
     name = cls.__name__.lower()

@@ -1,4 +1,4 @@
-"""_anthropic.py: the Claude backend — the one that needs real translation.
+"""anthropic.py: the Claude backend — the one that needs real translation.
 
 Anthropic's Messages API isn't chat-completions-shaped: content blocks instead of a `tool_calls`
 array, a separate `system` param, strict user/assistant alternation, and its own streaming events.
@@ -12,7 +12,7 @@ from typing import Any
 
 from anthropic import AsyncAnthropic
 
-from runa._models._base import StreamDelta, _handoff_dict, _tool_dict
+from runa._models.interface import StreamDelta, _handoff_dict, _tool_dict
 from runa._types import (
     InputTokensDetails,
     ModelResponse,

@@ -22,6 +22,7 @@ from runa import (
     Case,
     ConsoleExporter,
     RunHooks,
+    Runner,
     SQLiteExporter,
     approval,
     guardrail,
@@ -31,7 +32,6 @@ from runa import (
 
 # `Agent.run`/`run_sync` don't surface `interruptions` (see docs/approval.md), so driving an
 # approval pause/resume by hand needs the same `Runner` `runa chat` (cli/chat.py) calls directly.
-from runa._runner import Runner
 
 # --------------------------------------------------------------------------------------------
 # 1. Tools, with guardrails on both the agent and one tool's arguments.

@@ -8,10 +8,11 @@ is derived straight from `AgentRun.trace.spans`.
 import time
 from dataclasses import dataclass, field
 
-from runa._runner import RunConfig, Runner
 from runa.agent import _MODEL_PROVIDER, Agent
 from runa.eval.case import Case
 from runa.exceptions import RunaError
+from runa.run_config import RunConfig
+from runa.runner import Runner
 from runa.tracing import Trace
 
 _EMPTY_TRACE = Trace(id="", name="", start_time=0.0, end_time=0.0, spans=[], metadata={})

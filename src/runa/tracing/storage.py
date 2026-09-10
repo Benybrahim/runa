@@ -11,8 +11,8 @@ from pathlib import Path
 
 from runa.db.sqlite import DEFAULT_DB_PATH
 from runa.db.sqlite import connect as _connect_db
-from runa.tracing._span import Span
-from runa.tracing._trace import Trace
+from runa.tracing.spans import Span
+from runa.tracing.traces import Trace
 
 _TRACES_TABLE = "traces"
 _SPANS_TABLE = "spans"

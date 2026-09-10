@@ -1,9 +1,9 @@
-"""tracing/trace.py: `Trace`, one logical agent execution and its `Span` tree."""
+"""tracing/traces.py: `Trace`, one logical agent execution and its `Span` tree."""
 
 from dataclasses import dataclass, field
 from typing import Any
 
-from runa.tracing._span import Span, SpanStatus
+from runa.tracing.spans import Span, SpanStatus
 
 _TYPE_LABELS: dict[str, str] = {
     "agent": "Agent",

@@ -6,8 +6,8 @@ file `SQLiteSession` uses (`db/sqlite.py`). A `vec0` virtual table holds the emb
 by `user_id` for correct per-user nearest-neighbor search; a companion table holds the text/
 metadata they came from, joined back to it by rowid.
 
-`remember_from_conversation` is what `_runner._core._run_async` calls after a run to turn the
-turn's exchange into zero or more remembered facts; `MemoryLike` is the contract (it and
+`remember_from_conversation` is what `run_internal.run_loop._run_async` calls after a run to turn
+the turn's exchange into zero or more remembered facts; `MemoryLike` is the contract (it and
 `search`) a wholesale custom `memory=` object needs, as opposed to `Memory(store=...)`'s
 narrower escape hatch of swapping just the storage backend.
 """
@@ -291,8 +291,8 @@ class Memory:
     ) -> list[str]:
         """Ask `model` what's durably worth remembering from `conversation`, and store it.
 
-        Called by `_runner._core._run_async` after a run when `agent.memory` is set, not meant to
-        be called directly by app code -- but part of `MemoryLike`, the contract a custom
+        Called by `run_internal.run_loop._run_async` after a run when `agent.memory` is set, not
+        meant to be called directly by app code -- but part of `MemoryLike`, the contract a custom
         `memory=` object must implement alongside `search`. Returns the texts it stored, empty if
         none were worth it.
         """

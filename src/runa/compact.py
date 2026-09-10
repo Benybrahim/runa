@@ -5,7 +5,7 @@ most recent exchange -- a rolling window, not a summary, the simplest thing that
 from growing without bound. `compact=my_fn` swaps in any other strategy instead -- a different
 threshold, an LLM summary, dropping by item count rather than tokens -- since a `Compactor` gets
 full raw `items`/`usage_tokens` and decides entirely for itself whether/how to trim. See
-`_runner._core._maybe_compact`, the only caller.
+`run_internal.run_loop._maybe_compact`, the only caller.
 """
 
 from __future__ import annotations

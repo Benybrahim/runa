@@ -1,4 +1,4 @@
-"""`runa.logging`: `RunHooks`/`AgentHooks`, and live `logging`-module output for a run.
+"""`runa.lifecycle`: `RunHooks`/`AgentHooks`, and live `logging`-module output for a run.
 
 For a structured, persisted, queryable record of a run instead, see `runa.tracing` — that runs
 unconditionally regardless of `hooks`; this module is just console/log lines while a run happens.
@@ -25,8 +25,8 @@ __all__ = [
 class RunHooks[TContext]:
     """Lifecycle callbacks for one run; every method is a no-op unless overridden.
 
-    Passed as `hooks=` to `Agent.run`/`run_sync`/`run_streamed` — `_runner.py` calls these as the
-    run progresses. `LoggingRunHooks` (below) is the default when no `hooks` is given.
+    Passed as `hooks=` to `Agent.run`/`run_sync`/`run_streamed` — `runa.run_internal` calls these
+    as the run progresses. `LoggingRunHooks` (below) is the default when no `hooks` is given.
     """
 
     async def on_agent_start(self, context: RunContextWrapper[TContext], agent: Any) -> None:

@@ -1,4 +1,7 @@
-"""_openai.py: the chat-completions-shaped backend — OpenAI, Gemini, Llama, DeepSeek, Qwen."""
+"""openai_chatcompletions.py: the chat-completions-shaped backend.
+
+Covers OpenAI, Gemini, Llama, DeepSeek, and Qwen — every provider that speaks this wire format.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +10,7 @@ from typing import Any, cast
 
 import httpx2 as httpx
 
-from runa._models._base import StreamDelta, _handoff_dict, _tool_dict
+from runa._models.interface import StreamDelta, _handoff_dict, _tool_dict
 from runa._types import (
     InputTokensDetails,
     ModelResponse,

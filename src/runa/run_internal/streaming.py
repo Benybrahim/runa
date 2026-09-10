@@ -1,4 +1,8 @@
-"""_streaming.py: `Runner.run_streamed`'s event loop and its `RunResultStreaming` wrapper."""
+"""streaming.py: `Runner.run_streamed`'s event loop — translates model deltas into `StreamEvent`s.
+
+The public `RunResultStreaming` wrapper around this loop lives in `runa.result`, alongside
+`RunResult`, since both are things `Runner` returns to a caller rather than execution-time detail.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +10,11 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
-from runa._runner._helpers import (
+from runa._types import RunContextWrapper, TResponseInputItem, Usage
+from runa.exceptions import ApprovalRequiredError, DuplicateToolCallError, MaxTurnsExceeded
+from runa.lifecycle import RunHooks
+from runa.run_config import RunConfig
+from runa.run_internal.agent_runner_helpers import (
     _agent_tools,
     _find_tool,
     _gate_tool_call,
@@ -15,46 +23,12 @@ from runa._runner._helpers import (
     _resolve_instructions,
     _resolve_model,
 )
-from runa._runner._state import (
+from runa.stream_events import (
     AgentUpdatedStreamEvent,
     RawResponsesStreamEvent,
-    RunConfig,
     RunItemStreamEvent,
     StreamEvent,
 )
-from runa._types import RunContextWrapper, TResponseInputItem, Usage
-from runa.exceptions import ApprovalRequiredError, DuplicateToolCallError, MaxTurnsExceeded
-from runa.logging import RunHooks
-
-
-class RunResultStreaming:
-    """What `Runner.run_streamed` returns: an async iterator of `StreamEvent`s.
-
-    `context_wrapper`/`to_input_list()` reflect the run's final state once the iterator has been
-    fully consumed — both read the same `items` list and `RunContextWrapper` the streaming loop
-    mutates in place as it goes, so there's no separate "final result" object to reconcile with.
-    """
-
-    def __init__(
-        self,
-        agent: Any,
-        items: list[TResponseInputItem],
-        context_wrapper: RunContextWrapper,
-        run_config: RunConfig,
-        hooks: RunHooks[Any],
-    ) -> None:
-        """Store the shared, mutable `items`/`context_wrapper` the streaming loop will update."""
-        self._items = items
-        self.context_wrapper = context_wrapper
-        self._events = _stream_async(agent, items, context_wrapper, run_config, hooks)
-
-    def __aiter__(self) -> AsyncIterator[StreamEvent]:
-        """Iterate the `StreamEvent`s this run produces."""
-        return self._events
-
-    def to_input_list(self) -> list[TResponseInputItem]:
-        """Return the full item list so far: original input plus everything generated."""
-        return list(self._items)
 
 
 async def _stream_async(
@@ -163,4 +137,4 @@ async def _stream_async(
     raise MaxTurnsExceeded(f"max turns ({run_config.max_turns}) exceeded")
 
 
-__all__ = ["RunResultStreaming", "_stream_async"]
+__all__ = ["_stream_async"]

@@ -1,11 +1,9 @@
-"""_guardrails.py: running an agent's or tool's guardrails, raising on a tripwire."""
+"""guardrails.py: running an agent's or tool's guardrails, raising on a tripwire."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from runa._runner._spans import _close_span, _new_span
-from runa._runner._state import GuardrailResult
 from runa._types import RunContextWrapper
 from runa.exceptions import (
     InputGuardrailTripwireTriggered,
@@ -13,9 +11,10 @@ from runa.exceptions import (
     ToolInputGuardrailTripwireTriggered,
     ToolOutputGuardrailTripwireTriggered,
 )
-from runa.guardrail import ToolInputGuardrailContext, ToolInputGuardrailData
+from runa.guardrail import GuardrailResult, ToolInputGuardrailContext, ToolInputGuardrailData
+from runa.run_internal.spans import _close_span, _new_span
 from runa.tool import FunctionTool
-from runa.tracing._trace import Trace
+from runa.tracing.traces import Trace
 
 
 async def _run_input_guardrails(

@@ -1,9 +1,9 @@
-"""tracing/_manual.py: `trace`/`span`, the manual/advanced tracing API.
+"""tracing/manual.py: `trace`/`span`, the manual/advanced tracing API.
 
-Standalone from `_runner.py`'s automatic per-`Agent.run()` tracing: these build and export their
+Standalone from `run_internal`'s automatic per-`Agent.run()` tracing: these build and export their
 own `Trace`, for instrumenting code that isn't itself an agent run. They don't nest around an
 `Agent.run()` call to group it with other spans — each `Agent.run()` always produces its own,
-independent `Trace` (see `runa._runner`); use these to group other work of your own instead.
+independent `Trace` (see `runa.runner`); use these to group other work of your own instead.
 """
 
 from __future__ import annotations
@@ -12,13 +12,13 @@ import time
 import uuid
 from typing import Any
 
-from runa.tracing._span import Span
-from runa.tracing._trace import Trace
 from runa.tracing.config import exporters
+from runa.tracing.spans import Span
+from runa.tracing.traces import Trace
 
 
 def _export(finished: Trace) -> None:
-    from runa.logging import logger
+    from runa.lifecycle import logger
 
     for exporter in exporters():
         try:

@@ -13,21 +13,21 @@ that shape. Tools/handoffs are read structurally here (`.name`/`.description`/`.
 for a tool, `.tool_name`/`.tool_description` for a handoff) rather than importing their concrete
 types, so this package has no dependency on `runa.tool`/`runa.handoff`.
 
-Split by concern: `_base` (the `Model` protocol, `StreamDelta`, shared wire-format helpers),
-`_openai` (the chat-completions backend), `_anthropic` (the Claude backend), and `_provider`
-(`ModelProvider`, routing a model name to one of the two).
+Split by concern: `interface` (the `Model` protocol, `StreamDelta`, shared wire-format helpers),
+`openai_chatcompletions` (the chat-completions backend), `anthropic` (the Claude backend), and
+`multi_provider` (`ModelProvider`, routing a model name to one of the two).
 """
 
-from runa._models._anthropic import AnthropicModel
-from runa._models._anthropic import _anthropic_deltas as _anthropic_deltas
-from runa._models._anthropic import _check_plain_text_output as _check_plain_text_output
-from runa._models._anthropic import _to_anthropic_messages as _to_anthropic_messages
-from runa._models._anthropic import _to_anthropic_tool as _to_anthropic_tool
-from runa._models._anthropic import _to_anthropic_tool_choice as _to_anthropic_tool_choice
-from runa._models._anthropic import _to_chat_message as _to_chat_message
-from runa._models._anthropic import _to_usage as _to_usage
-from runa._models._base import Model, StreamDelta
-from runa._models._openai import OpenAICompatibleModel
-from runa._models._provider import ModelProvider
+from runa._models.anthropic import AnthropicModel
+from runa._models.anthropic import _anthropic_deltas as _anthropic_deltas
+from runa._models.anthropic import _check_plain_text_output as _check_plain_text_output
+from runa._models.anthropic import _to_anthropic_messages as _to_anthropic_messages
+from runa._models.anthropic import _to_anthropic_tool as _to_anthropic_tool
+from runa._models.anthropic import _to_anthropic_tool_choice as _to_anthropic_tool_choice
+from runa._models.anthropic import _to_chat_message as _to_chat_message
+from runa._models.anthropic import _to_usage as _to_usage
+from runa._models.interface import Model, StreamDelta
+from runa._models.multi_provider import ModelProvider
+from runa._models.openai_chatcompletions import OpenAICompatibleModel
 
 __all__ = ["AnthropicModel", "Model", "ModelProvider", "OpenAICompatibleModel", "StreamDelta"]

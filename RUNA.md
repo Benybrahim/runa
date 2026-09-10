@@ -98,7 +98,7 @@ passing that `RunState` back into `Runner.run`/`run_sync` in place of the origin
 result = Runner.run_sync(agent, "issue a $75 refund")
 state = result.to_state()
 for item in result.interruptions:
-    state.approve(item)   # or state.reject(item, rejection_message="not authorized")
+    state.approve(item)  # or state.reject(item, rejection_message="not authorized")
 result = Runner.run_sync(agent, state)
 ```
 

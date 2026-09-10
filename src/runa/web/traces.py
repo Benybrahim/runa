@@ -11,8 +11,8 @@ from typing import Any
 
 from runa.cli._project import resolve_db_path
 from runa.tracing import Trace, get_errors, get_trace, list_traces
-from runa.tracing._span import Span
-from runa.tracing._trace import _TYPE_LABELS, _fmt_duration
+from runa.tracing.spans import Span
+from runa.tracing.traces import _TYPE_LABELS, _fmt_duration
 from runa.web._html import back_link, chip, empty, escape, page, pre
 
 __all__ = ["TraceNotFound", "render_detail", "render_list"]

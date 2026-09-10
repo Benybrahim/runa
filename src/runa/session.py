@@ -38,9 +38,9 @@ CREATE INDEX IF NOT EXISTS idx_{_MESSAGES_TABLE}_session_id ON {_MESSAGES_TABLE}
 
 
 class SessionABC(ABC):
-    """What `_runner.py` needs to persist and replay conversation history across turns.
+    """What `run_internal` needs to persist and replay conversation history across turns.
 
-    `user_id` is optional and unrelated to history: `_runner.py` reads it (when set) to scope
+    `user_id` is optional and unrelated to history: `run_internal` reads it (when set) to scope
     automatic `Agent.memory` retrieval/persistence to one user, so app code doesn't have to
     thread a `user_id` through `Memory.remember`/`.search` itself. `None` means memory that goes
     through this session lands in its own user-less scope, not everyone's.

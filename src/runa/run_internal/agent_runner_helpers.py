@@ -1,4 +1,4 @@
-"""_helpers.py: low-level per-turn helpers — model/instruction resolution, tool/handoff lookup."""
+"""agent_runner_helpers.py: low-level per-turn helpers — model/instruction/tool resolution."""
 
 from __future__ import annotations
 
@@ -92,8 +92,8 @@ async def _gate_tool_call(
 
     Consults `context_wrapper.approval_ledger` first -- the sticky "always approve"/"always
     reject" decisions set via `RunState.approve`/`.reject(..., always=True)` -- before falling
-    back to `_needs_approval` and the per-call-id `approvals` dict. Shared by `_tool_calls.py`
-    (turn-based runs) and `_streaming.py` (`run_streamed`), so there's exactly one sanctioned
+    back to `_needs_approval` and the per-call-id `approvals` dict. Shared by `tool_execution.py`
+    (turn-based runs) and `streaming.py` (`run_streamed`), so there's exactly one sanctioned
     approval-gating path rather than two that could drift apart.
     """
     sticky = context_wrapper.approval_ledger.get(tool.name)

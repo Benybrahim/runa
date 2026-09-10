@@ -1,17 +1,14 @@
-"""_state.py: per-call config, paused/finished-run data, and stream event types."""
+"""run_state.py: `RunState`, enough of a paused run to resume it once approvals are resolved."""
 
 from __future__ import annotations
 
 import dataclasses
 import json
-import uuid
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
 
-from runa._models import ModelProvider, StreamDelta
-from runa._runner._helpers import _agent_tools, _find_agent_by_name, _find_tool
 from runa._types import (
     InputTokensDetails,
     OutputTokensDetails,
@@ -21,48 +18,9 @@ from runa._types import (
 )
 from runa.exceptions import UserError
 from runa.tool import FunctionTool
-from runa.tracing._trace import Trace
+from runa.tracing.traces import Trace
 
-_DEFAULT_MAX_TURNS = 10
 _SCHEMA_VERSION = 1
-
-
-def gen_trace_id() -> str:
-    """Generate a fresh, opaque trace id."""
-    return uuid.uuid4().hex
-
-
-def _gen_span_id() -> str:
-    return uuid.uuid4().hex
-
-
-@dataclass
-class RunConfig:
-    """Per-call configuration for `Runner.run`/`run_sync`/`run_streamed`.
-
-    `workflow_name` names the `Trace` this run produces; `group_id`/`trace_metadata` are recorded
-    on it verbatim. `model_provider` resolves an `Agent.model` string to a `Model` — irrelevant
-    when `Agent.model` is already a `Model` instance (as Runa's own tests do, to script one).
-    """
-
-    model_provider: ModelProvider = field(default_factory=ModelProvider)
-    workflow_name: str = "Agent"
-    group_id: str | None = None
-    trace_metadata: dict[str, Any] | None = None
-    max_turns: int = _DEFAULT_MAX_TURNS
-
-
-@dataclass
-class GuardrailResult:
-    """A guardrail plus the verdict it returned, whether or not it tripped.
-
-    Every guardrail run this run is recorded (see `RunContextWrapper.input_guardrail_results`
-    etc.), not just the one that stopped the run; `tripped` distinguishes the two.
-    """
-
-    guardrail: Any
-    output: Any
-    tripped: bool
 
 
 @dataclass
@@ -262,6 +220,12 @@ class RunState:
         an unknown schema version, a malformed field, or a tool/agent name that can no longer be
         found -- never a raw `pydantic.ValidationError`.
         """
+        from runa.run_internal.agent_runner_helpers import (
+            _agent_tools,
+            _find_agent_by_name,
+            _find_tool,
+        )
+
         try:
             schema = _RunStateSchema.model_validate(state_json)
         except ValidationError as exc:
@@ -326,69 +290,4 @@ class RunState:
         return await cls.from_json(initial_agent, state_json)
 
 
-@dataclass
-class RunResult:
-    """The outcome of one `Runner.run`/`run_sync` call."""
-
-    final_output: Any
-    context_wrapper: RunContextWrapper
-    trace: Trace
-    _original_input: list[TResponseInputItem]
-    _generated_items: list[TResponseInputItem]
-    interruptions: list[Interruption] = field(default_factory=list)
-    _state: RunState | None = None
-    input_guardrail_results: list[Any] = field(default_factory=list)
-    output_guardrail_results: list[Any] = field(default_factory=list)
-    tool_input_guardrail_results: list[Any] = field(default_factory=list)
-    tool_output_guardrail_results: list[Any] = field(default_factory=list)
-
-    def to_input_list(self) -> list[TResponseInputItem]:
-        """Return `original_input + generated_items`: the full history after this run."""
-        return [*self._original_input, *self._generated_items]
-
-    def to_state(self) -> RunState:
-        """Return the `RunState` to resolve `interruptions` against and resume with."""
-        assert self._state is not None, "to_state() needs a run that actually paused"
-        return self._state
-
-
-@dataclass
-class RawResponsesStreamEvent:
-    """A raw, provider-shaped fragment of a streamed response, passed through as-is."""
-
-    data: StreamDelta
-    type: Literal["raw_response_event"] = "raw_response_event"
-
-
-@dataclass
-class RunItemStreamEvent:
-    """One completed item produced mid-stream: a message, a tool call, a tool's output, ..."""
-
-    name: Literal["message_output_created", "tool_called", "tool_output", "handoff_occured"]
-    item: TResponseInputItem
-    type: Literal["run_item_stream_event"] = "run_item_stream_event"
-
-
-@dataclass
-class AgentUpdatedStreamEvent:
-    """A handoff switched the agent running this turn."""
-
-    new_agent: Any
-    type: Literal["agent_updated_stream_event"] = "agent_updated_stream_event"
-
-
-StreamEvent = RawResponsesStreamEvent | RunItemStreamEvent | AgentUpdatedStreamEvent
-
-
-__all__ = [
-    "AgentUpdatedStreamEvent",
-    "GuardrailResult",
-    "Interruption",
-    "RawResponsesStreamEvent",
-    "RunConfig",
-    "RunItemStreamEvent",
-    "RunResult",
-    "RunState",
-    "StreamEvent",
-    "gen_trace_id",
-]
+__all__ = ["Interruption", "RunState"]

@@ -24,6 +24,19 @@ class GuardrailFunctionOutput:
 
 
 @dataclass
+class GuardrailResult:
+    """A guardrail plus the verdict it returned, whether or not it tripped.
+
+    Every guardrail run this run is recorded (see `RunContextWrapper.input_guardrail_results`
+    etc.), not just the one that stopped the run; `tripped` distinguishes the two.
+    """
+
+    guardrail: Any
+    output: Any
+    tripped: bool
+
+
+@dataclass
 class InputGuardrail[TContext]:
     """Checks an agent's input before the model ever sees it; trips the run if it should stop."""
 
@@ -309,6 +322,7 @@ def flatten_tool_guardrails(
 
 __all__ = [
     "Guardrail",
+    "GuardrailResult",
     "GuardrailsDict",
     "GuardrailsList",
     "ToolGuardrailsDict",

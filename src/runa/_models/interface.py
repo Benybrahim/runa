@@ -1,4 +1,4 @@
-"""_base.py: the `Model` protocol, `StreamDelta`, and wire-format bits both backends share."""
+"""interface.py: the `Model` protocol, `StreamDelta`, and wire-format bits both backends share."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from runa._types import ModelResponse, ModelSettings, TResponseInputItem, Usage
 
 
 class Model(Protocol):
-    """What `_runner` needs from a model backend: a non-streaming and a streaming call.
+    """What `runa.run_internal` needs from a model backend: a non-streaming and a streaming call.
 
     `tools`/`handoffs` are read structurally (see the package docstring); `output_schema` is
     `None` or `str` for plain-text output, or any other type to ask the backend for JSON output.
@@ -45,7 +45,7 @@ class Model(Protocol):
 class StreamDelta:
     """One incremental fragment of a streamed model response.
 
-    Only the fields relevant to a given fragment are set. `_runner` accumulates a stream of
+    Only the fields relevant to a given fragment are set. `run_internal` accumulates a stream of
     these into a final message: `text` fragments concatenate; a tool-call fragment is keyed by
     `tool_call_index`, with `id`/`name` set once (when the call starts) and `arguments` arriving
     in pieces to be concatenated; `usage` is set once, on whichever fragment carries it (a

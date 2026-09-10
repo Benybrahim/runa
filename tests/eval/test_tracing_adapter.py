@@ -5,12 +5,12 @@ from typing import Any
 
 import pytest
 
-from runa._runner import RunResult
 from runa._types import RunContextWrapper, Usage
 from runa.agent import Agent
 from runa.eval.case import Case
 from runa.eval.tracing.adapter import run_agent_for_eval
 from runa.exceptions import MaxTurnsExceeded, RunErrorDetails
+from runa.result import RunResult
 from runa.tracing import Span, Trace
 
 

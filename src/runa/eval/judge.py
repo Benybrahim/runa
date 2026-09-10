@@ -11,8 +11,9 @@ import re
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from runa._runner import RunConfig, Runner
 from runa.agent import _MODEL_PROVIDER, Agent
+from runa.run_config import RunConfig
+from runa.runner import Runner
 
 _TRAILING_COMMA = re.compile(r",\s*([\]}])")
 

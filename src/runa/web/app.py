@@ -65,7 +65,9 @@ def create_app(root: Path) -> FastAPI:
         try:
             return HTMLResponse(evaluations_page.render_detail(run_id, root=root))
         except evaluations_page.EvalRunNotFound:
-            return HTMLResponse(_error_page("Evaluations", "Evaluation run not found."), status_code=404)
+            return HTMLResponse(
+                _error_page("Evaluations", "Evaluation run not found."), status_code=404
+            )
 
     @app.exception_handler(NotARunaProject)
     def _not_a_project(_request: Request, _exc: NotARunaProject) -> HTMLResponse:

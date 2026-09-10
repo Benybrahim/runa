@@ -1,4 +1,9 @@
-"""_core.py: the turn loop (`_run_turns`), run/resume orchestration, and the public `Runner`."""
+"""run_loop.py: the turn loop (`_run_turns`), and run/resume orchestration.
+
+The public `Runner` that calls into this lives in `runa.runner`, matching openaisdk's own
+`run_internal/run_loop.py` docstring: only execution-time utilities belong here; public-facing
+APIs belong at the top level.
+"""
 
 from __future__ import annotations
 
@@ -6,24 +11,26 @@ import asyncio
 import time
 from typing import Any
 
-from runa._runner._guardrails import _run_input_guardrails, _run_output_guardrails
-from runa._runner._helpers import (
+from runa._types import RunContextWrapper, TResponseInputItem
+from runa.compact import Compactor, default_compactor
+from runa.exceptions import MaxTurnsExceeded, ModelBehaviorError, RunaError
+from runa.lifecycle import RunHooks, logger
+from runa.result import RunResult
+from runa.run_config import RunConfig
+from runa.run_internal.agent_runner_helpers import (
     _agent_tools,
     _model_settings,
     _normalized_handoffs,
     _resolve_instructions,
     _resolve_model,
 )
-from runa._runner._spans import _close_span, _export, _new_span
-from runa._runner._state import RunConfig, RunResult, RunState, gen_trace_id
-from runa._runner._streaming import RunResultStreaming
-from runa._runner._tool_calls import _run_message_tool_calls, _TurnOutcome
-from runa._types import RunContextWrapper, TResponseInputItem
-from runa.compact import Compactor, default_compactor
-from runa.exceptions import MaxTurnsExceeded, ModelBehaviorError, RunaError
-from runa.logging import RunHooks, logger
+from runa.run_internal.guardrails import _run_input_guardrails, _run_output_guardrails
+from runa.run_internal.spans import _close_span, _export, _new_span
+from runa.run_internal.tool_execution import _run_message_tool_calls, _TurnOutcome
+from runa.run_state import RunState
 from runa.session import SessionABC
-from runa.tracing._trace import Trace
+from runa.tracing.traces import Trace
+from runa.tracing.util import gen_trace_id
 
 
 def _latest_user_text(items: list[TResponseInputItem]) -> str | None:
@@ -193,7 +200,7 @@ async def _run_turns(
 
 
 def _default_hooks() -> RunHooks[Any]:
-    from runa.logging import LoggingRunHooks
+    from runa.lifecycle import LoggingRunHooks
 
     return LoggingRunHooks()
 
@@ -467,73 +474,4 @@ async def _resume(state: RunState, hooks: RunHooks[Any], run_config: RunConfig) 
     )
 
 
-class Runner:
-    """Runs an `Agent` for one turn: `run`/`run_sync` (final output) or `run_streamed` (events)."""
-
-    @staticmethod
-    async def run(
-        agent: Any,
-        input: str | list[TResponseInputItem] | RunState,
-        *,
-        context: Any = None,
-        hooks: RunHooks[Any] | None = None,
-        run_config: RunConfig | None = None,
-        session: SessionABC | None = None,
-        _context_wrapper: RunContextWrapper[Any] | None = None,
-    ) -> RunResult:
-        """Run `agent` on `input` (or resume a paused `RunState`) and return the final result.
-
-        `_context_wrapper` is internal: used by `agent_as_tool`'s nested delegate calls to pass
-        a forked `RunContextWrapper` through instead of building a fresh one from `context`; not
-        meant to be passed directly.
-        """
-        return await _run_async(
-            agent,
-            input,
-            context=context,
-            hooks=hooks,
-            run_config=run_config,
-            session=session,
-            _context_wrapper=_context_wrapper,
-        )
-
-    @staticmethod
-    def run_sync(
-        agent: Any,
-        input: str | list[TResponseInputItem] | RunState,
-        *,
-        context: Any = None,
-        hooks: RunHooks[Any] | None = None,
-        run_config: RunConfig | None = None,
-        session: SessionABC | None = None,
-    ) -> RunResult:
-        """Synchronous `run`, for callers not already inside an event loop."""
-        import asyncio
-
-        return asyncio.run(
-            Runner.run(
-                agent, input, context=context, hooks=hooks, run_config=run_config, session=session
-            )
-        )
-
-    @staticmethod
-    def run_streamed(
-        agent: Any,
-        input: str | list[TResponseInputItem],
-        *,
-        context: Any = None,
-        hooks: RunHooks[Any] | None = None,
-        run_config: RunConfig | None = None,
-    ) -> RunResultStreaming:
-        """Run `agent` on `input`, returning a `RunResultStreaming` of `StreamEvent`s."""
-        items = [{"role": "user", "content": input}] if isinstance(input, str) else list(input)
-        return RunResultStreaming(
-            agent,
-            items,
-            RunContextWrapper(context=context),
-            run_config or RunConfig(),
-            hooks or _default_hooks(),
-        )
-
-
-__all__ = ["Runner", "_default_hooks", "_resume", "_run_async", "_run_turns"]
+__all__ = ["_default_hooks", "_resume", "_run_async", "_run_turns"]

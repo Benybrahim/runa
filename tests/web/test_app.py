@@ -14,9 +14,9 @@ from runa.eval.report import CaseReport, Report
 from runa.eval.storage import save_report
 from runa.eval.tracing.adapter import AgentRun
 from runa.session import SQLiteSession
-from runa.tracing._span import Span
-from runa.tracing._trace import Trace
+from runa.tracing.spans import Span
 from runa.tracing.storage import save_trace
+from runa.tracing.traces import Trace
 from runa.web.app import create_app
 
 

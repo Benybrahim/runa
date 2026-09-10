@@ -1,7 +1,7 @@
 """handoff.py: `Handoff` (agent-as-a-switch) and `agent_as_tool` (agent-as-a-tool).
 
 Both wrap a sub-`Agent` as something the model can call, differing in what happens next: calling a
-`Handoff`'s tool switches `_runner.py`'s current agent for the rest of the run (`Agent.subagents`'
+`Handoff`'s tool switches `run_internal`'s current agent for the rest of the run (`Agent.subagents`'
 `.handoff` mode); calling an `agent_as_tool()` tool runs the sub-agent to completion and hands its
 output back to the *calling* agent, which keeps going (`.delegate` mode). See `runa.agent.Subagent`
 for how a class wires either mode up from its `subagents` list.
@@ -33,7 +33,7 @@ def _slugify(name: str) -> str:
 class Handoff:
     """A sub-agent registered as a switch: calling its tool hands the run over to it.
 
-    `_runner.py` sees a `Handoff` in an agent's `handoffs` list and recognizes a call to
+    `run_internal` sees a `Handoff` in an agent's `handoffs` list and recognizes a call to
     `tool_name` as a request to switch `current_agent` to `agent`, rather than a normal tool call.
     """
 

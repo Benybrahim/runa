@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from runa.tracing._trace import Trace
+from runa.tracing.traces import Trace
 
 _REDACTED = "[REDACTED]"
 
