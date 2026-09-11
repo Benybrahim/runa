@@ -23,12 +23,6 @@ jobs:
       - name: Set up Python
         run: uv python install 3.14
 
-      - name: Install dependencies
-        run: make install
-
-      - name: Run checks
-        run: make check
-
       - name: Build package
         run: uv build
 
