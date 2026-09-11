@@ -35,7 +35,7 @@ dev = [
     "pyright>=1.1.400",
     "python-dotenv>=1.2.3",
     "httpx>=0.28.0",
-    "runa[postgres,redis,ui]",
+    "runa-ai[postgres,redis,ui]",
     "mkdocs>=1.6.1",
 ]
 

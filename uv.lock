@@ -1131,7 +1131,7 @@ wheels = [
 ]
 
 [[package]]
-name = "runa"
+name = "runa-ai"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
@@ -1166,7 +1166,7 @@ dev = [
     { name = "pytest" },
     { name = "python-dotenv" },
     { name = "ruff" },
-    { name = "runa", extra = ["postgres", "redis", "ui"] },
+    { name = "runa-ai", extra = ["postgres", "redis", "ui"] },
 ]
 
 [package.metadata]
@@ -1195,7 +1195,7 @@ dev = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "python-dotenv", specifier = ">=1.2.3" },
     { name = "ruff", specifier = ">=0.16.4" },
-    { name = "runa", extras = ["postgres", "redis", "ui"] },
+    { name = "runa-ai", extras = ["postgres", "redis", "ui"] },
 ]
 
 [[package]]
