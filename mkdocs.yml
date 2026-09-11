@@ -10,8 +10,8 @@ copyright: Copyright &copy; Runa contributors
 theme:
   name: material
   custom_dir: docs/overrides
-  logo: assets/mark-dark.svg
-  favicon: assets/favicon.ico
+  logo: assets/runa-logo-main.svg
+  favicon: assets/runa-logo-main.ico
   icon:
     repo: fontawesome/brands/github
   palette:
@@ -54,7 +54,6 @@ theme:
     - content.tooltips
 
 nav:
-  - Install: install.md
   - Getting Started: getting_started.md
   - Guides: guides.md
   - Core Concepts:
@@ -65,11 +64,11 @@ nav:
   - Running Agents:
       - Sessions and Chat: sessions.md
       - Memory: memory.md
+      - Knowledge: knowledge.md
       - Cache: cache.md
       - MCP Servers: mcp.md
       - Human Approval: approval.md
-  - Testing and Evaluation:
-      - Testing: testing.md
+  - Evaluation:
       - Evaluation: evaluation.md
   - Observability: tracing.md
   - Reference:

@@ -1,7 +1,7 @@
 # Guardrails
 
-A guardrail is a predicate: `(value) -> bool`, tripping the run when it
-returns `True`.
+A guardrail is a function `(value) -> bool`. Return `True` and the run trips. Return `False` and
+it continues.
 
 ```python
 from runa import guardrail
@@ -24,29 +24,28 @@ class SupportAgent(Agent):
 
 * On `.input`, the predicate sees the latest user message as plain text.
 * On `.output`, it sees the agent's final output.
-* `.i`/`.o` are shorthand for `.input`/`.output` — the exact same binding,
-  just shorter to type. There's no other way to bind a guardrail.
+* `.i` and `.o` are shorthand for `.input` and `.output`, the exact same binding, just shorter to
+  type. There is no other way to bind a guardrail.
 
-Listed bare (no `.input`/`.output`), a guardrail is wired to both sides:
+Listed bare, with no `.input`/`.output`, a guardrail is wired to both sides:
 
 ```python
 guardrails = [block_empty.input, contains_pii]  # contains_pii checks input and output
 ```
 
-Group them explicitly instead, if you'd rather be specific:
+Group them explicitly instead, if you would rather be specific:
 
 ```python
 guardrails = {"input": [block_empty], "output": [contains_pii]}
 ```
 
-A tripped guardrail stops the run before the model call (input side) or
-before the caller sees the output (output side); `run`/`run_sync` come
-back with `status="error"` instead of raising.
+A tripped guardrail stops the run before the model call (input side), or before the caller sees
+the output (output side). `run`/`run_sync` come back with `status="error"` instead of raising.
 
 ## Guardrails on Tools
 
-The same `@guardrail` predicate works against a [tool's](tools.md) arguments
-or return value, via `@tool(guardrails=[...])`:
+The same `@guardrail` predicate works against a [tool's](tools.md) arguments or return value, via
+`@tool(guardrails=[...])`:
 
 ```python
 @guardrail
@@ -61,17 +60,16 @@ def now() -> str:
     ...
 ```
 
-On a tool, `.input` sees the call's parsed arguments as a `dict`; `.output`
-sees the tool's raw return value. A guardrail that only observes — logs,
-metrics — without ever tripping just always returns `False`.
+On a tool, `.input` sees the call's parsed arguments as a `dict`. `.output` sees the tool's raw
+return value. A guardrail that only observes, for logging or metrics, without ever tripping just
+always returns `False`.
 
 ## Async Guardrails
 
-A guardrail predicate can be `async def` too; it's awaited automatically.
+A guardrail predicate can be `async def` too. It is awaited automatically.
 
 ## Human Approval
 
-Some tool calls shouldn't run without a person saying yes. That's a
-different mechanism from a guardrail — a guardrail's predicate is the
-final verdict, `needs_approval`'s predicate only decides whether to stop
-and ask a human — see [Human Approval](approval.md).
+Some tool calls should not run without a person saying yes. That is a different mechanism from a
+guardrail: a guardrail's predicate is the final verdict, while `needs_approval`'s predicate only
+decides whether to stop and ask a human. See [Human Approval](approval.md).

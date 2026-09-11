@@ -28,7 +28,6 @@ Conventions: [Runa.md](./RUNA.md)
 
 ## Development principles
 
-- Rails way
 - Optimize for Developer Happiness
 - Convention Over Configuration
 - Don't Repeat Yourself
@@ -36,3 +35,4 @@ Conventions: [Runa.md](./RUNA.md)
 - You Aren't Gonna Need it
 - Give Escape Hatch
 - Organize code by conventions and responsibility
+- Don't use em dash

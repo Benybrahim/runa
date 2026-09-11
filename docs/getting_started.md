@@ -111,56 +111,59 @@ right provider by name.
 Let's generate an agent:
 
 ```bash
-runa generate agent CodeAgent --model gpt-5.4-nano
+runa generate agent GreeterAgent --model gpt-5.4-nano --instruction "Say Hello!"
 ```
 
-This creates `app/agents/code_agent.py`:
+This creates `app/agents/greeter_agent.py`:
 
 ```python
 from runa import Agent
 
 
-class CodeAgent(Agent):
+class GretterAgent(Agent):
     name = "code_agent"
     model = "gpt-5.4-nano"
 ```
 
-It will also automatically create `app/prompts/code_agents.md`, and CodeAgent
+It will also automatically create `app/prompts/greeter_agents.md`, 
+and `CodeAgent` will load his instructions by default automatically from there.
+
+```markdown
+You write and edit code for the user, one file at a time.
+```
+
+Run it from `main.py`, or straight from a Python shell:
 
 ```python
 from runa import Agent
 
 
 class GreeterAgent(Agent):
-    name = "code_agent"
+    name = "greeter_agent"
     model = "gpt-5.4-nano"
-    instruction = "app/prompts/code_agents.md"
-```
-```
 
-Run it from `main.py`, or straight from a Python shell:
 
-```python
-from app.agents.greeter_agent import GreeterAgent
-
-agent = GreeterAgent()
-run = agent.run_sync("Hi, I'm new here.")
-print(run.output)
+run = GreeterAgent.run_sync("Say Hello!")
 ```
 
-Or skip writing any code and talk to it directly:
+`run_sync/run` returns a `Run` with: 
+- **output**: the agent final output; `None` when `status == "error"`
+- **trace**: The hierarchical trace (agent/LLM/tool/guardrail spans) for that call
+- **usage**: token usage for this call (same value as agent.last_usage afterward) 
+- **status**: "completed" | "error" - default to `"completed"`
+- **error**: the exception message when `status == "error"`
+- **metdata**: reserved for future per-run detail, empty by default
+
+You can also chat with your agent using:
 
 ```bash
-runa chat greeter_agent
+runa chat code_agent
 ```
 
-`run_sync` returns a `Run` with `.output`, `.usage`, `.status`, and
-`.error`. Calling `run_sync`/`run` again on the same agent instance
-continues the same conversation — `self.history` remembers what was said.
 
 ## Giving Your Agent Tools
 
-A tool is a plain Python function. Its signature *is* its schema — Runa
+A tool is a plain Python function. Its signature *is* its schema, Runa
 reads the type hints and the docstring, so there's nothing else to declare.
 
 ```bash
@@ -199,25 +202,12 @@ class GreeterAgent(Agent):
     tools = [current_time]
 ```
 
-The model decides on its own when to call `current_time` — you never call
-it yourself.
-
-Omit `instructions` and it's loaded automatically from
-`app/prompts/greeter_agent.md` (matching the `name`); if that file doesn't
-exist yet, it's created with a `TODO` stub — the same one `runa generate
-prompt` writes — ready for you to fill in:
-
-```python
-class GreeterAgent(Agent):
-    name = "greeter_agent"
-    tools = [current_time]
-```
+The model decides on its own when to call `current_time`, by checking your request and tool description match.
 
 ## Adding Guardrails
 
-A guardrail is a predicate: `(value) -> bool`, tripping the run when it
-returns `True`. Bind it to `.input` or `.output` to say which side it
-checks.
+A guardrail is a function tha return a boolean. It basically check conditons on agent and tools 
+inputs, outputs. Bind it to `.input` or `.output` to say which side it checks.
 
 ```python
 from runa import Agent, guardrail
@@ -302,13 +292,13 @@ runa chat --show SESSION_ID          # replay one session's history
 
 ## Persisting Conversations in Code
 
-`runa chat` uses `SQLiteSession` under the hood; use it directly to persist
+`runa chat` uses `SQLiteSession` under the hood by default; use it directly to persist
 history from your own code:
 
 ```python
 from runa import SQLiteSession
 
-from app.agents.greeter_agent import GreeterAgent
+from app.agents import GreeterAgent
 
 agent = GreeterAgent()
 session = SQLiteSession("user-42")
@@ -317,40 +307,23 @@ agent.run_sync("Hi, I'm new here.", session=session)
 agent.run_sync("What did I just say?", session=session)
 ```
 
-With a `session`, prior turns are read from `runa.db` automatically — you
+With a `session`, prior turns are read from `runa.db` automatically, you
 only ever pass the new message.
 
-## Testing Your Agent
-
-`tests/` holds deterministic checks — plain `assert` against a run:
-
-```python
-# tests/test_greeter_agent.py
-from app.agents.greeter_agent import GreeterAgent
 
 
-def test_greets_politely():
-    run = GreeterAgent().run_sync("Hi")
-    assert run.status == "completed"
-    assert run.output
-```
-
-```bash
-runa test
-```
-
-`evals/` holds behavioral evals — grading with a judge model instead of an
+`evals/` holds behavioral evals, grading with a judge model instead of an
 assertion:
 
 ```bash
-runa generate evaluation GreeterAgent
+runa generate evaluation greeter_agent
 ```
 
 ```python
 # evals/greeter_agent_eval.py
 from runa import Case
 
-from app.agents.greeter_agent import GreeterAgent
+from app.agents import GreeterAgent
 
 agent = GreeterAgent()
 
@@ -358,6 +331,7 @@ dataset = [
     Case(input="Hi there", expected="A warm, one-sentence greeting"),
 ]
 ```
+
 
 ```bash
 runa eval
@@ -372,14 +346,3 @@ runa traces list
 runa traces errors
 runa traces show TRACE_ID
 ```
-
-## What's Next?
-
-* Run `runa generate --help` to see everything scaffolding can create.
-* Read the source under `app/agents/`, `app/tools/`, and `evals/` in your
-  generated project — the generated comments and docstrings double as
-  reference documentation.
-* Keep prompts that grow beyond a line or two in `app/prompts/<name>.md`
-  instead of inlining them in Python — omit `instructions` and it's loaded
-  from there automatically, creating the file with a `TODO` stub first if
-  it doesn't exist yet.

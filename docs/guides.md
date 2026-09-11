@@ -1,7 +1,7 @@
 # Runa Guides
 
-These guides assume you've read [Getting Started with Runa](getting_started.md).
-Each one stands alone — read whichever covers what you're building today.
+These guides assume you've read [Getting Started with Runa](getting_started.md). Each one
+stands alone. Read whichever covers what you're building today.
 
 ## Start Here
 
@@ -11,14 +11,14 @@ Each one stands alone — read whichever covers what you're building today.
 ## Core Concepts
 
 * **[Agents](agents.md).**
-  The `Agent` class: attributes, `instructions`, `run`/`run_sync`/`run_streamed`,
-  history, usage, and context.
+  The `Agent` class: attributes, `instructions`, `run`/`run_sync`/`run_streamed`, history,
+  usage, and context.
 
 * **[Tools](tools.md).**
   Exposing functions to the model with `@tool`.
 
 * **[Guardrails](guardrails.md).**
-  Checking input/output with `@guardrail`.
+  Checking input and output with `@guardrail`.
 
 * **[Subagents](subagents.md).**
   Composing agents with `.handoff` and `.delegate`.
@@ -31,15 +31,17 @@ Each one stands alone — read whichever covers what you're building today.
 * **[Memory](memory.md).**
   Long-term, semantic memory that persists across conversations.
 
+* **[Knowledge](knowledge.md).**
+  Retrieving the application's own documents by meaning, before every turn.
+
 * **[Cache](cache.md).**
-  A minimal get/set/delete/clear cache, independent of Agent/Memory/Sessions.
+  A minimal get/set/delete/clear cache, independent of Agent, Memory, and Sessions.
 
 * **[MCP Servers](mcp.md).**
   Connecting to external tool servers over MCP.
 
 * **[Human Approval](approval.md).**
-  Gating sensitive tool calls behind human approval, and how that differs
-  from a guardrail.
+  Gating sensitive tool calls behind human approval, and how that differs from a guardrail.
 
 ## Testing and Evaluation
 

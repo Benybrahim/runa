@@ -2,9 +2,9 @@
 
 ## Tracing
 
-Every `run`/`run_sync`/`run_streamed` call is traced automatically — there's
-no separate setup step. A `Trace` is a hierarchical tree of `Span`s: agent,
-LLM call, tool call, handoff, guardrail.
+Every `run`/`run_sync`/`run_streamed` call is traced automatically. There is no separate setup
+step. A `Trace` is a hierarchical tree of `Span`s: agent, LLM call, tool call, handoff,
+guardrail.
 
 ```python
 run = agent.run_sync("...")
@@ -14,12 +14,12 @@ print(run.trace)  # human-readable span tree
 Traces are persisted to `runa.db` by default. Inspect them from the CLI:
 
 ```bash
-runa traces list             # most recent traces
-runa traces errors           # most recent traces that errored
-runa traces show TRACE_ID    # one trace's full span tree
+runa traces list           # most recent traces
+runa traces errors         # most recent traces that errored
+runa traces show TRACE_ID  # one trace's full span tree
 ```
 
-Or visually, with `runa ui` — see [CLI Reference](cli.md#runa-ui).
+Or visually, with `runa ui`. See [CLI Reference](cli.md#runa-ui).
 
 ### Privacy Policy
 
@@ -34,15 +34,13 @@ with observe(redact=["password", "ssn"]):
     agent.run_sync(...)  # redacted within this block only
 ```
 
-Options: `capture_inputs`/`capture_outputs` (whether to keep them at all),
-`redact` (a list of dict keys to scrub) or a custom `redactor` callable,
-and `max_input_bytes`/`max_output_bytes`/`max_tool_result_bytes` to
-truncate what's kept.
+Options: `capture_inputs`/`capture_outputs` (whether to keep them at all), `redact` (a list of
+dict keys to scrub) or a custom `redactor` callable, and `max_input_bytes`/`max_output_bytes`/
+`max_tool_result_bytes` to truncate what's kept.
 
 ### Custom Exporters
 
-By default, traces go to `runa.db` via `SQLiteExporter`. Swap or add
-exporters:
+By default, traces go to `runa.db` via `SQLiteExporter`. Swap or add exporters:
 
 ```python
 from runa import ConsoleExporter, SQLiteExporter, observe
@@ -50,16 +48,14 @@ from runa import ConsoleExporter, SQLiteExporter, observe
 observe(exporter=[SQLiteExporter(), ConsoleExporter()])
 ```
 
-Write your own by implementing `TraceExporter`'s single method,
-`export(self, trace: Trace) -> None`.
+Write your own by implementing `TraceExporter`'s single method, `export(self, trace: Trace) -> None`.
 
 ## Hooks
 
-Tracing is unconditional; hooks are optional lifecycle callbacks for your
-own logic — logging, metrics, side effects.
+Tracing is unconditional. Hooks are optional lifecycle callbacks for your own logic: logging,
+metrics, side effects.
 
-`RunHooks` is passed per-call and fires for every agent involved in a run
-(including subagents):
+`RunHooks` is passed per-call and fires for every agent involved in a run, including subagents:
 
 ```python
 from runa import RunHooks
@@ -73,9 +69,11 @@ class MyHooks(RunHooks):
 agent.run_sync("...", hooks=MyHooks())
 ```
 
-`AgentHooks` is scoped to a single `Agent` subclass instead, via its
-`hooks` class attribute — it fires only for that agent, not for the whole
-run:
+`RunHooks` fires `on_agent_start`, `on_agent_end`, `on_handoff`, `on_tool_start`, `on_tool_end`,
+`on_llm_start`, and `on_llm_end`. Every method is a no-op unless overridden.
+
+`AgentHooks` is scoped to a single `Agent` subclass instead, via its `hooks` class attribute. It
+fires only for that agent, not for the whole run:
 
 ```python
 class SupportAgent(Agent):
@@ -83,8 +81,9 @@ class SupportAgent(Agent):
     hooks = MyAgentHooks()
 ```
 
-Both fire `on_agent_start`, `on_agent_end`, `on_handoff`, `on_tool_start`,
-`on_tool_end`, `on_llm_start`, `on_llm_end` — every method is a no-op
-unless overridden. `LoggingRunHooks`/`LoggingAgentHooks` (the defaults) log
-each event through the standard `logging` module, under the `"runa"`
-logger name.
+`AgentHooks` fires `on_start`, `on_end`, `on_handoff`, `on_tool_start`, `on_tool_end`,
+`on_llm_start`, and `on_llm_end`.
+
+`LoggingRunHooks`/`LoggingAgentHooks` are the framework's defaults, logging each event through
+the standard `logging` module under the `"runa"` logger name. Don't subclass them to add
+behavior; subclass `RunHooks`/`AgentHooks` directly and pass your own instance instead.

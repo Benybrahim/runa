@@ -1,7 +1,7 @@
 # Tools
 
-A tool is a plain Python function. `@tool` derives its JSON schema from the
-function's signature and docstring — there's nothing else to declare.
+A tool is a plain Python function. `@tool` derives its JSON schema from the function's signature
+and docstring. There is nothing else to declare.
 
 ```python
 from runa import tool
@@ -14,10 +14,10 @@ def get_weather(city: str) -> str:
 ```
 
 * The docstring becomes the tool's description.
-* Type hints become the JSON schema (`str`, `int`, `float`, `bool`,
-  `list[T]`, `dict`, `Literal[...]`, `Enum` subclasses, and `T | None` are
-  all understood; anything else falls back to an unconstrained schema).
-* A parameter with no default is required; one with a default is optional.
+* Type hints become the JSON schema. `str`, `int`, `float`, `bool`, `list[T]`, `dict`,
+  `Literal[...]`, `Enum` subclasses, and `T | None` are all understood. Anything else falls back
+  to an unconstrained schema.
+* A parameter with no default is required. One with a default is optional.
 
 Attach tools to an agent:
 
@@ -28,8 +28,7 @@ class WeatherAgent(Agent):
     tools = [get_weather]
 ```
 
-The model decides on its own when to call a tool — you never invoke it
-directly.
+The model decides on its own when to call a tool. You never invoke it directly.
 
 ## Async Tools
 
@@ -44,9 +43,8 @@ async def fetch_price(symbol: str) -> float:
 
 ## Reserved Parameters
 
-Name a parameter `ctx` or `call_id` to receive the run's `RunContextWrapper`
-or the tool call's id instead of a model-supplied argument. Neither appears
-in the tool's schema:
+Name a parameter `ctx` or `call_id` to receive the run's `RunContextWrapper` or the tool call's
+id instead of a model-supplied argument. Neither appears in the tool's schema:
 
 ```python
 @tool
@@ -55,5 +53,9 @@ def whoami(ctx) -> str:
     return ctx.context.user_name
 ```
 
-Tool calls can also be gated behind [Guardrails](guardrails.md) or
-[Human Approval](approval.md).
+## Gating a Tool Call
+
+A tool call can be checked before it runs, or paused for a human to approve:
+
+* [Guardrails](guardrails.md): a predicate that stops the run if it trips.
+* [Human Approval](approval.md): a predicate that pauses the run for a person to decide.

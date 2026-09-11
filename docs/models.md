@@ -8,31 +8,29 @@ class SupportAgent(Agent):
     model = "claude-sonnet-5"
 ```
 
-No client to construct, no provider to configure globally — Runa resolves
-the string to a provider by its prefix, and reads the matching API key
-from the environment (typically via `.env`, loaded by your app's
-`main.py`).
+No client to construct, no provider to configure globally. Runa resolves the string to a
+provider by its prefix, and reads the matching API key from the environment, typically via
+`.env`, loaded by your app's `main.py`.
 
-| Prefix     | Provider   | Env var             |
-|------------|------------|----------------------|
-| `claude`   | Anthropic  | `ANTHROPIC_API_KEY`  |
-| `gpt`      | OpenAI     | `OPENAI_API_KEY`     |
-| `gemini`   | Google     | `GEMINI_API_KEY`     |
-| `llama`    | Meta       | `LLAMA_API_KEY`      |
-| `deepseek` | DeepSeek   | `DEEPSEEK_API_KEY`   |
-| `qwen`     | Alibaba    | `DASHSCOPE_API_KEY`  |
+| Prefix | Provider | Env Var |
+|---|---|---|
+| `claude` | Anthropic | `ANTHROPIC_API_KEY` |
+| `gpt` | OpenAI | `OPENAI_API_KEY` |
+| `gemini` | Google | `GEMINI_API_KEY` |
+| `llama` | Meta | `LLAMA_API_KEY` |
+| `deepseek` | DeepSeek | `DEEPSEEK_API_KEY` |
+| `qwen` | Alibaba | `DASHSCOPE_API_KEY` |
 
-An unrecognized or bare model name falls back to the OpenAI-compatible
-backend. The default, when `model` isn't set, is `"gpt-5.4-nano"`.
+An unrecognized or bare model name falls back to the OpenAI-compatible backend. The default,
+when `model` isn't set, is `"gpt-5.4-nano"`.
 
-Every provider except Anthropic speaks the same chat-completions wire
-format, so they share one backend; Anthropic's Messages API is shaped
-differently and gets its own.
+Every provider except Anthropic speaks the same chat-completions wire format, so they share one
+backend. Anthropic's Messages API is shaped differently and gets its own.
 
 ## Model Settings
 
-Tune sampling per agent with `model_settings` — `ModelSettings` currently
-lives at `runa._types` (not yet re-exported from `runa` itself):
+Tune sampling per agent with `model_settings`. `ModelSettings` currently lives at
+`runa._types`, not yet re-exported from `runa` itself:
 
 ```python
 from runa import Agent
@@ -46,9 +44,8 @@ class SupportAgent(Agent):
 
 ## Mixing Providers
 
-Because `model` is per-agent, a single application can freely mix
-providers across agents — a fast, cheap model for routing, a stronger one
-for the agent that actually answers:
+Because `model` is per-agent, a single application can freely mix providers across agents: a
+fast, cheap model for routing, a stronger one for the agent that actually answers.
 
 ```python
 class Router(Agent):
