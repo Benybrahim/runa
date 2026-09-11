@@ -76,9 +76,7 @@ def test_generate_agent_rejects_a_class_name_not_ending_in_agent(
     """A class name that doesn't end in `Agent` is a clean error, not a traceback."""
     project_dir = scaffold_project("demo", root=tmp_path)
 
-    exit_code = main(
-        ["generate", "agent", "Support", "--model", "gpt-5.4-nano"], cwd=project_dir
-    )
+    exit_code = main(["generate", "agent", "Support", "--model", "gpt-5.4-nano"], cwd=project_dir)
 
     assert exit_code == 1
     assert "error:" in capsys.readouterr().err
@@ -311,7 +309,7 @@ def test_chat_with_no_name_or_flags_reports_a_clean_error(
     exit_code = main(["chat"], cwd=project_dir)
 
     assert exit_code == 1
-    assert "needs an Agent name" in capsys.readouterr().err
+    assert "needs an agent name" in capsys.readouterr().err
 
 
 def test_missing_main_py_reports_a_clean_error(
@@ -336,6 +334,18 @@ def test_eval_reports_pass_fail_counts_and_exit_code(
 
     assert exit_code == 0
     assert "0/0 passed" in capsys.readouterr().out
+
+
+def test_eval_with_agent_name_reports_a_clean_error_when_unmatched(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`runa eval AGENT_NAME` against an unmatched name exits 1 with a clean message."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    exit_code = main(["eval", "nonexistent"], cwd=project_dir)
+
+    assert exit_code == 1
+    assert "nonexistent" in capsys.readouterr().err
 
 
 def test_test_reports_a_failing_test_with_exit_code_one(

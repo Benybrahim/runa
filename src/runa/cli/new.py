@@ -45,7 +45,7 @@ load_dotenv()
 
 
 if __name__ == "__main__":
-    # from app.agents.example_agent import ExampleAgent
+    # from app.agents import ExampleAgent
     #
     # print(ExampleAgent().run_sync("...").output)
     pass

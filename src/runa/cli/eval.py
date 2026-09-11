@@ -9,6 +9,7 @@ import importlib
 from pathlib import Path
 
 from runa.cli._project import NotARunaProject, loaded_app
+from runa.cli.chat import AgentNotFound
 from runa.eval import Report
 
 
@@ -16,8 +17,13 @@ class InvalidEvalModule(Exception):
     """Raised when an `evals/` module doesn't declare `agent` and `dataset`."""
 
 
-def run_project_evals(root: Path) -> list[Report]:
-    """Import every `evals/` module and evaluate its agent against its dataset."""
+def run_project_evals(root: Path, agent_name: str | None = None) -> list[Report]:
+    """Import every `evals/` module and evaluate its agent against its dataset.
+
+    `agent_name`, when given, filters this down to the module(s) whose `agent` declares that
+    `name` (the same identity `runa chat <name>` takes) instead of running the whole `evals/`
+    directory.
+    """
     evals_dir = root / "evals"
     if not evals_dir.is_dir():
         raise NotARunaProject(
@@ -38,6 +44,11 @@ def run_project_evals(root: Path) -> list[Report]:
                     f"{eval_file} must define module-level `agent` and `dataset`"
                 )
             modules.append((agent, dataset))
+
+        if agent_name is not None:
+            modules = [(agent, dataset) for agent, dataset in modules if agent.name == agent_name]
+            if not modules:
+                raise AgentNotFound(f"no evals/ module found for Agent named {agent_name!r}")
 
         async def _run_all() -> list[Report]:
             return [await agent.evaluate(dataset) for agent, dataset in modules]

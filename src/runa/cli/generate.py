@@ -39,7 +39,7 @@ def {func_name}(value: str) -> bool:
 _EVALUATION_TEMPLATE = """from runa import Agent, Case
 
 # TODO: replace with the agent you actually want to evaluate, e.g.:
-# from app.agents.example_agent import ExampleAgent
+# from app.agents import ExampleAgent
 # agent = ExampleAgent()
 
 
@@ -153,6 +153,19 @@ def _module_path(root: Path, file: Path) -> str:
     return ".".join(file.relative_to(root).with_suffix("").parts)
 
 
+def _export_agent(agents_dir: Path, file_stem: str, class_name: str) -> None:
+    """Re-export `class_name` from `app/agents/__init__.py`.
+
+    So it's reachable as `from app.agents import {class_name}` instead of
+    `from app.agents.{file_stem} import ...`.
+    """
+    init_file = agents_dir / "__init__.py"
+    existing = init_file.read_text() if init_file.exists() else ""
+    lines = [line for line in existing.splitlines() if line.strip()]
+    lines.append(f"from .{file_stem} import {class_name}")
+    init_file.write_text("\n".join(sorted(lines)) + "\n")
+
+
 def _resolve_components(
     names: Sequence[str],
     *,
@@ -261,6 +274,10 @@ def generate_agent(
     instead a stub `app/prompts/<snake_case(name)>.md` is written alongside it, the same
     file `Agent.__init__` would lazily create on first instantiation (`agent.py`'s
     `_load_prompt`). Generating it upfront means it's there to edit before the first `runa chat`.
+
+    Also appends `from .{file_stem} import {class_name}` to `app/agents/__init__.py`, so the
+    agent is reachable as `from app.agents import {class_name}` rather than reaching into its
+    own submodule.
     """
     if not _AGENT_CLASS_NAME.fullmatch(name):
         raise InvalidAgentName(
@@ -319,6 +336,8 @@ def generate_agent(
         prompt_file = prompts_dir / f"{file_stem}.md"
         if not prompt_file.exists():
             prompt_file.write_text(_PROMPT_TEMPLATE.format(name=file_stem))
+
+    _export_agent(agents_dir, file_stem, class_name)
 
     return agent_file
 
@@ -382,20 +401,26 @@ def generate_prompt(name: str, *, root: Path) -> Path:
     return prompt_file
 
 
+def _pascal_case(snake_name: str) -> str:
+    return "".join(word[:1].upper() + word[1:] for word in snake_name.split("_") if word)
+
+
 def generate_evaluation(name: str, *, root: Path) -> Path:
     """Write a new eval dataset module into `root/evals/`.
 
-    Unlike `generate_agent`/`generate_tool`, `name` doesn't become a class: `evals/` modules are
-    plain scripts declaring module-level `agent`/`dataset` (see `cli/eval.py`), so it only shapes
-    the filename and the placeholder Agent's docstring.
+    `name` is the agent's snake_case identity, the same one `runa chat <name>` takes (e.g.
+    `support_agent`) — not the class name. Unlike `generate_agent`/`generate_tool`, it doesn't
+    become a class: `evals/` modules are plain scripts declaring module-level `agent`/`dataset`
+    (see `cli/eval.py`), so `name` only shapes the filename and the placeholder Agent's
+    docstring/class name.
     """
     evals_dir = _require_dir(root, "evals")
 
-    file_stem = _snake_case(name[:-5] if name.endswith("Agent") else name)
+    file_stem = _snake_case(name)
     eval_file = evals_dir / f"{file_stem}_eval.py"
     if eval_file.exists():
         raise EvaluationAlreadyExists(f"{eval_file} already exists")
 
-    placeholder_name = name[:1].upper() + name[1:]
+    placeholder_name = _pascal_case(file_stem)
     eval_file.write_text(_EVALUATION_TEMPLATE.format(class_name=placeholder_name, name=name))
     return eval_file

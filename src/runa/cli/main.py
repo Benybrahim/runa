@@ -66,9 +66,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     generate_subparsers = generate_parser.add_subparsers(dest="kind", required=True)
     agent_parser = generate_subparsers.add_parser("agent", help="Generate a new Agent")
-    agent_parser.add_argument(
-        "name", help="UpperCamelCase, ending in 'Agent', e.g. SupportAgent"
-    )
+    agent_parser.add_argument("name", help="UpperCamelCase, ending in 'Agent', e.g. SupportAgent")
     agent_parser.add_argument(
         "--model", required=True, help="e.g. gpt-5.4-nano, claude-... (required)"
     )
@@ -98,9 +96,10 @@ def _build_parser() -> argparse.ArgumentParser:
     generate_subparsers.add_parser("prompt", help="Generate a new app/prompts/ file").add_argument(
         "name"
     )
-    generate_subparsers.add_parser(
+    evaluation_parser = generate_subparsers.add_parser(
         "evaluation", help="Generate a new evals/ case module"
-    ).add_argument("name")
+    )
+    evaluation_parser.add_argument("name", help="the agent's snake_case name, e.g. support_agent")
 
     chat_parser = subparsers.add_parser("chat", help="Chat with an Agent, or inspect past sessions")
     chat_parser.add_argument(
@@ -140,7 +139,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Show one session's history instead of chatting",
     )
 
-    subparsers.add_parser("eval", help="Run this app's evals/ cases")
+    eval_parser = subparsers.add_parser("eval", help="Run this app's evals/ cases")
+    eval_parser.add_argument(
+        "agent_name",
+        nargs="?",
+        default=None,
+        help="only run this Agent's evals/ module (its declared `name`, e.g. support_agent)",
+    )
     subparsers.add_parser("test", help="Run this app's tests/ test functions")
 
     traces_parser = subparsers.add_parser("traces", help="Inspect this app's traces in runa.db")
@@ -244,7 +249,7 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
             "then chat with it:\n"
             f"  runa chat {agent_file.stem}\n"
             "or call it from your own code:\n"
-            f"  from app.agents.{agent_file.stem} import {class_name}\n"
+            f"  from app.agents import {class_name}\n"
             f"  {class_name}().run_sync('...')"
         )
         return 0
@@ -297,7 +302,7 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
             print(show_session(args.show, root=cwd))
             return 0
         if args.agent_name is None:
-            print("error: runa chat needs an Agent name, or --list/--show", file=sys.stderr)
+            print("error: runa chat needs an agent name, or --list/--show", file=sys.stderr)
             return 1
         run_agent_repl(
             args.agent_name,
@@ -309,7 +314,7 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
         return 0
 
     if args.command == "eval":
-        reports = run_project_evals(cwd)
+        reports = run_project_evals(cwd, args.agent_name)
         for report in reports:
             print(report)
             print()

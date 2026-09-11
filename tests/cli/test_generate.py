@@ -104,6 +104,28 @@ def test_generate_agent_raises_if_the_derived_name_already_exists(tmp_path: Path
         generate_agent("SupportAgent", root=project_dir)
 
 
+def test_generate_agent_exports_it_from_the_agents_package(tmp_path: Path) -> None:
+    """The class is re-exported from `app/agents/__init__.py`, reachable as a package import."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    generate_agent("SupportAgent", root=project_dir)
+
+    init_content = (project_dir / "app" / "agents" / "__init__.py").read_text()
+    assert init_content == "from .support_agent import SupportAgent\n"
+
+
+def test_generate_agent_appends_to_existing_exports(tmp_path: Path) -> None:
+    """A second agent's export is appended, not overwriting the first."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+    generate_agent("SupportAgent", root=project_dir)
+
+    generate_agent("BillingAgent", root=project_dir)
+
+    init_content = (project_dir / "app" / "agents" / "__init__.py").read_text()
+    assert "from .support_agent import SupportAgent" in init_content
+    assert "from .billing_agent import BillingAgent" in init_content
+
+
 def test_generate_agent_raises_outside_a_runa_project(tmp_path: Path) -> None:
     """`generate_agent` refuses to run where `app/agents/` doesn't exist."""
     with pytest.raises(NotARunaProject):
@@ -408,6 +430,18 @@ def test_generate_evaluation_writes_a_module_declaring_agent_and_dataset(tmp_pat
     content = eval_file.read_text()
     assert "agent = _SupportPlaceholder()" in content
     assert "dataset: list[Case] = [" in content
+
+
+def test_generate_evaluation_takes_the_agent_s_snake_case_name(tmp_path: Path) -> None:
+    """`name` is the agent's `runa chat`-style identity, e.g. `greeter_agent`, not a class name."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    eval_file = generate_evaluation("greeter_agent", root=project_dir)
+
+    assert eval_file == project_dir / "evals" / "greeter_agent_eval.py"
+    content = eval_file.read_text()
+    assert "class _GreeterAgentPlaceholder(Agent):" in content
+    assert "agent = _GreeterAgentPlaceholder()" in content
 
 
 def test_generate_evaluation_raises_if_the_file_already_exists(tmp_path: Path) -> None:
