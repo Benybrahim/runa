@@ -5,7 +5,6 @@ s = """The Zen of Runa, by Brahim Benyous et al.
 When one is enough, many are useless.
 Clear is better than ambiguous.
 Planning is better than reacting.
-Replanning is better than stubbornness.
 A tool is better than a guess.
 Delegation is better than duplication.
 Traceability counts.
