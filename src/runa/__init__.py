@@ -1,5 +1,7 @@
 """Runa: an opinionated framework for agentic AI."""
 
+from importlib.metadata import version
+
 from runa.agent import Agent
 from runa.approval import approval
 from runa.cache import Cache, MemoryCache, SQLiteCache
@@ -31,6 +33,8 @@ from runa.stream_events import (
 )
 from runa.tool import tool
 from runa.tracing import ConsoleExporter, Span, SQLiteExporter, Trace, TraceExporter, observe
+
+__version__ = version("runa-ai")
 
 __all__ = [
     "DEFAULT_THRESHOLDS",
@@ -72,6 +76,7 @@ __all__ = [
     "StreamEvent",
     "Trace",
     "TraceExporter",
+    "__version__",
     "approval",
     "guardrail",
     "observe",
