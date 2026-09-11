@@ -24,7 +24,7 @@ from runa.web.app import create_app
 def project(tmp_path: Path) -> Path:
     """A scaffolded project with one agent, one session, one trace, and one eval run."""
     project_dir = scaffold_project("demo", root=tmp_path)
-    generate_agent("Support", root=project_dir)
+    generate_agent("SupportAgent", root=project_dir)
     db_path = project_dir / "db" / "runa.db"
 
     session = SQLiteSession("support_agent-1", db_path=db_path)

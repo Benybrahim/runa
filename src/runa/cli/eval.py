@@ -1,8 +1,7 @@
-"""cli/eval.py: `runa eval`, run app/evaluations/ datasets.
+"""cli/eval.py: `runa eval`, run evals/ datasets.
 
-A thin loop that imports each `app/evaluations/` module and hands what it declares to
-`agent.evaluate()`, the same code path production evaluation runs through, not a parallel
-CLI-only harness.
+A thin loop that imports each `evals/` module and hands what it declares to `agent.evaluate()`,
+the same code path production evaluation runs through, not a parallel CLI-only harness.
 """
 
 import asyncio
@@ -14,24 +13,24 @@ from runa.eval import Report
 
 
 class InvalidEvalModule(Exception):
-    """Raised when an `app/evaluations/` module doesn't declare `agent` and `dataset`."""
+    """Raised when an `evals/` module doesn't declare `agent` and `dataset`."""
 
 
 def run_project_evals(root: Path) -> list[Report]:
-    """Import every `app/evaluations/` module and evaluate its agent against its dataset."""
-    evaluations_dir = root / "app" / "evaluations"
-    if not evaluations_dir.is_dir():
+    """Import every `evals/` module and evaluate its agent against its dataset."""
+    evals_dir = root / "evals"
+    if not evals_dir.is_dir():
         raise NotARunaProject(
-            f"{evaluations_dir} does not exist, run this from inside a Runa "
+            f"{evals_dir} does not exist, run this from inside a Runa "
             "project created with `runa new`"
         )
 
     with loaded_app(root):
         modules = []
-        for eval_file in sorted(evaluations_dir.glob("*.py")):
+        for eval_file in sorted(evals_dir.glob("*.py")):
             if eval_file.stem == "__init__":
                 continue
-            module = importlib.import_module(f"app.evaluations.{eval_file.stem}")
+            module = importlib.import_module(f"evals.{eval_file.stem}")
             agent = getattr(module, "agent", None)
             dataset = getattr(module, "dataset", None)
             if agent is None or dataset is None:

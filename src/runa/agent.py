@@ -85,10 +85,7 @@ def _snake_case(name: str) -> str:
 
 _NO_SOURCE_FILE = (TypeError, OSError)
 
-_PROMPT_TEMPLATE = """# {name}
-
-TODO: write the prompt {name} uses.
-"""
+_PROMPT_TEMPLATE = """"""
 
 
 def _load_prompt(cls: type, name: str) -> str | None:

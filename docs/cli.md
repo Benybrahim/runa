@@ -3,25 +3,30 @@
 Every subcommand runs from inside a Runa app (created with `runa new`),
 except `runa new` itself.
 
-## `runa new NAME`
+## `runa new [NAME]`
 
 Scaffold a new application at `./NAME`, with the conventional layout — see
-[Getting Started](getting_started.md).
+[Getting Started](getting_started.md). Omit `NAME` to scaffold the current
+directory in place instead of creating a subdirectory.
 
 ## `runa generate KIND NAME`
 
 Generate scaffolding inside an existing app:
 
 ```bash
-runa generate agent MyAgent        # app/agents/my_agent.py
-runa generate tool MyTool          # app/tools/my_tool.py
-runa generate prompt MyAgent       # app/prompts/my_agent.md
-runa generate evaluation MyAgent   # app/evaluations/my_agent_eval.py
+runa generate agent MyAgent --model gpt-5.4-nano  # app/agents/my_agent.py
+runa generate tool MyTool                         # app/tools/my_tool.py
+runa generate guardrail MyCheck                   # app/guardrails/my_check.py
+runa generate prompt MyAgent                      # app/prompts/my_agent.md
+runa generate evaluation MyAgent                  # evals/my_agent_eval.py
 ```
 
-`agent`'s `NAME` becomes the Python class name (suffixed with `Agent` if
-it isn't already); the class's `name` attribute is that class name's
-snake_case form, matching the generated filename.
+`agent`'s `NAME` must be UpperCamelCase ending in `Agent` (e.g. `MyAgent`) —
+the one naming convention this command enforces. Both the generated file and
+the class's `name` attribute are derived from it via snake_case (`MyAgent` ->
+`app/agents/my_agent.py`, `name = "my_agent"`); there's no separate `--name`
+to pass. `--model` is required; `--instructions`/`--tool`/`--guardrail`/
+`--memory`/`--knowledge`/`--compact` stay optional.
 
 ## `runa chat [AGENT_NAME]`
 
@@ -43,7 +48,7 @@ Run every `test_*` function under `tests/` — see [Testing](testing.md).
 
 ## `runa eval`
 
-Run every dataset under `app/evaluations/` against its agent — see
+Run every dataset under `evals/` against its agent — see
 [Evaluation](evaluation.md).
 
 ## `runa traces SUBCOMMAND`

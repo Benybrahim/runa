@@ -4,14 +4,14 @@ Runa distinguishes two kinds of checks: **tests** verify invariants with a
 plain `assert` — see [Testing](testing.md); **evals** grade behavior,
 including with a judge model, against a dataset of cases.
 
-`app/evaluations/` holds datasets of `Case`s, graded against an agent:
+`evals/` holds datasets of `Case`s, graded against an agent:
 
 ```bash
 runa generate evaluation SupportAgent
 ```
 
 ```python
-# app/evaluations/support_agent_eval.py
+# evals/support_agent_eval.py
 from runa import Case
 
 from app.agents.support_agent import SupportAgent
@@ -31,9 +31,8 @@ runa eval
 ```
 
 A module must declare module-level `agent` and `dataset`; `runa eval`
-imports every module under `app/evaluations/` and calls
-`agent.evaluate(dataset)` on each — the same path production evaluation
-runs through.
+imports every module under `evals/` and calls `agent.evaluate(dataset)`
+on each — the same path production evaluation runs through.
 
 ## What a `Case` Can Carry
 

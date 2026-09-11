@@ -44,7 +44,8 @@ def get_weather(city: str) -> str:
 
 ## 3. Guardrail
 
-**Always a plain function wrapped in `@guardrail`**. Can be used both for agents and tools.
+**Always a plain function wrapped in `@guardrail`**, living in `app/guardrails/`
+(`runa generate guardrail`). Can be used both for agents and tools.
 
 For:
 - input: `guardrail.input` or `guardrail.i`
@@ -299,11 +300,11 @@ def test_answers_politely():
 
 ## 13. Eval (Case/Dataset)
 
-**A module under `app/evaluations/` declares exactly two module-level
-names, `agent` and `dataset`** (a list of `Case`); `runa eval` imports
-every such module and calls `agent.evaluate(dataset)` on it. There's no
-other registration mechanism — a dataset that isn't a module-level
-`dataset` next to a module-level `agent` doesn't get picked up.
+**A module under `evals/` declares exactly two module-level names,
+`agent` and `dataset`** (a list of `Case`); `runa eval` imports every such
+module and calls `agent.evaluate(dataset)` on it. There's no other
+registration mechanism — a dataset that isn't a module-level `dataset`
+next to a module-level `agent` doesn't get picked up.
 
 ```python
 agent = SupportAgent()

@@ -13,7 +13,7 @@ from runa.cli.new import scaffold_project
 def test_list_agents_finds_every_declared_agent(tmp_path: Path) -> None:
     """`list_agents` returns one `AgentInfo` per Agent subclass under `app/agents/`."""
     project_dir = scaffold_project("demo", root=tmp_path)
-    generate_agent("Support", root=project_dir)
+    generate_agent("SupportAgent", root=project_dir)
 
     infos = list_agents(root=project_dir)
 
@@ -24,7 +24,7 @@ def test_list_agents_finds_every_declared_agent(tmp_path: Path) -> None:
 def test_list_agents_reports_defaults_for_a_bare_agent(tmp_path: Path) -> None:
     """A freshly generated Agent has no tools/guardrails/subagents and memory/knowledge off."""
     project_dir = scaffold_project("demo", root=tmp_path)
-    generate_agent("Support", root=project_dir)
+    generate_agent("SupportAgent", root=project_dir)
 
     info = list_agents(root=project_dir)[0]
 

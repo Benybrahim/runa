@@ -19,6 +19,19 @@ def test_new_scaffolds_a_project_and_prints_next_steps(
     assert "created" in capsys.readouterr().out
 
 
+def test_new_without_a_name_scaffolds_cwd_and_omits_the_cd_step(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`runa new` with no argument scaffolds `cwd` in place, no `cd` step in next steps."""
+    exit_code = main(["new"], cwd=tmp_path)
+
+    assert exit_code == 0
+    assert (tmp_path / "main.py").is_file()
+    out = capsys.readouterr().out
+    assert f"created {tmp_path}" in out
+    assert "cd " not in out
+
+
 def test_new_reports_an_existing_directory_as_a_clean_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -34,13 +47,176 @@ def test_new_reports_an_existing_directory_as_a_clean_error(
 def test_generate_agent_dispatches_to_generate_agent(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`runa generate agent Support` writes the agent file under the given cwd."""
+    """`runa generate agent SupportAgent --model ...` writes the agent file under the given cwd."""
     project_dir = scaffold_project("demo", root=tmp_path)
 
-    exit_code = main(["generate", "agent", "Support"], cwd=project_dir)
+    exit_code = main(
+        ["generate", "agent", "SupportAgent", "--model", "gpt-5.4-nano"], cwd=project_dir
+    )
 
     assert exit_code == 0
     assert (project_dir / "app" / "agents" / "support_agent.py").is_file()
+
+
+def test_generate_agent_without_model_is_a_clean_argparse_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`--model` is required; omitting it exits non-zero via argparse, not a traceback."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["generate", "agent", "SupportAgent"], cwd=project_dir)
+
+    assert excinfo.value.code != 0
+
+
+def test_generate_agent_rejects_a_class_name_not_ending_in_agent(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A class name that doesn't end in `Agent` is a clean error, not a traceback."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    exit_code = main(
+        ["generate", "agent", "Support", "--model", "gpt-5.4-nano"], cwd=project_dir
+    )
+
+    assert exit_code == 1
+    assert "error:" in capsys.readouterr().err
+
+
+def test_generate_agent_flags_dispatch_model_instructions_and_tools(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`--model`/`--instructions`/`--tool a,b` land in the generated file via one dispatch."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+    (project_dir / "app" / "tools" / "search_web.py").write_text("def search_web() -> str: ...\n")
+
+    exit_code = main(
+        [
+            "generate",
+            "agent",
+            "SupportAgent",
+            "--model",
+            "gpt-5.4-nano",
+            "--instructions",
+            "Help users",
+            "--tool",
+            "search_web",
+            "--compact",
+        ],
+        cwd=project_dir,
+    )
+
+    assert exit_code == 0
+    content = (project_dir / "app" / "agents" / "support_agent.py").read_text()
+    assert 'model = "gpt-5.4-nano"' in content
+    assert "tools = [search_web]" in content
+    assert "compact = True" in content
+
+
+def test_generate_agent_next_steps_point_to_the_prompt_file_and_generate_tool(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Without `--instructions`, next-steps names the prompt stub and `runa generate tool`."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    exit_code = main(
+        ["generate", "agent", "SupportAgent", "--model", "gpt-5.4-nano"], cwd=project_dir
+    )
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "app/prompts/support_agent.md" in out
+    assert "runa generate tool --name <name>" in out
+    assert "instructions" not in out
+
+
+def test_generate_agent_next_steps_omit_the_prompt_file_with_explicit_instructions(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """With `--instructions`, next-steps doesn't mention the prompt stub (none was written)."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    exit_code = main(
+        [
+            "generate",
+            "agent",
+            "SupportAgent",
+            "--model",
+            "gpt-5.4-nano",
+            "--instructions",
+            "Help",
+        ],
+        cwd=project_dir,
+    )
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "app/prompts" not in out
+    assert "runa generate tool --name <name>" in out
+
+
+def test_generate_tool_dispatches_to_generate_tool(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`runa generate tool --name search_web --description ...` writes the docstring in."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    exit_code = main(
+        [
+            "generate",
+            "tool",
+            "--name",
+            "search_web",
+            "--description",
+            "Search the web and return a summary.",
+        ],
+        cwd=project_dir,
+    )
+
+    assert exit_code == 0
+    content = (project_dir / "app" / "tools" / "core.py").read_text()
+    assert '"""Search the web and return a summary."""' in content
+
+
+def test_generate_tool_without_description_falls_back_to_a_todo_stub(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`runa generate tool --name ...` with no `--description` keeps the old TODO stub."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    exit_code = main(["generate", "tool", "--name", "search_web"], cwd=project_dir)
+
+    assert exit_code == 0
+    content = (project_dir / "app" / "tools" / "core.py").read_text()
+    assert '"""TODO: describe what this tool does."""' in content
+
+
+def test_generate_tool_with_a_module_prefix_writes_and_prints_the_function_name(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`--name research:search_web` writes `app/tools/research.py` and prints the func name."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    exit_code = main(["generate", "tool", "--name", "research:search_web"], cwd=project_dir)
+
+    assert exit_code == 0
+    assert (project_dir / "app" / "tools" / "research.py").is_file()
+    out = capsys.readouterr().out
+    assert "from app.tools.research import search_web" in out
+    assert "tools = [search_web]" in out
+
+
+def test_generate_guardrail_dispatches_to_generate_guardrail(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`runa generate guardrail BlockEmpty` writes the guardrail file under the given cwd."""
+    project_dir = scaffold_project("demo", root=tmp_path)
+
+    exit_code = main(["generate", "guardrail", "BlockEmpty"], cwd=project_dir)
+
+    assert exit_code == 0
+    assert (project_dir / "app" / "guardrails" / "block_empty.py").is_file()
 
 
 def test_chat_reports_agent_not_found_as_a_clean_error(
@@ -153,7 +329,7 @@ def test_missing_main_py_reports_a_clean_error(
 def test_eval_reports_pass_fail_counts_and_exit_code(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`runa eval` against an empty `app/evaluations/` reports 0/0 passed and exits 0."""
+    """`runa eval` against an empty `evals/` reports 0/0 passed and exits 0."""
     project_dir = scaffold_project("demo", root=tmp_path)
 
     exit_code = main(["eval"], cwd=project_dir)

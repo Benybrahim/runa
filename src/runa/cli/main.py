@@ -9,6 +9,7 @@ the app in `cwd`; no logic lives here that doesn't already exist elsewhere.
 
 import argparse
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from runa.cli._project import AppLoadError, NotARunaProject
@@ -16,13 +17,18 @@ from runa.cli.chat import AgentNotFound, run_agent_repl
 from runa.cli.eval import InvalidEvalModule, run_project_evals
 from runa.cli.generate import (
     AgentAlreadyExists,
+    AmbiguousComponent,
     EvaluationAlreadyExists,
+    GuardrailAlreadyExists,
+    InvalidAgentName,
     PromptAlreadyExists,
     ToolAlreadyExists,
     generate_agent,
     generate_evaluation,
+    generate_guardrail,
     generate_prompt,
     generate_tool,
+    split_tool_name,
 )
 from runa.cli.new import ProjectAlreadyExists, scaffold_project
 from runa.cli.sessions import SessionNotFound, list_sessions, show_session
@@ -31,28 +37,69 @@ from runa.cli.traces import TraceNotFound, list_errors_cli, list_traces_cli, sho
 from runa.cli.ui import serve_ui
 
 
+def _split_names(value: str | None) -> list[str]:
+    """Split a `--tool`/`--guardrail` value ("a, b,c") into trimmed, non-empty names."""
+    return [part.strip() for part in value.split(",") if part.strip()] if value else []
+
+
+def _runa_version() -> str:
+    try:
+        return version("runa")
+    except PackageNotFoundError:
+        return "unknown"
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="runa", description="Scaffold, run, and evaluate Runa agents."
     )
+    parser.add_argument("--version", action="version", version=f"runa {_runa_version()}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     new_parser = subparsers.add_parser("new", help="Scaffold a new Runa application")
-    new_parser.add_argument("name")
+    new_parser.add_argument(
+        "name", nargs="?", default=None, help="omit to scaffold the current directory in place"
+    )
 
     generate_parser = subparsers.add_parser(
         "generate", help="Generate scaffolding inside a Runa application"
     )
     generate_subparsers = generate_parser.add_subparsers(dest="kind", required=True)
-    generate_subparsers.add_parser("agent", help="Generate a new Agent").add_argument("name")
-    generate_subparsers.add_parser("tool", help="Generate a new @tool function").add_argument(
-        "name"
+    agent_parser = generate_subparsers.add_parser("agent", help="Generate a new Agent")
+    agent_parser.add_argument(
+        "name", help="UpperCamelCase, ending in 'Agent', e.g. SupportAgent"
     )
+    agent_parser.add_argument(
+        "--model", required=True, help="e.g. gpt-5.4-nano, claude-... (required)"
+    )
+    agent_parser.add_argument("--instructions", default=None, help="inline instructions string")
+    agent_parser.add_argument(
+        "--tool",
+        default=None,
+        help="comma-separated tool names, e.g. search_web,research:fetch_page",
+    )
+    agent_parser.add_argument("--guardrail", default=None, help="comma-separated guardrail names")
+    agent_parser.add_argument("--memory", choices=["auto", "llm"], default=None)
+    agent_parser.add_argument("--knowledge", choices=["auto", "llm"], default=None)
+    agent_parser.add_argument("--compact", action="store_true")
+    tool_parser = generate_subparsers.add_parser("tool", help="Generate a new @tool function")
+    tool_parser.add_argument(
+        "--name",
+        dest="tool_name",
+        required=True,
+        help="e.g. search_web (app/tools/core.py) or research:search_web (app/tools/research.py)",
+    )
+    tool_parser.add_argument(
+        "--description", default=None, help="one-line docstring describing what it does"
+    )
+    generate_subparsers.add_parser(
+        "guardrail", help="Generate a new @guardrail function"
+    ).add_argument("name")
     generate_subparsers.add_parser("prompt", help="Generate a new app/prompts/ file").add_argument(
         "name"
     )
     generate_subparsers.add_parser(
-        "evaluation", help="Generate a new app/evaluations/ case module"
+        "evaluation", help="Generate a new evals/ case module"
     ).add_argument("name")
 
     chat_parser = subparsers.add_parser("chat", help="Chat with an Agent, or inspect past sessions")
@@ -93,7 +140,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Show one session's history instead of chatting",
     )
 
-    subparsers.add_parser("eval", help="Run this app's app/evaluations/ cases")
+    subparsers.add_parser("eval", help="Run this app's evals/ cases")
     subparsers.add_parser("test", help="Run this app's tests/ test functions")
 
     traces_parser = subparsers.add_parser("traces", help="Inspect this app's traces in runa.db")
@@ -138,7 +185,10 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None) -> int:
         ProjectAlreadyExists,
         AgentAlreadyExists,
         AgentNotFound,
+        AmbiguousComponent,
+        InvalidAgentName,
         ToolAlreadyExists,
+        GuardrailAlreadyExists,
         PromptAlreadyExists,
         EvaluationAlreadyExists,
         NotARunaProject,
@@ -160,21 +210,38 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
     if args.command == "new":
         project_dir = scaffold_project(args.name, root=cwd)
         print(f"created {project_dir}")
+        cd_step = f"  cd {project_dir.name}\n" if args.name else ""
         print(
-            "\nnext steps:\n"
-            f"  cd {project_dir.name}\n"
+            f"\nnext steps:\n{cd_step}"
             "  put your OPENAI_API_KEY in .env   # or whichever model your agents use\n"
-            "  runa generate agent MyAgent\n"
+            "  runa generate agent MyAgent --model gpt-5.4-nano\n"
             "  runa chat my_agent"
         )
         return 0
 
     if args.command == "generate" and args.kind == "agent":
-        agent_file = generate_agent(args.name, root=cwd)
+        agent_file = generate_agent(
+            args.name,
+            root=cwd,
+            model=args.model,
+            instructions=args.instructions,
+            tools=_split_names(args.tool),
+            guardrails=_split_names(args.guardrail),
+            memory=args.memory,
+            knowledge=args.knowledge,
+            compact=args.compact,
+        )
         print(f"created {agent_file}")
-        class_name = args.name if args.name.endswith("Agent") else f"{args.name}Agent"
+        class_name = args.name
+        tool_step = "add tools with\n  runa generate tool --name <name>\n"
+        prompt_step = (
+            f"write app/prompts/{agent_file.stem}.md, {tool_step}"
+            if args.instructions is None
+            else tool_step
+        )
         print(
-            "\nnext: declare its tools and instructions, then chat with it:\n"
+            f"\nnext: {prompt_step}"
+            "then chat with it:\n"
             f"  runa chat {agent_file.stem}\n"
             "or call it from your own code:\n"
             f"  from app.agents.{agent_file.stem} import {class_name}\n"
@@ -183,12 +250,26 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
         return 0
 
     if args.command == "generate" and args.kind == "tool":
-        tool_file = generate_tool(args.name, root=cwd)
+        tool_file = generate_tool(args.tool_name, root=cwd, description=args.description)
+        _, func_name = split_tool_name(args.tool_name)
         print(f"created {tool_file}")
         print(
             "\nnext: implement it, then declare it on an Agent, e.g.\n"
-            f"  from app.tools.{tool_file.stem} import {tool_file.stem}\n"
-            f"  tools = [{tool_file.stem}]"
+            f"  from app.tools.{tool_file.stem} import {func_name}\n\n"
+            "  class MyAgent(Agent):\n"
+            '      name = "my_agent"\n'
+            '      model = "gpt-5.4-nano"\n'
+            f"      tools = [{func_name}]"
+        )
+        return 0
+
+    if args.command == "generate" and args.kind == "guardrail":
+        guardrail_file = generate_guardrail(args.name, root=cwd)
+        print(f"created {guardrail_file}")
+        print(
+            "\nnext: implement it, then bind it to an Agent or @tool, e.g.\n"
+            f"  from app.guardrails.{guardrail_file.stem} import {guardrail_file.stem}\n"
+            f"  guardrails = [{guardrail_file.stem}.input]"
         )
         return 0
 

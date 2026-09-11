@@ -1,7 +1,6 @@
-"""The Zen of Runa, by import."""
+"""The Zen of Runa."""
 
-s = """The Zen of Runa
-The Zen of Runa, by Brahim Benyous et al.
+s = """The Zen of Runa, by Brahim Benyous et al.
 
 When one is enough, many are useless.
 Clear is better than ambiguous.

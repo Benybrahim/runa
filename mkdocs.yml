@@ -54,7 +54,7 @@ theme:
     - content.tooltips
 
 nav:
-  - Home: index.md
+  - Install: install.md
   - Getting Started: getting_started.md
   - Guides: guides.md
   - Core Concepts:

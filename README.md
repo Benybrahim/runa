@@ -47,8 +47,8 @@ Runa is an opinionated Python framework for agentic AI.
 
    ```bash
    cd myapp
-   runa generate agent Assistant
-   runa chat assistant
+   runa generate agent AssistantAgent --model gpt-5.4-nano
+   runa chat assistant_agent
    ```
 
    Run any subcommand with `--help` for options.

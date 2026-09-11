@@ -47,15 +47,15 @@ class AppLoadError(Exception):
     """
 
 
-_PROJECT_MODULE_NAMES = ("main", "app", "tests")
+_PROJECT_MODULE_NAMES = ("main", "app", "tests", "evals")
 
 
 def _reset_project_modules() -> None:
-    """Drop cached `main`/`app`/`tests` modules from a previous project's import.
+    """Drop cached `main`/`app`/`tests`/`evals` modules from a previous project's import.
 
     Each call may target a different project root, but Python caches imports by name in
     `sys.modules`; without this, a later call in the same process (e.g. across tests) would
-    silently reuse a previous project's `main`/`app`/`tests` instead of the one at `root`.
+    silently reuse a previous project's `main`/`app`/`tests`/`evals` instead of the one at `root`.
     """
     for name in list(sys.modules):
         if name in _PROJECT_MODULE_NAMES or name.startswith(

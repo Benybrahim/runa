@@ -1,15 +1,26 @@
 """cli/new.py: scaffold a new Runa application.
 
 Establishes the conventional project layout so a fresh project has somewhere obvious to put
-agents, tools, prompts, and eval cases (under `app/`), plus tests, shared config, the SQLite
-database, and developer docs (at the project root) without any configuration.
+agents, tools, prompts, and guardrails (under `app/`), plus tests, eval cases, shared config, the
+SQLite database, and developer docs (at the project root) without any configuration. Given a
+`name`, scaffolds into `root/name`; without one, scaffolds `root` itself in place.
 """
 
 from pathlib import Path
 
-_APP_SUBDIRS = ("agents", "tools", "knowledge", "prompts", "evaluations")
-_ROOT_PACKAGE_SUBDIRS = ("tests", "config")
+_APP_SUBDIRS = ("agents", "guardrails", "prompts", "tools")
+_ROOT_PACKAGE_SUBDIRS = ("tests", "evals", "config")
 _ROOT_PLAIN_SUBDIRS = ("db", "docs")
+_TOP_LEVEL_ENTRIES = (
+    "app",
+    *_ROOT_PACKAGE_SUBDIRS,
+    *_ROOT_PLAIN_SUBDIRS,
+    "pyproject.toml",
+    "main.py",
+    "Dockerfile",
+    ".gitignore",
+    ".env",
+)
 
 _PYPROJECT_TEMPLATE = """[project]
 name = "{name}"
@@ -53,30 +64,14 @@ db/runa.db
 .env
 """
 
-_README_TEMPLATE = """# {name}
+_DOCKERFILE_TEMPLATE = """FROM python:3.14-slim
 
-A Runa application.
+WORKDIR /app
+COPY . .
 
-## Layout
+RUN pip install --no-cache-dir uv && uv sync --frozen
 
-- `main.py`: application entry point, loads `.env`
-- `.env`: your model's API key, gitignored; fill it in before running
-- `app/agents/`: Agent subclasses
-- `app/tools/`: `@tool`-decorated functions
-- `app/knowledge/`: files (Markdown, PDF, text, CSV) a `Knowledge()` retrieves from automatically
-- `app/prompts/`: prompt text, kept out of Python source
-- `app/evaluations/`: eval cases, run with `runa eval`
-- `tests/`: deterministic tests, run with `runa test`
-- `config/`: shared config (clients, settings)
-- `db/runa.db`: conversation history and traces, see `runa chat --list`/`--show`; don't commit it
-- `docs/`: developer documentation -- for agent-retrievable knowledge, see `app/knowledge/` instead
-
-Generate scaffolding with:
-
-    runa generate agent MyAgent
-    runa generate tool MyTool
-    runa generate prompt MyAgent
-    runa generate evaluation MyAgent
+CMD ["uv", "run", "python", "main.py"]
 """
 
 
@@ -84,11 +79,21 @@ class ProjectAlreadyExists(Exception):
     """Raised when `runa new` targets a directory that already exists."""
 
 
-def scaffold_project(name: str, *, root: Path) -> Path:
-    """Create `root/name` with the conventional Runa project layout."""
-    project_dir = root / name
-    if project_dir.exists():
-        raise ProjectAlreadyExists(f"{project_dir} already exists")
+def scaffold_project(name: str | None, *, root: Path) -> Path:
+    """Create `root/name` with the conventional Runa project layout.
+
+    Without a `name`, scaffolds `root` itself (used for `runa new` with no argument), so
+    `root`'s own existence isn't grounds for `ProjectAlreadyExists` -- only an entry this
+    function would otherwise write into is.
+    """
+    project_dir = root / name if name else root
+    if name:
+        if project_dir.exists():
+            raise ProjectAlreadyExists(f"{project_dir} already exists")
+    else:
+        for entry in _TOP_LEVEL_ENTRIES:
+            if (project_dir / entry).exists():
+                raise ProjectAlreadyExists(f"{project_dir / entry} already exists")
 
     app_dir = project_dir / "app"
     for subdir in _APP_SUBDIRS:
@@ -105,9 +110,11 @@ def scaffold_project(name: str, *, root: Path) -> Path:
     for subdir in _ROOT_PLAIN_SUBDIRS:
         (project_dir / subdir).mkdir()
 
-    (project_dir / "pyproject.toml").write_text(_PYPROJECT_TEMPLATE.format(name=name))
-    (project_dir / "README.md").write_text(_README_TEMPLATE.format(name=name))
+    (project_dir / "pyproject.toml").write_text(
+        _PYPROJECT_TEMPLATE.format(name=name or project_dir.resolve().name)
+    )
     (project_dir / "main.py").write_text(_MAIN_TEMPLATE)
+    (project_dir / "Dockerfile").write_text(_DOCKERFILE_TEMPLATE)
     (project_dir / ".gitignore").write_text(_GITIGNORE_TEMPLATE)
     (project_dir / ".env").write_text(_ENV_TEMPLATE)
 

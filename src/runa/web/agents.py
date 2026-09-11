@@ -34,7 +34,9 @@ def render(*, root: Path) -> str:
     body = (
         "".join(_card(info) for info in infos)
         if infos
-        else empty("no agents found under app/agents/ -- run `runa generate agent MyAgent`")
+        else empty(
+            "no agents found under app/agents/ -- run `runa generate agent MyAgent --name my_agent`"
+        )
     )
     return page(
         title="Agents",

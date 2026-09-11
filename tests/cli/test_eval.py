@@ -11,17 +11,17 @@ from runa.cli.new import scaffold_project
 
 
 def _write_evaluation(project_dir: Path, filename: str, source: str) -> None:
-    (project_dir / "app" / "evaluations" / filename).write_text(source)
+    (project_dir / "evals" / filename).write_text(source)
 
 
 def test_run_project_evals_raises_outside_a_runa_project(tmp_path: Path) -> None:
-    """`run_project_evals` refuses to run where `app/evaluations/` doesn't exist."""
+    """`run_project_evals` refuses to run where `evals/` doesn't exist."""
     with pytest.raises(NotARunaProject):
         run_project_evals(tmp_path)
 
 
 def test_run_project_evals_raises_for_a_module_missing_agent_or_dataset(tmp_path: Path) -> None:
-    """A module under `app/evaluations/` that doesn't declare `agent`/`dataset` is rejected."""
+    """A module under `evals/` that doesn't declare `agent`/`dataset` is rejected."""
     project_dir = scaffold_project("demo", root=tmp_path)
     _write_evaluation(project_dir, "broken_eval.py", "agent = None\n")
 
