@@ -1,71 +1,67 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://benybrahim.github.io/runa/</loc>
-         <lastmod>2026-09-10</lastmod>
-    </url>
-    <url>
          <loc>https://benybrahim.github.io/runa/agents/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/approval/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/cache/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/cli/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/evaluation/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/getting_started/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/guardrails/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/guides/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
+    </url>
+    <url>
+         <loc>https://benybrahim.github.io/runa/knowledge/</loc>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/mcp/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/memory/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/models/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/sessions/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/subagents/</loc>
-         <lastmod>2026-09-10</lastmod>
-    </url>
-    <url>
-         <loc>https://benybrahim.github.io/runa/testing/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/tools/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
     <url>
          <loc>https://benybrahim.github.io/runa/tracing/</loc>
-         <lastmod>2026-09-10</lastmod>
+         <lastmod>2026-09-11</lastmod>
     </url>
 </urlset>
