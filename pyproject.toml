@@ -1,6 +1,9 @@
 [project]
-name = "runa"
+name = "runa-ai"
 version = "0.1.0"
+authors = [
+    { name = "Brahim Benyous" },
+]
 description = "The application framework for agentic AI."
 readme = "README.md"
 license = "MIT"
@@ -37,11 +40,11 @@ dev = [
 ]
 
 [build-system]
-requires = ["hatchling>=1.32.0"]
-build-backend = "hatchling.build"
+requires = ["uv_build >= 0.12.10, <0.13.0"]
+build-backend = "uv_build"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/runa"]
+[tool.uv.build-backend]
+module-name = "runa"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -70,8 +73,4 @@ line-ending = "auto"
 
 [tool.pyright]
 include = ["src", "tests", "examples"]
-# Tool.call is deliberately overridden with a bespoke, concretely-typed
-# signature per subclass (see tool.py's docstring and _schema_from_signature,
-# which derives a Tool's JSON schema from that signature via reflection).
-# That's the documented interface, not an LSP violation pyright should flag.
 reportIncompatibleMethodOverride = false
