@@ -24,7 +24,7 @@ correctness with plain assertions or judged, dataset-driven scoring.
    ```bash
    uv venv --python 3.14
    source .venv/bin/activate
-   uv add git+https://github.com/benybrahim/runa.git
+   uv add runa-ai
    ```
 
 2. Scaffold a new application:
