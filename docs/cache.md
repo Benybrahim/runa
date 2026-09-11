@@ -16,7 +16,7 @@ await cache.get("weather:paris")  # {"temp_c": 18}, until it expires
 Every backend implements the same four async methods:
 
 ```python
-await cache.get(key)                 # value, or None if missing/expired
+await cache.get(key)  # value, or None if missing/expired
 await cache.set(key, value, ttl=60)  # ttl in seconds; None never expires
 await cache.delete(key)
 await cache.clear()
@@ -43,7 +43,7 @@ use, created automatically on first use:
 ```python
 from runa import SQLiteCache
 
-cache = SQLiteCache()               # db/runa.db by default
+cache = SQLiteCache()  # db/runa.db by default
 cache = SQLiteCache("db/cache.db")  # or your own file
 ```
 

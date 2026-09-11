@@ -95,7 +95,7 @@ only once the stream is fully consumed.
 
 ```python
 agent.last_usage  # tokens used by the most recent call
-agent.usage       # accumulated across every call on this instance
+agent.usage  # accumulated across every call on this instance
 ```
 
 Both are populated whether or not the run succeeded, used a `session`, or passed `hooks`.

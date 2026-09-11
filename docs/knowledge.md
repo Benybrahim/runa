@@ -69,5 +69,7 @@ extra):
 from runa import Knowledge
 from runa.db.postgres import PostgresKnowledgeStore
 
-knowledge = Knowledge(store=PostgresKnowledgeStore(dsn="postgresql://runa:runa@localhost:5432/runa"))
+knowledge = Knowledge(
+    store=PostgresKnowledgeStore(dsn="postgresql://runa:runa@localhost:5432/runa")
+)
 ```

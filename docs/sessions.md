@@ -33,8 +33,8 @@ pick session-backed or in-memory per agent instance, not both for the same conve
 `SQLiteSession` also supports:
 
 ```python
-await session.get_items()      # this session's items, oldest first
-await session.pop_item()       # remove and return the most recent item
+await session.get_items()  # this session's items, oldest first
+await session.pop_item()  # remove and return the most recent item
 await session.clear_session()  # delete the session and all its items
 ```
 

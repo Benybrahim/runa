@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from dataclasses import dataclass
 
@@ -47,9 +48,15 @@ class ModelProvider:
     """
 
     def __init__(self) -> None:
-        """Start with no clients; each is created lazily, on first use, and then reused."""
-        self._http_clients: dict[str, httpx.AsyncClient] = {}
-        self._anthropic_client: AsyncAnthropic | None = None
+        """Start with no clients; each is created lazily, on first use, and then reused.
+
+        A client's connections are bound to the event loop it was created on, so each is
+        cached alongside that loop; `run_sync` opens a fresh loop per call (`asyncio.run`),
+        and a client left over from a now-closed loop would crash the next call trying to
+        reuse it. A loop mismatch discards the stale client and builds a new one instead.
+        """
+        self._http_clients: dict[str, tuple[asyncio.AbstractEventLoop, httpx.AsyncClient]] = {}
+        self._anthropic_client: tuple[asyncio.AbstractEventLoop, AsyncAnthropic] | None = None
 
     def get_model(self, model_name: str | None) -> Model:
         """Return the `Model` for `model_name` (or Runa's own default, if `None`)."""
@@ -63,9 +70,10 @@ class ModelProvider:
         return OpenAICompatibleModel(name, self._get_http_client(backend))
 
     def _get_http_client(self, backend: _Backend) -> httpx.AsyncClient:
-        client = self._http_clients.get(backend.prefix)
-        if client is not None:
-            return client
+        loop = asyncio.get_running_loop()
+        cached = self._http_clients.get(backend.prefix)
+        if cached is not None and cached[0] is loop:
+            return cached[1]
         api_key = os.environ.get(backend.api_key_env)
         if api_key is None:
             raise UserError(
@@ -76,13 +84,14 @@ class ModelProvider:
             headers={"Authorization": f"Bearer {api_key}"},
             timeout=600.0,
         )
-        self._http_clients[backend.prefix] = client
+        self._http_clients[backend.prefix] = (loop, client)
         return client
 
     def _get_anthropic_client(self) -> AsyncAnthropic:
-        if self._anthropic_client is None:
-            self._anthropic_client = AsyncAnthropic()
-        return self._anthropic_client
+        loop = asyncio.get_running_loop()
+        if self._anthropic_client is None or self._anthropic_client[0] is not loop:
+            self._anthropic_client = (loop, AsyncAnthropic())
+        return self._anthropic_client[1]
 
 
 __all__ = ["ModelProvider"]
