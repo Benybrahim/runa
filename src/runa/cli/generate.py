@@ -161,8 +161,8 @@ def _export_agent(agents_dir: Path, file_stem: str, class_name: str) -> None:
     """
     init_file = agents_dir / "__init__.py"
     existing = init_file.read_text() if init_file.exists() else ""
-    lines = [line for line in existing.splitlines() if line.strip()]
-    lines.append(f"from .{file_stem} import {class_name}")
+    lines = {line for line in existing.splitlines() if line.strip()}
+    lines.add(f"from .{file_stem} import {class_name}")
     init_file.write_text("\n".join(sorted(lines)) + "\n")
 
 
