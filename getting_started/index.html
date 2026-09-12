@@ -1653,7 +1653,7 @@ and trying to use patterns you learned elsewhere, you may have a less happy expe
   By not writing the same information over and over again, our code is more maintainable, more extensible, and less buggy.</li>
 </ul>
 <h2 id="3-creating-a-new-runa-application">3. Creating a New Runa Application<a class="headerlink" href="#3-creating-a-new-runa-application" title="Permanent link">&para;</a></h2>
-<p>We're going to build a project called <code>code-editor</code> - a simple agent app that demonstrate several of Runa's
+<p>We're going to build a project called <code>greeter</code> - a simple agent app that demonstrates several of Runa's
 built-in features.</p>
 <h3 id="installing-runa">Installing Runa<a class="headerlink" href="#installing-runa" title="Permanent link">&para;</a></h3>
 <p>Runa needs Python 3.14. Install it with <a href="https://docs.astral.sh/uv/">uv</a>:</p>
@@ -1663,28 +1663,27 @@ built-in features.</p>
 <li>Install <a href="https://www.python.org/downloads/">Python 3.14</a>:</li>
 <li>
 <p>Install Runa</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>init
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uv<span class="w"> </span>venv
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>uv<span class="w"> </span>add<span class="w"> </span>git+https://github.com/benybrahim/runa.git
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>venv<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.14
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>uv<span class="w"> </span>add<span class="w"> </span>runa-ai
 </span></code></pre></div>
 </li>
 </ol>
 <h3 id="creating-the-application">Creating the Application<a class="headerlink" href="#creating-the-application" title="Permanent link">&para;</a></h3>
 <p><code>runa new</code> scaffolds a new application with everything you need:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>runa<span class="w"> </span>new<span class="w"> </span>code-editor
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>code-editor
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>runa<span class="w"> </span>new<span class="w"> </span>greeter
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>greeter
 </span></code></pre></div>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>created code-editor
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>created greeter
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>next steps:
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  cd code-editor
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  cd greeter
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  put your OPENAI_API_KEY in .env   # or whichever model your agents use
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  runa generate agent MyAgent --model gpt-5.4-nano
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  runa chat my_agent
 </span></code></pre></div>
 <p>Take a look at what was generated:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>code-editor/
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>greeter/
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>├── app/
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>│   ├── agents/          # Agent subclasses
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>│   ├── guardrails/      # input and output guardrails
@@ -1696,7 +1695,7 @@ built-in features.</p>
 </span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>├── evals/               # eval cases, run with `runa eval`
 </span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>├── tests/               # deterministic tests, run with `runa test`
 </span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>├── main.py              # application entry point, loads .env
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>├── Dockerfile            
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>├── Dockerfile
 </span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>├── .env                  # your model's API key — fill this in, never commit it
 </span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>└── pyproject.toml
 </span></code></pre></div>
@@ -1750,7 +1749,7 @@ stub with the real prompt:</p>
 - <strong>usage</strong>: token usage for this call (same value as agent.last_usage afterward) 
 - <strong>status</strong>: "completed" | "error" - default to <code>"completed"</code>
 - <strong>error</strong>: the exception message when <code>status == "error"</code>
-- <strong>metdata</strong>: reserved for future per-run detail, empty by default</p>
+- <strong>metadata</strong>: reserved for future per-run detail, empty by default</p>
 <p>You can also chat with your agent using:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>runa<span class="w"> </span>chat<span class="w"> </span>greeter_agent
 </span></code></pre></div>

@@ -517,10 +517,32 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#contents" class="md-nav__link">
+  <a href="#quickstart" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Contents
+        Quickstart
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to Go Next
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-zen-of-runa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Zen of Runa
       
     </span>
   </a>
@@ -1277,10 +1299,32 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#contents" class="md-nav__link">
+  <a href="#quickstart" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Contents
+        Quickstart
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to Go Next
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-zen-of-runa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Zen of Runa
       
     </span>
   </a>
@@ -1314,17 +1358,38 @@
 
 <h1 id="runa">Runa<a class="headerlink" href="#runa" title="Permanent link">&para;</a></h1>
 <p>The application framework for agentic AI.</p>
-<p>New here? Start with <a href="getting_started/">Getting Started</a>.</p>
-<h2 id="contents">Contents<a class="headerlink" href="#contents" title="Permanent link">&para;</a></h2>
+<p>Runa is opinionated: instead of a wide menu of configuration options, it gives you a small set
+of primitives, with clear conventions for how they fit together — <code>Agent</code>, <code>Tool</code>, <code>Guardrail</code>,
+<code>Subagent</code>, <code>Session</code>, <code>Memory</code>, <code>Knowledge</code>, <code>MCP Server</code>. Tracing and evaluation come built in,
+not bolted on.</p>
+<h2 id="quickstart">Quickstart<a class="headerlink" href="#quickstart" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>venv<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.14
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>uv<span class="w"> </span>add<span class="w"> </span>runa-ai
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>runa<span class="w"> </span>new<span class="w"> </span>myapp
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="nb">cd</span><span class="w"> </span>myapp
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>runa<span class="w"> </span>generate<span class="w"> </span>agent<span class="w"> </span>AssistantAgent<span class="w"> </span>--model<span class="w"> </span>gpt-5.4-nano
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>runa<span class="w"> </span>chat<span class="w"> </span>assistant_agent
+</span></code></pre></div>
+<p>Fill in the API key for whichever model you use in <code>.env</code>, and you're running. Walk through it
+step by step in <a href="getting_started/">Getting Started</a>.</p>
+<h2 id="where-to-go-next">Where to Go Next<a class="headerlink" href="#where-to-go-next" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="getting_started/">Getting Started</a></li>
-<li><a href="guides/">Guides</a></li>
-<li><strong>Core Concepts</strong> — <a href="agents/">Agents</a>, <a href="tools/">Tools</a>, <a href="guardrails/">Guardrails</a>, <a href="subagents/">Subagents</a></li>
-<li><strong>Running Agents</strong> — <a href="sessions/">Sessions and Chat</a>, <a href="memory/">Memory</a>, <a href="knowledge/">Knowledge</a>, <a href="cache/">Cache</a>, <a href="mcp/">MCP Servers</a>, <a href="approval/">Human Approval</a></li>
-<li><a href="evaluation/">Evaluation</a></li>
-<li><a href="tracing/">Observability</a></li>
-<li><strong>Reference</strong> — <a href="models/">Model Providers</a>, <a href="cli/">CLI Reference</a></li>
+<li><strong>New to Runa?</strong> Start with <a href="getting_started/">Getting Started</a>, then browse the
+  <a href="guides/">Guides</a> for the topic you need.</li>
+<li><strong>Core Concepts.</strong> <a href="agents/">Agents</a>, <a href="tools/">Tools</a>, <a href="guardrails/">Guardrails</a>,
+  <a href="subagents/">Subagents</a>.</li>
+<li><strong>Running Agents.</strong> <a href="sessions/">Sessions and Chat</a>, <a href="memory/">Memory</a>,
+  <a href="knowledge/">Knowledge</a>, <a href="cache/">Cache</a>, <a href="mcp/">MCP Servers</a>,
+  <a href="approval/">Human Approval</a>.</li>
+<li><strong>Testing and Evaluation.</strong> <a href="evaluation/">Evaluation</a>.</li>
+<li><strong>Observability.</strong> <a href="tracing/">Tracing and Hooks</a>.</li>
+<li><strong>Reference.</strong> <a href="models/">Model Providers</a>, <a href="cli/">CLI Reference</a>.</li>
 </ul>
+<h2 id="the-zen-of-runa">The Zen of Runa<a class="headerlink" href="#the-zen-of-runa" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"from runa import this"</span>
+</span></code></pre></div>
 
 
 
