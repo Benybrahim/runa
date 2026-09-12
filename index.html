@@ -10,31 +10,29 @@
       
       
       
-        <link rel="canonical" href="https://benybrahim.github.io/runa/tracing/">
+        <link rel="canonical" href="https://benybrahim.github.io/runa/">
       
       
-        <link rel="prev" href="../evaluation/">
       
-      
-        <link rel="next" href="../models/">
+        <link rel="next" href="getting_started/">
       
       
         
       
       
-      <link rel="icon" href="../assets/runa-logo-main.ico">
+      <link rel="icon" href="assets/runa-logo-main.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Observability - Runa</title>
+        <title>Runa</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -53,17 +51,17 @@
       
     
     
-      <link rel="stylesheet" href="../stylesheets/extra.css">
+      <link rel="stylesheet" href="stylesheets/extra.css">
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
     
     
-  <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
   <meta name="theme-color" content="#15191A">
   <meta property="og:title" content="Runa">
   <meta property="og:description" content="The application framework for agentic AI.">
@@ -92,7 +90,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#tracing-and-hooks" class="md-skip">
+        <a href="#runa" class="md-skip">
           Skip to content
         </a>
       
@@ -106,9 +104,9 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href=".." title="Runa" class="md-header__button md-logo" aria-label="Runa" data-md-component="logo">
+    <a href="." title="Runa" class="md-header__button md-logo" aria-label="Runa" data-md-component="logo">
       
-  <img src="../assets/runa-logo-main.svg" alt="logo">
+  <img src="assets/runa-logo-main.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -125,7 +123,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Observability
+              Home
             
           </span>
         </div>
@@ -246,9 +244,11 @@
   
   
   
+    
   
-    <li class="md-tabs__item">
-      <a href=".." class="md-tabs__link">
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="." class="md-tabs__link">
         
   
   
@@ -267,7 +267,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../getting_started/" class="md-tabs__link">
+      <a href="getting_started/" class="md-tabs__link">
         
   
   
@@ -286,7 +286,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../guides/" class="md-tabs__link">
+      <a href="guides/" class="md-tabs__link">
         
   
   
@@ -307,7 +307,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../agents/" class="md-tabs__link">
+        <a href="agents/" class="md-tabs__link">
           
   
   
@@ -329,7 +329,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../sessions/" class="md-tabs__link">
+        <a href="sessions/" class="md-tabs__link">
           
   
   
@@ -351,7 +351,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../evaluation/" class="md-tabs__link">
+        <a href="evaluation/" class="md-tabs__link">
           
   
   
@@ -369,11 +369,9 @@
   
   
   
-    
   
-  
-    <li class="md-tabs__item md-tabs__item--active">
-      <a href="./" class="md-tabs__link">
+    <li class="md-tabs__item">
+      <a href="tracing/" class="md-tabs__link">
         
   
   
@@ -394,7 +392,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../models/" class="md-tabs__link">
+        <a href="models/" class="md-tabs__link">
           
   
   
@@ -430,9 +428,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href=".." title="Runa" class="md-nav__button md-logo" aria-label="Runa" data-md-component="logo">
+    <a href="." title="Runa" class="md-nav__button md-logo" aria-label="Runa" data-md-component="logo">
       
-  <img src="../assets/runa-logo-main.svg" alt="logo">
+  <img src="assets/runa-logo-main.svg" alt="logo">
 
     </a>
     Runa
@@ -456,10 +454,37 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href=".." class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="." class="md-nav__link md-nav__link--active">
         
   
   
@@ -475,6 +500,37 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -486,7 +542,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting_started/" class="md-nav__link">
+      <a href="getting_started/" class="md-nav__link">
         
   
   
@@ -513,7 +569,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/" class="md-nav__link">
+      <a href="guides/" class="md-nav__link">
         
   
   
@@ -602,7 +658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../agents/" class="md-nav__link">
+      <a href="agents/" class="md-nav__link">
         
   
   
@@ -630,7 +686,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tools/" class="md-nav__link">
+      <a href="tools/" class="md-nav__link">
         
   
   
@@ -658,7 +714,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guardrails/" class="md-nav__link">
+      <a href="guardrails/" class="md-nav__link">
         
   
   
@@ -686,7 +742,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../subagents/" class="md-nav__link">
+      <a href="subagents/" class="md-nav__link">
         
   
   
@@ -787,7 +843,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../sessions/" class="md-nav__link">
+      <a href="sessions/" class="md-nav__link">
         
   
   
@@ -815,7 +871,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../memory/" class="md-nav__link">
+      <a href="memory/" class="md-nav__link">
         
   
   
@@ -843,7 +899,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../knowledge/" class="md-nav__link">
+      <a href="knowledge/" class="md-nav__link">
         
   
   
@@ -871,7 +927,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cache/" class="md-nav__link">
+      <a href="cache/" class="md-nav__link">
         
   
   
@@ -899,7 +955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../mcp/" class="md-nav__link">
+      <a href="mcp/" class="md-nav__link">
         
   
   
@@ -927,7 +983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../approval/" class="md-nav__link">
+      <a href="approval/" class="md-nav__link">
         
   
   
@@ -1018,7 +1074,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../evaluation/" class="md-nav__link">
+      <a href="evaluation/" class="md-nav__link">
         
   
   
@@ -1050,37 +1106,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Observability
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="tracing/" class="md-nav__link">
         
   
   
@@ -1096,76 +1125,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#tracing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tracing
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Tracing">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#privacy-policy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Privacy Policy
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#custom-exporters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Custom Exporters
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#hooks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Hooks
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1235,7 +1194,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../models/" class="md-nav__link">
+      <a href="models/" class="md-nav__link">
         
   
   
@@ -1263,7 +1222,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cli/" class="md-nav__link">
+      <a href="cli/" class="md-nav__link">
         
   
   
@@ -1318,49 +1277,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#tracing" class="md-nav__link">
+  <a href="#contents" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tracing
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Tracing">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#privacy-policy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Privacy Policy
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#custom-exporters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Custom Exporters
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#hooks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Hooks
+        Contents
       
     </span>
   </a>
@@ -1384,7 +1304,7 @@
 
 
   
-    <a href="https://github.com/Benybrahim/runa/edit/main/docs/tracing.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/Benybrahim/runa/edit/main/docs/index.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -1392,66 +1312,19 @@
   
 
 
-<h1 id="tracing-and-hooks">Tracing and Hooks<a class="headerlink" href="#tracing-and-hooks" title="Permanent link">&para;</a></h1>
-<h2 id="tracing">Tracing<a class="headerlink" href="#tracing" title="Permanent link">&para;</a></h2>
-<p>Every <code>run</code>/<code>run_sync</code>/<code>run_streamed</code> call is traced automatically. There is no separate setup
-step. A <code>Trace</code> is a hierarchical tree of <code>Span</code>s: agent, LLM call, tool call, handoff,
-guardrail.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">run</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">run_sync</span><span class="p">(</span><span class="s2">"..."</span><span class="p">)</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">run</span><span class="o">.</span><span class="n">trace</span><span class="p">)</span>  <span class="c1"># human-readable span tree</span>
-</span></code></pre></div>
-<p>Traces are persisted to <code>runa.db</code> by default. Inspect them from the CLI:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>runa<span class="w"> </span>traces<span class="w"> </span>list<span class="w">           </span><span class="c1"># most recent traces</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>runa<span class="w"> </span>traces<span class="w"> </span>errors<span class="w">         </span><span class="c1"># most recent traces that errored</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>runa<span class="w"> </span>traces<span class="w"> </span>show<span class="w"> </span>TRACE_ID<span class="w">  </span><span class="c1"># one trace's full span tree</span>
-</span></code></pre></div>
-<p>Or visually, with <code>runa ui</code>. See <a href="../cli/#runa-ui">CLI Reference</a>.</p>
-<h3 id="privacy-policy">Privacy Policy<a class="headerlink" href="#privacy-policy" title="Permanent link">&para;</a></h3>
-<p><code>observe()</code> configures what tracing captures, globally or for a block:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">runa</span><span class="w"> </span><span class="kn">import</span> <span class="n">observe</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">observe</span><span class="p">(</span><span class="n">capture_inputs</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># applies immediately, stays applied</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">with</span> <span class="n">observe</span><span class="p">(</span><span class="n">redact</span><span class="o">=</span><span class="p">[</span><span class="s2">"password"</span><span class="p">,</span> <span class="s2">"ssn"</span><span class="p">]):</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">agent</span><span class="o">.</span><span class="n">run_sync</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>  <span class="c1"># redacted within this block only</span>
-</span></code></pre></div>
-<p>Options: <code>capture_inputs</code>/<code>capture_outputs</code> (whether to keep them at all), <code>redact</code> (a list of
-dict keys to scrub) or a custom <code>redactor</code> callable, and <code>max_input_bytes</code>/<code>max_output_bytes</code>/
-<code>max_tool_result_bytes</code> to truncate what's kept.</p>
-<h3 id="custom-exporters">Custom Exporters<a class="headerlink" href="#custom-exporters" title="Permanent link">&para;</a></h3>
-<p>By default, traces go to <code>runa.db</code> via <code>SQLiteExporter</code>. Swap or add exporters:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">runa</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConsoleExporter</span><span class="p">,</span> <span class="n">SQLiteExporter</span><span class="p">,</span> <span class="n">observe</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">observe</span><span class="p">(</span><span class="n">exporter</span><span class="o">=</span><span class="p">[</span><span class="n">SQLiteExporter</span><span class="p">(),</span> <span class="n">ConsoleExporter</span><span class="p">()])</span>
-</span></code></pre></div>
-<p>Write your own by implementing <code>TraceExporter</code>'s single method, <code>export(self, trace: Trace) -&gt; None</code>.</p>
-<h2 id="hooks">Hooks<a class="headerlink" href="#hooks" title="Permanent link">&para;</a></h2>
-<p>Tracing is unconditional. Hooks are optional lifecycle callbacks for your own logic: logging,
-metrics, side effects.</p>
-<p><code>RunHooks</code> is passed per-call and fires for every agent involved in a run, including subagents:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">runa</span><span class="w"> </span><span class="kn">import</span> <span class="n">RunHooks</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyHooks</span><span class="p">(</span><span class="n">RunHooks</span><span class="p">):</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">on_tool_end</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="n">agent</span><span class="p">,</span> <span class="n">tool</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">tool</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">result</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="n">agent</span><span class="o">.</span><span class="n">run_sync</span><span class="p">(</span><span class="s2">"..."</span><span class="p">,</span> <span class="n">hooks</span><span class="o">=</span><span class="n">MyHooks</span><span class="p">())</span>
-</span></code></pre></div>
-<p><code>RunHooks</code> fires <code>on_agent_start</code>, <code>on_agent_end</code>, <code>on_handoff</code>, <code>on_tool_start</code>, <code>on_tool_end</code>,
-<code>on_llm_start</code>, and <code>on_llm_end</code>. Every method is a no-op unless overridden.</p>
-<p><code>AgentHooks</code> is scoped to a single <code>Agent</code> subclass instead, via its <code>hooks</code> class attribute. It
-fires only for that agent, not for the whole run:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">SupportAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">name</span> <span class="o">=</span> <span class="s2">"support_agent"</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">hooks</span> <span class="o">=</span> <span class="n">MyAgentHooks</span><span class="p">()</span>
-</span></code></pre></div>
-<p><code>AgentHooks</code> fires <code>on_start</code>, <code>on_end</code>, <code>on_handoff</code>, <code>on_tool_start</code>, <code>on_tool_end</code>,
-<code>on_llm_start</code>, and <code>on_llm_end</code>.</p>
-<p><code>LoggingRunHooks</code>/<code>LoggingAgentHooks</code> are the framework's defaults, logging each event through
-the standard <code>logging</code> module under the <code>"runa"</code> logger name. Don't subclass them to add
-behavior; subclass <code>RunHooks</code>/<code>AgentHooks</code> directly and pass your own instance instead.</p>
+<h1 id="runa">Runa<a class="headerlink" href="#runa" title="Permanent link">&para;</a></h1>
+<p>The application framework for agentic AI.</p>
+<p>New here? Start with <a href="getting_started/">Getting Started</a>.</p>
+<h2 id="contents">Contents<a class="headerlink" href="#contents" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="getting_started/">Getting Started</a></li>
+<li><a href="guides/">Guides</a></li>
+<li><strong>Core Concepts</strong> — <a href="agents/">Agents</a>, <a href="tools/">Tools</a>, <a href="guardrails/">Guardrails</a>, <a href="subagents/">Subagents</a></li>
+<li><strong>Running Agents</strong> — <a href="sessions/">Sessions and Chat</a>, <a href="memory/">Memory</a>, <a href="knowledge/">Knowledge</a>, <a href="cache/">Cache</a>, <a href="mcp/">MCP Servers</a>, <a href="approval/">Human Approval</a></li>
+<li><a href="evaluation/">Evaluation</a></li>
+<li><a href="tracing/">Observability</a></li>
+<li><strong>Reference</strong> — <a href="models/">Model Providers</a>, <a href="cli/">CLI Reference</a></li>
+</ul>
 
 
 
@@ -1486,31 +1359,15 @@ behavior; subclass <code>RunHooks</code>/<code>AgentHooks</code> directly and pa
       
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
-          
-          <a href="../evaluation/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Evaluation">
-            <div class="md-footer__button md-icon">
-              
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
-            </div>
-            <div class="md-footer__title">
-              <span class="md-footer__direction">
-                Previous
-              </span>
-              <div class="md-ellipsis">
-                Evaluation
-              </div>
-            </div>
-          </a>
-        
         
           
-          <a href="../models/" class="md-footer__link md-footer__link--next" aria-label="Next: Model Providers">
+          <a href="getting_started/" class="md-footer__link md-footer__link--next" aria-label="Next: Getting Started">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Model Providers
+                Getting Started
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -1580,10 +1437,10 @@ behavior; subclass <code>RunHooks</code>/<code>AgentHooks</code> directly and pa
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.action.edit", "content.tooltips"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.action.edit", "content.tooltips"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
