@@ -47,7 +47,7 @@ The Runa philosophy includes two major guiding principles:
 
 ## 3. Creating a New Runa Application
 
-We're going to build a project called `code-editor` - a simple agent app that demonstrate several of Runa's
+We're going to build a project called `greeter` - a simple agent app that demonstrates several of Runa's
 built-in features.
 
 ### Installing Runa
@@ -61,10 +61,9 @@ Runa needs Python 3.14. Install it with [uv](https://docs.astral.sh/uv/):
 3. Install Runa
 
     ```bash
-    uv init
-    uv venv
+    uv venv --python 3.14
     source .venv/bin/activate
-    uv add git+https://github.com/benybrahim/runa.git
+    uv add runa-ai
     ```
 
 ### Creating the Application
@@ -72,15 +71,15 @@ Runa needs Python 3.14. Install it with [uv](https://docs.astral.sh/uv/):
 `runa new` scaffolds a new application with everything you need:
 
 ```bash
-runa new code-editor
-cd code-editor
+runa new greeter
+cd greeter
 ```
 
 ```
-created code-editor
+created greeter
 
 next steps:
-  cd code-editor
+  cd greeter
   put your OPENAI_API_KEY in .env   # or whichever model your agents use
   runa generate agent MyAgent --model gpt-5.4-nano
   runa chat my_agent
@@ -89,7 +88,7 @@ next steps:
 Take a look at what was generated:
 
 ```
-code-editor/
+greeter/
 ├── app/
 │   ├── agents/          # Agent subclasses
 │   ├── guardrails/      # input and output guardrails
@@ -101,7 +100,7 @@ code-editor/
 ├── evals/               # eval cases, run with `runa eval`
 ├── tests/               # deterministic tests, run with `runa test`
 ├── main.py              # application entry point, loads .env
-├── Dockerfile            
+├── Dockerfile
 ├── .env                  # your model's API key — fill this in, never commit it
 └── pyproject.toml
 ```
@@ -180,7 +179,7 @@ Hello! 👋 How can I help you today?
 - **usage**: token usage for this call (same value as agent.last_usage afterward) 
 - **status**: "completed" | "error" - default to `"completed"`
 - **error**: the exception message when `status == "error"`
-- **metdata**: reserved for future per-run detail, empty by default
+- **metadata**: reserved for future per-run detail, empty by default
 
 You can also chat with your agent using:
 

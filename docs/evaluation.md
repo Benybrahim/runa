@@ -1,8 +1,7 @@
 # Evaluating Agents
 
-Runa distinguishes two kinds of checks. **Tests** verify invariants with a plain `assert`. See
-[Testing](testing.md). **Evals** grade behavior, including with a judge model, against a dataset
-of cases.
+Runa distinguishes two kinds of checks. **Tests** verify invariants with a plain `assert`.
+**Evals** grade behavior, including with a judge model, against a dataset of cases.
 
 `evals/` holds datasets of `Case`s, graded against an agent:
 

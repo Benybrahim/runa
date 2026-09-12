@@ -42,7 +42,7 @@ runa chat --show SESSION_ID                   # replay one session's history
 
 ## `runa test`
 
-Run every `test_*` function under `tests/`. See [Testing](testing.md).
+Run every `test_*` function under `tests/`.
 
 ## `runa eval [AGENT_NAME]`
 

@@ -6,13 +6,13 @@ Runa is an opinionated Python framework for agentic AI. Instead of a wide
 menu of configuration options, it gives you a small set of primitives,
 with clear conventions:
 
-- **Agents:** which are LLMs equipped with instructions and tools
-- **Tools:** the actions an agent can take in the outside world, described clearly enough that the agent knows when and how to use them.
-- **Guardrails:** checks that keep what goes into and comes out of an agent or tool within bounds.
-- **Delegation:** how agents hand off work to each other, either passing a task along completely or asking for help and getting an answer back.
-- **Context management:** what an agent remembers: session, memory, and domain knowledge.
+- **Agents**, which are LLMs equipped with instructions and tools
+- **Tools:**, let agents take actions.
+- **Guardrails**, which enable validation of agent inputs and outputs
+- **Delegation:**, how an agent delegate or handoffs tasks.
+- **Context management**, what an agent remembers: session, memory, and domain knowledge.
 
-Observability and evaluation come built in, not bolted on: every run is
+traces and evaluation come built in, not bolted on: every run is
 traced automatically as a span tree, and evaluation grade
 correctness with plain assertions or judged, dataset-driven scoring.
 

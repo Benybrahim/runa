@@ -45,9 +45,6 @@ stands alone. Read whichever covers what you're building today.
 
 ## Testing and Evaluation
 
-* **[Testing](testing.md).**
-  Deterministic tests with `runa test`.
-
 * **[Evaluation](evaluation.md).**
   Behavioral evals with `runa eval`.
 
