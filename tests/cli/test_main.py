@@ -125,7 +125,7 @@ def test_generate_agent_next_steps_point_to_the_prompt_file_and_generate_tool(
     assert exit_code == 0
     out = capsys.readouterr().out
     assert "app/prompts/support_agent.md" in out
-    assert "runa generate tool --name <name>" in out
+    assert "runa generate tool <name>" in out
     assert "instructions" not in out
 
 
@@ -151,20 +151,19 @@ def test_generate_agent_next_steps_omit_the_prompt_file_with_explicit_instructio
     assert exit_code == 0
     out = capsys.readouterr().out
     assert "app/prompts" not in out
-    assert "runa generate tool --name <name>" in out
+    assert "runa generate tool <name>" in out
 
 
 def test_generate_tool_dispatches_to_generate_tool(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`runa generate tool --name search_web --description ...` writes the docstring in."""
+    """`runa generate tool search_web --description ...` writes the docstring in."""
     project_dir = scaffold_project("demo", root=tmp_path)
 
     exit_code = main(
         [
             "generate",
             "tool",
-            "--name",
             "search_web",
             "--description",
             "Search the web and return a summary.",
@@ -180,10 +179,10 @@ def test_generate_tool_dispatches_to_generate_tool(
 def test_generate_tool_without_description_falls_back_to_a_todo_stub(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`runa generate tool --name ...` with no `--description` keeps the old TODO stub."""
+    """`runa generate tool ...` with no `--description` keeps the old TODO stub."""
     project_dir = scaffold_project("demo", root=tmp_path)
 
-    exit_code = main(["generate", "tool", "--name", "search_web"], cwd=project_dir)
+    exit_code = main(["generate", "tool", "search_web"], cwd=project_dir)
 
     assert exit_code == 0
     content = (project_dir / "app" / "tools" / "core.py").read_text()
@@ -193,10 +192,10 @@ def test_generate_tool_without_description_falls_back_to_a_todo_stub(
 def test_generate_tool_with_a_module_prefix_writes_and_prints_the_function_name(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`--name research:search_web` writes `app/tools/research.py` and prints the func name."""
+    """`research:search_web` writes `app/tools/research.py` and prints the func name."""
     project_dir = scaffold_project("demo", root=tmp_path)
 
-    exit_code = main(["generate", "tool", "--name", "research:search_web"], cwd=project_dir)
+    exit_code = main(["generate", "tool", "research:search_web"], cwd=project_dir)
 
     assert exit_code == 0
     assert (project_dir / "app" / "tools" / "research.py").is_file()

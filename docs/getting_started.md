@@ -127,7 +127,7 @@ runa generate agent GreeterAgent --model gpt-5.4-nano
 created app/agents/greeter_agent.py
 
 next: write app/prompts/greeter_agent.md, add tools with
-  runa generate tool --name <name>
+  runa generate tool <name>
 then chat with it:
   runa chat greeter_agent
 or call it from your own code:
@@ -202,7 +202,7 @@ A tool is a plain Python function. Its signature *is* its schema, Runa
 reads the type hints and the docstring, so there's nothing else to declare.
 
 ```bash
-runa generate tool --name current_time
+runa generate tool current_time
 ```
 
 ```
@@ -227,7 +227,7 @@ def current_time() -> str:
 Every tool you generate without a module prefix lands in this same
 catch-all `app/tools/core.py` file. Once it grows crowded, group related
 tools into their own file with `module:function`, e.g. `runa generate tool
---name weather:forecast` writes `app/tools/weather.py`.
+weather:forecast` writes `app/tools/weather.py`.
 
 Attach it to an agent with `tools`:
 

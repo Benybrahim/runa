@@ -95,7 +95,7 @@ _AGENT_CLASS_NAME = re.compile(r"[A-Z][A-Za-z0-9]*Agent")
 
 
 def split_tool_name(raw_name: str) -> tuple[str, str]:
-    """Split a `--tool`/`--name` value into (module, function).
+    """Split a `--tool`/`NAME` value into (module, function).
 
     `research:search_web` -> `("research", "search_web")`: the tool lands in (or is looked up
     from) `app/tools/research.py`. A bare `search_web` defaults its module to `core` --

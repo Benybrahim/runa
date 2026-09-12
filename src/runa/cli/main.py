@@ -82,9 +82,7 @@ def _build_parser() -> argparse.ArgumentParser:
     agent_parser.add_argument("--compact", action="store_true")
     tool_parser = generate_subparsers.add_parser("tool", help="Generate a new @tool function")
     tool_parser.add_argument(
-        "--name",
-        dest="tool_name",
-        required=True,
+        "name",
         help="e.g. search_web (app/tools/core.py) or research:search_web (app/tools/research.py)",
     )
     tool_parser.add_argument(
@@ -238,7 +236,7 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
         )
         print(f"created {agent_file}")
         class_name = args.name
-        tool_step = "add tools with\n  runa generate tool --name <name>\n"
+        tool_step = "add tools with\n  runa generate tool <name>\n"
         prompt_step = (
             f"write app/prompts/{agent_file.stem}.md, {tool_step}"
             if args.instructions is None
@@ -255,8 +253,8 @@ def _dispatch(args: argparse.Namespace, cwd: Path) -> int:
         return 0
 
     if args.command == "generate" and args.kind == "tool":
-        tool_file = generate_tool(args.tool_name, root=cwd, description=args.description)
-        _, func_name = split_tool_name(args.tool_name)
+        tool_file = generate_tool(args.name, root=cwd, description=args.description)
+        _, func_name = split_tool_name(args.name)
         print(f"created {tool_file}")
         print(
             "\nnext: implement it, then declare it on an Agent, e.g.\n"
