@@ -1,6 +1,6 @@
 """tracing/config.py: the privacy policy every captured span/trace goes through, plus `observe()`.
 
-One small, global, mutable policy — not a policy engine. `capture_inputs`/`capture_outputs` gate
+One small, global, mutable policy, not a policy engine. `capture_inputs`/`capture_outputs` gate
 whether input/output are kept at all; `redact`/`redactor` scrub what's kept; the `max_*_bytes`
 limits truncate what's left. `RunaTraceProcessor` (`tracing/processor.py`) is the only caller.
 """
@@ -20,7 +20,7 @@ class TraceExporter(Protocol):
 
     `export` is synchronous because it's called from `on_trace_end`, a synchronous callback the
     underlying Agents SDK invokes as part of finishing a trace (see `TracingProcessor` in
-    `agents.tracing`) — there is no event loop available to await from there.
+    `agents.tracing`); there is no event loop available to await from there.
     """
 
     def export(self, trace: Trace) -> None:
@@ -75,7 +75,7 @@ def _truncate(text: str, max_bytes: int) -> str:
 def apply_policy(value: Any, *, max_bytes: int) -> Any:
     """Apply the active redact/size policy to one span's `input`/`output`/tool result.
 
-    Callers check `capture_inputs()`/`capture_outputs()` themselves before calling this — this
+    Callers check `capture_inputs()`/`capture_outputs()` themselves before calling this: this
     function only redacts and truncates a value that's already been decided worth keeping.
     """
     if value is None:

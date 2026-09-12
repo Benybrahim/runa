@@ -1,6 +1,6 @@
 """_types.py: the provider-neutral request/response shapes Runa's own runtime is built on.
 
-No OpenAI (or Anthropic) SDK type leaks past `_models` — everywhere else in Runa speaks these
+No OpenAI (or Anthropic) SDK type leaks past `_models`, everywhere else in Runa speaks these
 types instead: a plain dict for one turn of conversation, a token-usage tally, and per-call model
 settings. `run_internal` builds and consumes these; each `Model` implementation translates them to
 and from whatever shape its own provider's wire format actually wants.
@@ -13,12 +13,12 @@ from typing import Any, Literal
 
 TResponseInputItem = dict[str, Any]
 """One turn of conversation history: a `{"role": ..., "content": ...}` message, a tool call, or a
-tool result. Plain JSON, never a provider SDK type — an output item becomes tomorrow's input item
+tool result. Plain JSON, never a provider SDK type, an output item becomes tomorrow's input item
 once appended to history, so this one shape serves both directions.
 """
 
 TResponseOutputItem = TResponseInputItem
-"""What a model call produces, before it's appended to history — the same shape as
+"""What a model call produces, before it's appended to history, the same shape as
 `TResponseInputItem`; see that alias for why one shape covers both.
 """
 

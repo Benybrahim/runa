@@ -179,7 +179,7 @@ def _resolve_components(
 
     A missing name prompts for approval to scaffold it via `generate` (the same
     `generate_tool`/`generate_guardrail` a standalone `runa generate tool`/`guardrail` would run)
-    before the agent file is written. Declined, it's still imported and referenced — the agent
+    before the agent file is written. Declined, it's still imported and referenced: the agent
     file fails loudly on import instead of silently dropping it from `tools`/`guardrails`.
 
     A `--tool` name may carry a `module:function` prefix (see `split_tool_name`); only the
@@ -192,7 +192,7 @@ def _resolve_components(
         existing = _find_component(base_dir, snake_name)
         if existing is None:
             relative_dir = base_dir.relative_to(root)
-            if confirm(f"{kind} '{snake_name}' not found in {relative_dir}/ — create it?"):
+            if confirm(f"{kind} '{snake_name}' not found in {relative_dir}/, create it?"):
                 existing = generate(raw_name, root=root)
             else:
                 module_name = split_tool_name(raw_name)[0] if kind == "tool" else snake_name
@@ -252,16 +252,16 @@ def generate_agent(
 ) -> Path:
     """Write a new Agent subclass into `root/app/agents/`.
 
-    `name` must be an UpperCamelCase class name ending in `Agent` (e.g. `SupportAgent`) — the
+    `name` must be an UpperCamelCase class name ending in `Agent` (e.g. `SupportAgent`), the
     one naming convention this command enforces, so it's the single source of truth for an
     agent's identity. Anything else raises `InvalidAgentName`.
 
     Both the generated file and the class's declared `name` attribute are derived from it via
-    snake_case (`SupportAgent` -> `app/agents/support_agent.py`, `name = "support_agent"`) —
-    there's no separate identity to pass in, and nothing that can drift out of sync with the
+    snake_case (`SupportAgent` -> `app/agents/support_agent.py`, `name = "support_agent"`).
+    There's no separate identity to pass in, and nothing that can drift out of sync with the
     class name. That derived identity must also be unique across `app/agents/`: generating a
     second agent that derives a `name` already declared elsewhere raises `AgentAlreadyExists`,
-    since `runa chat <name>` couldn't tell the two apart — the same error a plain filename
+    since `runa chat <name>` couldn't tell the two apart, the same error a plain filename
     collision already raises.
 
     `tools`/`guardrails` are names looked up under `app/tools/`/`app/guardrails/` (searched
@@ -270,8 +270,8 @@ def generate_agent(
     carry a `module:function` prefix (see `split_tool_name`) to place a new tool outside the
     default `app/tools/core.py`.
 
-    Without an explicit `instructions`, the class gets no `instructions` attribute at all —
-    instead a stub `app/prompts/<snake_case(name)>.md` is written alongside it, the same
+    Without an explicit `instructions`, the class gets no `instructions` attribute at all.
+    Instead a stub `app/prompts/<snake_case(name)>.md` is written alongside it, the same
     file `Agent.__init__` would lazily create on first instantiation (`agent.py`'s
     `_load_prompt`). Generating it upfront means it's there to edit before the first `runa chat`.
 
@@ -281,7 +281,7 @@ def generate_agent(
     """
     if not _AGENT_CLASS_NAME.fullmatch(name):
         raise InvalidAgentName(
-            f"'{name}' is not a valid Agent class name — use UpperCamelCase ending in "
+            f"'{name}' is not a valid Agent class name, use UpperCamelCase ending in "
             "'Agent', e.g. SupportAgent"
         )
 
@@ -409,7 +409,7 @@ def generate_evaluation(name: str, *, root: Path) -> Path:
     """Write a new eval dataset module into `root/evals/`.
 
     `name` is the agent's snake_case identity, the same one `runa chat <name>` takes (e.g.
-    `support_agent`) — not the class name. Unlike `generate_agent`/`generate_tool`, it doesn't
+    `support_agent`), not the class name. Unlike `generate_agent`/`generate_tool`, it doesn't
     become a class: `evals/` modules are plain scripts declaring module-level `agent`/`dataset`
     (see `cli/eval.py`), so `name` only shapes the filename and the placeholder Agent's
     docstring/class name.

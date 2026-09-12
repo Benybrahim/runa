@@ -1,4 +1,4 @@
-"""streaming.py: `Runner.run_streamed`'s event loop — translates model deltas into `StreamEvent`s.
+"""streaming.py: `Runner.run_streamed`'s event loop, translates model deltas into `StreamEvent`s.
 
 The public `RunResultStreaming` wrapper around this loop lives in `runa.result`, alongside
 `RunResult`, since both are things `Runner` returns to a caller rather than execution-time detail.

@@ -277,7 +277,7 @@ def test_generate_agent_prompt_message_names_the_missing_component(tmp_path: Pat
         confirm=confirm,
     )
 
-    assert seen == ["tool 'search_web' not found in app/tools/ — create it?"]
+    assert seen == ["tool 'search_web' not found in app/tools/, create it?"]
 
 
 def test_generate_tool_writes_a_snake_case_tool_function(tmp_path: Path) -> None:

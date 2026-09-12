@@ -155,7 +155,7 @@ def test_delegate_adds_only_to_tools() -> None:
 
 
 def test_h_and_d_are_shorthand_for_handoff_and_delegate() -> None:
-    """`.h`/`.d` bind exactly like `.handoff`/`.delegate` — same subagent, same mode."""
+    """`.h`/`.d` bind exactly like `.handoff`/`.delegate`, same subagent, same mode."""
 
     class Main(Agent):
         name = "Main"

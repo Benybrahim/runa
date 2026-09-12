@@ -194,17 +194,17 @@ class _AgentOutputGuardrail(OutputGuardrail[Any]):
 class Guardrail:
     """A predicate bound to neither side yet; `.input`/`.output` (or `.i`/`.o`) picks which.
 
-    `@guardrail` wraps a plain `(value) -> bool` predicate — tripping the guardrail on `True` —
+    `@guardrail` wraps a plain `(value) -> bool` predicate (tripping the guardrail on `True`)
     into this, the same way `@tool` wraps a plain function into a `FunctionTool`. Read `.input`
     to bind it to the input side, `.output` for the output side; `.i`/`.o` are the exact same
-    binding under a shorter name — there is no third spelling. The same bound object works in
+    binding under a shorter name, there is no third spelling. The same bound object works in
     both places it's listed:
 
-    - In an `Agent.guardrails` list, it's an `InputGuardrail`/`OutputGuardrail` — the predicate
+    - In an `Agent.guardrails` list, it's an `InputGuardrail`/`OutputGuardrail`: the predicate
       sees the latest user message as plain text (regardless of whether the SDK passed a string
       or the running list of input items) on `.input`, or the agent's final output on `.output`.
     - In a `@tool(guardrails=[...])` list, the same object is reinterpreted as a
-      `ToolInputGuardrail`/`ToolOutputGuardrail` — the predicate sees the tool call's arguments
+      `ToolInputGuardrail`/`ToolOutputGuardrail`: the predicate sees the tool call's arguments
       (parsed from JSON into a dict) on `.input`, or the tool's raw return value on `.output`.
 
     The predicate's docstring becomes `output_info`. Listed bare (no `.input`/`.output`), it's
@@ -299,7 +299,7 @@ def flatten_tool_guardrails(
     """Split a `@tool(guardrails=...)` list/dict into input/output lists; bare entries wire as both.
 
     Accepts a bare `@guardrail` predicate, or the same `.input`/`.output`-bound object used for
-    `Agent.guardrails` — reused here against the tool call's arguments/return value instead of
+    `Agent.guardrails`, reused here against the tool call's arguments/return value instead of
     the agent's input/output.
     """
     input_guardrails: list[ToolInputGuardrail[Any]] = []

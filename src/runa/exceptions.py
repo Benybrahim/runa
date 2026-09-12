@@ -3,7 +3,7 @@
 `RunaError` is the base every run-ending failure raises: a tripped guardrail, `MaxTurnsExceeded`, a
 model behaving unexpectedly, or a `UserError` in how the framework itself was used. `Agent.run`/
 `run_sync` catch `RunaError` (not each subclass individually) and translate it into
-`Run(status="error", ...)` — see `runa.agent`.
+`Run(status="error", ...)`, see `runa.agent`.
 """
 
 from __future__ import annotations

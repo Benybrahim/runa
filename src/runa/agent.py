@@ -94,12 +94,12 @@ def _load_prompt(cls: type, name: str) -> str | None:
 
     Mirrors `runa generate prompt`'s naming: `app/prompts/<snake_case(name)>.md`, a sibling of
     the `agents/` directory the subclass is defined in. Missing, it's created from
-    `_PROMPT_TEMPLATE` — the same stub `runa generate prompt` (`cli/generate.py`, which imports
-    this constant rather than duplicating it) would write — so a fresh agent always has a prompt
+    `_PROMPT_TEMPLATE`, the same stub `runa generate prompt` (`cli/generate.py`, which imports
+    this constant rather than duplicating it) would write, so a fresh agent always has a prompt
     file ready to edit instead of silently running with empty instructions.
 
     Returns `None` (leaving `instructions` empty) when `cls` has no source file (e.g. defined at
-    a REPL) or its module doesn't live in an `agents/` directory — nothing is ever created outside
+    a REPL) or its module doesn't live in an `agents/` directory, nothing is ever created outside
     the one location `runa new`'s convention establishes for prompts.
     """
     try:

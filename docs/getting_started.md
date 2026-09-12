@@ -101,7 +101,7 @@ greeter/
 ├── tests/               # deterministic tests, run with `runa test`
 ├── main.py              # application entry point, loads .env
 ├── Dockerfile
-├── .env                  # your model's API key — fill this in, never commit it
+├── .env                  # your model's API key, fill this in, never commit it
 └── pyproject.toml
 ```
 
@@ -406,7 +406,7 @@ print(r2.output)
 ```
 
 ```
-Hi there—welcome! 😊 I'm glad you're here. How can I help you today?
+Hi there, welcome! 😊 I'm glad you're here. How can I help you today?
 You said: "Hi, I'm new here."
 ```
 

@@ -44,7 +44,7 @@ class RunResultStreaming:
     """What `Runner.run_streamed` returns: an async iterator of `StreamEvent`s.
 
     `context_wrapper`/`to_input_list()` reflect the run's final state once the iterator has been
-    fully consumed — both read the same `items` list and `RunContextWrapper` the streaming loop
+    fully consumed. Both read the same `items` list and `RunContextWrapper` the streaming loop
     mutates in place as it goes, so there's no separate "final result" object to reconcile with.
     """
 

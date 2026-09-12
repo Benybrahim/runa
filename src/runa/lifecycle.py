@@ -1,6 +1,6 @@
 """`runa.lifecycle`: `RunHooks`/`AgentHooks`, and live `logging`-module output for a run.
 
-For a structured, persisted, queryable record of a run instead, see `runa.tracing` — that runs
+For a structured, persisted, queryable record of a run instead, see `runa.tracing`. That runs
 unconditionally regardless of `hooks`; this module is just console/log lines while a run happens.
 """
 
@@ -25,7 +25,7 @@ __all__ = [
 class RunHooks[TContext]:
     """Lifecycle callbacks for one run; every method is a no-op unless overridden.
 
-    Passed as `hooks=` to `Agent.run`/`run_sync`/`run_streamed` — `runa.run_internal` calls these
+    Passed as `hooks=` to `Agent.run`/`run_sync`/`run_streamed`, `runa.run_internal` calls these
     as the run progresses. `LoggingRunHooks` (below) is the default when no `hooks` is given.
     """
 

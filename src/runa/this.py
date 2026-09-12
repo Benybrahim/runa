@@ -15,7 +15,7 @@ Think before you act.
 Recover before retrying.
 Ask when uncertainty matters.
 But act when confidence is sufficient.
-There should be one—and preferably only one—obvious way to orchestrate it.
+There should be one, and preferably only one, obvious way to orchestrate it.
 Although that way may not be obvious at first, unless you're a geek.
 Guardrails are better than apologies.
 Although an apology is often better than *silent* harm.

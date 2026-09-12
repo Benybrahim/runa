@@ -3,7 +3,7 @@
 The application framework for agentic AI.
 
 Runa is opinionated: instead of a wide menu of configuration options, it gives you a small set
-of primitives, with clear conventions for how they fit together — `Agent`, `Tool`, `Guardrail`,
+of primitives, with clear conventions for how they fit together, `Agent`, `Tool`, `Guardrail`,
 `Subagent`, `Session`, `Memory`, `Knowledge`, `MCP Server`. Tracing and evaluation come built in,
 not bolted on.
 

@@ -103,7 +103,7 @@ class RunState:
 
     `generated_items` ends with the assistant message that requested the paused calls;
     `ready_results` holds results already computed this turn for calls in that same message that
-    *didn't* need approval — they're carried forward rather than re-executed on resume.
+    *didn't* need approval: they're carried forward rather than re-executed on resume.
 
     `to_json()`/`to_string()`/`from_json()`/`from_string()` let a paused run survive a process
     restart -- see their docstrings for what is (and isn't) preserved.

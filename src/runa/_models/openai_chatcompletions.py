@@ -1,6 +1,6 @@
 """openai_chatcompletions.py: the chat-completions-shaped backend.
 
-Covers OpenAI, Gemini, Llama, DeepSeek, and Qwen — every provider that speaks this wire format.
+Covers OpenAI, Gemini, Llama, DeepSeek, and Qwen, every provider that speaks this wire format.
 """
 
 from __future__ import annotations

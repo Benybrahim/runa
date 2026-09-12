@@ -1,6 +1,6 @@
 """eval/tracing/adapter.py: run one `Case` through an `Agent` and normalize the result.
 
-`Runner.run()`'s own `RunResult.trace` is used directly — evaluation and observability read the
+`Runner.run()`'s own `RunResult.trace` is used directly: evaluation and observability read the
 same `Trace`/`Span` data instead of two parallel execution-history models: `AgentRun.tool_calls`
 is derived straight from `AgentRun.trace.spans`.
 """

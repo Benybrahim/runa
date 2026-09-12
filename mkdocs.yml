@@ -10,8 +10,8 @@ copyright: Copyright &copy; Runa contributors
 theme:
   name: material
   custom_dir: docs/overrides
-  logo: assets/runa-logo-main.svg
-  favicon: assets/runa-logo-main.ico
+  logo: assets/svg/runa-mark-blue.svg
+  favicon: assets/favicon/favicon.ico
   icon:
     repo: fontawesome/brands/github
   palette:
@@ -21,14 +21,14 @@ theme:
         name: Switch to light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: black
+      primary: indigo
       accent: indigo
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: black
+      primary: indigo
       accent: indigo
       toggle:
         icon: material/brightness-4
@@ -75,6 +75,7 @@ nav:
   - Reference:
       - Model Providers: models.md
       - CLI Reference: cli.md
+      - API Reference: api.md
 
 markdown_extensions:
   - toc:
@@ -106,6 +107,20 @@ markdown_extensions:
 
 plugins:
   - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_root_full_path: false
+            show_source: false
+            show_bases: true
+            show_signature_annotations: true
+            separate_signature: true
+            merge_init_into_class: true
+            members_order: source
+            summary: true
 
 extra:
   social:
@@ -113,6 +128,3 @@ extra:
       link: https://github.com/Benybrahim/runa
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/runa/
-
-extra_css:
-  - stylesheets/extra.css

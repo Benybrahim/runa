@@ -1,4 +1,4 @@
-"""runner.py: `Runner`, Runa's own agent loop — replaces `agents.Runner`."""
+"""runner.py: `Runner`, Runa's own agent loop, replaces `agents.Runner`."""
 
 from __future__ import annotations
 

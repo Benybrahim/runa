@@ -1,6 +1,6 @@
 """cli/traces.py: `runa traces list/show/errors` over `db/runa.db`.
 
-Thin formatting over `runa.tracing.storage`'s query API — no separate query logic lives here,
+Thin formatting over `runa.tracing.storage`'s query API, no separate query logic lives here,
 matching how `cli/runs.py` only formats what `runa.eval`/session storage already expose.
 """
 

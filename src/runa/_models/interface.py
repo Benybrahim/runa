@@ -75,8 +75,8 @@ def _tool_dict(tool: Any) -> dict[str, Any]:
 def _handoff_dict(handoff: Any) -> dict[str, Any]:
     """Convert a Runa `Handoff`-shaped object to a chat-completions tool definition.
 
-    A handoff takes no structured input from the model — calling it is itself the signal to
-    switch agents — so its schema is always an empty object.
+    A handoff takes no structured input from the model: calling it is itself the signal to
+    switch agents, so its schema is always an empty object.
     """
     return {
         "type": "function",

@@ -18,7 +18,7 @@ class Span:
     """One traceable operation: an agent turn, an LLM call, a tool call, a handoff, ...
 
     `input`/`output`/`error` stay `None` when that data isn't available or was withheld by the
-    active privacy policy (see `tracing.config.observe`) — missing data is never fabricated.
+    active privacy policy (see `tracing.config.observe`); missing data is never fabricated.
     """
 
     id: str

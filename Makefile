@@ -1,4 +1,4 @@
-.PHONY: install format lint typecheck test check hello tour examples clean
+.PHONY: install format lint typecheck test check docs hello tour examples clean
 
 install:
 	uv sync
@@ -23,6 +23,9 @@ check:
 	$(MAKE) lint
 	$(MAKE) typecheck
 	$(MAKE) test
+
+docs:
+	uv run zensical build --strict
 
 hello:
 	uv run python examples/hello.py

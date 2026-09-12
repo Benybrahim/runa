@@ -1,4 +1,4 @@
-"""anthropic.py: the Claude backend — the one that needs real translation.
+"""anthropic.py: the Claude backend, the one that needs real translation.
 
 Anthropic's Messages API isn't chat-completions-shaped: content blocks instead of a `tool_calls`
 array, a separate `system` param, strict user/assistant alternation, and its own streaming events.

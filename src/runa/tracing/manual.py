@@ -2,7 +2,7 @@
 
 Standalone from `run_internal`'s automatic per-`Agent.run()` tracing: these build and export their
 own `Trace`, for instrumenting code that isn't itself an agent run. They don't nest around an
-`Agent.run()` call to group it with other spans — each `Agent.run()` always produces its own,
+`Agent.run()` call to group it with other spans: each `Agent.run()` always produces its own,
 independent `Trace` (see `runa.runner`); use these to group other work of your own instead.
 """
 

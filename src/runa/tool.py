@@ -1,7 +1,7 @@
 """`@tool` decorator for exposing functions to agents.
 
 `tool` derives a JSON schema for the model to call a plain Python function by, purely by
-reflection over its signature (`_schema_from_signature` below) — the same "let types speak for
+reflection over its signature (`_schema_from_signature` below), the same "let types speak for
 themselves" approach the rest of Runa follows, and the one the `pyright` override comment in
 `pyproject.toml` already documents as this codebase's intended design for tool schemas.
 """
@@ -48,7 +48,7 @@ def _json_type(annotation: Any) -> dict[str, Any]:
     """Map a Python type annotation to a JSON Schema fragment, best-effort.
 
     Recognizes `str`/`int`/`float`/`bool`, `list[T]`, `dict`, `Literal[...]`, `Enum` subclasses,
-    and `T | None` (unwrapped to `T`'s schema — JSON Schema has no first-class optional). Anything
+    and `T | None` (unwrapped to `T`'s schema, JSON Schema has no first-class optional). Anything
     else (a dataclass, a `TypedDict`, ...) falls back to an unconstrained `{}`, which still works,
     just without the model getting a shape hint for it.
     """
@@ -135,8 +135,8 @@ def tool(
 ) -> FunctionTool | Callable[[Callable[..., Any]], FunctionTool]:
     """Wrap a plain function as a `FunctionTool`, deriving its schema from its signature.
 
-    `guardrails=[...]` (or `{...}`) wires `@guardrail` predicates — bare (wired as both sides)
-    or bound via `.input`/`.output` — against the tool call's parsed arguments and its return
+    `guardrails=[...]` (or `{...}`) wires `@guardrail` predicates, bare (wired as both sides)
+    or bound via `.input`/`.output`, against the tool call's parsed arguments and its return
     value, respectively.
     """
     input_guardrails, output_guardrails = flatten_tool_guardrails(guardrails or [])

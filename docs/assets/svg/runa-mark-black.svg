@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+   width="512"
+   height="512"
+   viewBox="0 0 135.46666 135.46667"
+   version="1.1"
+   xmlns="http://www.w3.org/2000/svg">
+  <path d="M 50.8,33.866667 33.866667,50.8 V 84.666667 L 50.8,101.6 h 33.866667 l 3.785298,-3.785299 A 45,45 0 0 1 76.919853,67.733333 45,45 0 0 1 88.451965,37.651965 l -3.785298,-3.785298 z" fill="#252525" stroke="#252525" stroke-width="0.4" stroke-linejoin="round" />
+  <path d="M 40.639897,13.54646 50.8,33.866667 H 84.666667 L 94.82677,13.54646 Z" fill="#1a1a1a" stroke="#1a1a1a" stroke-width="0.4" stroke-linejoin="round" />
+  <path d="M 40.639897,13.54646 13.54646,40.639897 33.866667,50.8 50.8,33.866667 Z" fill="#424242" stroke="#424242" stroke-width="0.4" stroke-linejoin="round" />
+  <path d="M 13.54646,94.82677 33.866667,84.666667 V 50.8 L 13.54646,40.639897 Z" fill="#1a1a1a" stroke="#1a1a1a" stroke-width="0.4" stroke-linejoin="round" />
+  <path d="M 40.639897,121.92021 50.8,101.6 33.866667,84.666667 13.54646,94.82677 Z" fill="#424242" stroke="#424242" stroke-width="0.4" stroke-linejoin="round" />
+  <path d="M 94.82677,121.92021 84.666667,101.6 H 50.8 l -10.160103,20.32021 z" fill="#1a1a1a" stroke="#1a1a1a" stroke-width="0.4" stroke-linejoin="round" />
+  <path d="M 106.67463,110.07235 A 45,45 0 0 1 88.451965,97.814701 L 84.666667,101.6 94.82677,121.92021 Z" fill="#424242" stroke="#424242" stroke-width="0.4" stroke-linejoin="round" />
+  <path d="m 84.666667,33.866667 3.785298,3.785298 A 45,45 0 0 1 106.67463,25.394316 L 94.82677,13.54646 Z" fill="#424242" stroke="#424242" stroke-width="0.4" stroke-linejoin="round" />
+</svg>

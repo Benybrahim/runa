@@ -39,7 +39,7 @@ def _fmt_tokens(attributes: dict[str, Any]) -> str | None:
 class Trace:
     """One logical agent execution: a start/end time, metadata, and its `Span` tree.
 
-    `spans` is a flat list — each `Span.parent_id` (or `None`, for a root span) is what gives it
+    `spans` is a flat list: each `Span.parent_id` (or `None`, for a root span) is what gives it
     shape; `__str__` walks that structure to render the tree shown in the "Human-readable trace
     representation" section of the design.
     """

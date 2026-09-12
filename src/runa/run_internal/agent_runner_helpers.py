@@ -1,4 +1,4 @@
-"""agent_runner_helpers.py: low-level per-turn helpers — model/instruction/tool resolution."""
+"""agent_runner_helpers.py: low-level per-turn helpers, model/instruction/tool resolution."""
 
 from __future__ import annotations
 

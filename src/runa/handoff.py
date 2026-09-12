@@ -55,7 +55,7 @@ def agent_as_tool(agent: Any, tool_name: str | None, tool_description: str | Non
     """Wrap `agent` as a `FunctionTool` that runs it on a generated `input` string.
 
     The nested run shares the caller's `context` (so tools/guardrails/`instructions` see the same
-    object) but not its conversation history — the calling agent generates fresh input for it, the
+    object) but not its conversation history: the calling agent generates fresh input for it, the
     same way any other tool call's arguments are generated. A nested run that errors surfaces its
     error message as the tool's return value instead of raising, so the calling agent's turn can
     still continue and decide how to respond.

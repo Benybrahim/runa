@@ -117,7 +117,7 @@ def test_output_predicate_false_does_not_trip() -> None:
 
 
 def test_i_and_o_are_shorthand_for_input_and_output() -> None:
-    """`.i`/`.o` bind exactly like `.input`/`.output` — same guardrail, same name, same side."""
+    """`.i`/`.o` bind exactly like `.input`/`.output`, same guardrail, same name, same side."""
 
     class Support(Agent):
         name = "Support"

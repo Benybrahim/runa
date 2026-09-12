@@ -1,4 +1,4 @@
-"""tool_execution.py: executing one message's tool calls — handoffs, approval gating, guardrails."""
+"""tool_execution.py: executing one message's tool calls, handoffs, approval gating, guardrails."""
 
 from __future__ import annotations
 

@@ -15,7 +15,7 @@ class RunConfig:
     """Per-call configuration for `Runner.run`/`run_sync`/`run_streamed`.
 
     `workflow_name` names the `Trace` this run produces; `group_id`/`trace_metadata` are recorded
-    on it verbatim. `model_provider` resolves an `Agent.model` string to a `Model` — irrelevant
+    on it verbatim. `model_provider` resolves an `Agent.model` string to a `Model`, irrelevant
     when `Agent.model` is already a `Model` instance (as Runa's own tests do, to script one).
     """
 

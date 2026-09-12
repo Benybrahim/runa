@@ -1,4 +1,4 @@
-"""`runa.eval`: `Case`/`Dataset` in, a `Report` out — see `Agent.evaluate()`.
+"""`runa.eval`: `Case`/`Dataset` in, a `Report` out, see `Agent.evaluate()`.
 
 Deterministic checks, judge-model-backed semantic metrics, and SQLite
 storage are all implementation details behind `evaluate_agent()`; see
