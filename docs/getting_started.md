@@ -66,7 +66,7 @@ Runa needs Python 3.14. Install it with [uv](https://docs.astral.sh/uv/):
     uv add runa-ai
     ```
 
-### Creating the Application
+### 3.2 Creating the Application
 
 `runa new` scaffolds a new application with everything you need:
 
@@ -115,7 +115,7 @@ That's the only configuration step. Nothing else needs to be wired up
 globally, a model is a per-`Agent` attribute, and Runa resolves it to the
 right provider by name.
 
-## Hello, Runa!
+## 4. Hello, Runa!
 
 Let's generate an agent:
 
@@ -196,7 +196,7 @@ Hello! 👋 How can I help you today?
 > exit
 ```
 
-## Giving Your Agent Tools
+## 5. Giving Your Agent Tools
 
 A tool is a plain Python function. Its signature *is* its schema, Runa
 reads the type hints and the docstring, so there's nothing else to declare.
@@ -267,7 +267,7 @@ for span in run.trace.spans:
 - llm span: 'gpt-5.4-nano' -> {'usage': {'requests': 1, 'input_tokens': 188, 'output_tokens': 26, ...}}
 ```
 
-## Adding Guardrails
+## 6. Adding Guardrails
 
 A guardrail is a function that returns a boolean. It checks conditions on
 an agent's or a tool's inputs and outputs. Bind it to `.input` or
@@ -322,7 +322,7 @@ def current_time() -> str:
 A tripped guardrail stops the run; `agent.run_sync(...)` comes back with
 `status="error"` instead of raising.
 
-## Delegating to Subagents
+## 7. Delegating to Subagents
 
 An agent can hand a conversation off to another agent, or call one as a
 tool, via `subagents`:
@@ -355,7 +355,7 @@ As of the latest official count, Jupiter has 95 known moons (including the 2023-
 * `.delegate` calls the subagent as a tool and returns its answer to the
   caller, which stays in control.
 
-## Chatting With Your Agent
+## 8. Chatting With Your Agent
 
 `runa chat` starts an interactive REPL against any agent's declared
 `name`:
@@ -386,7 +386,7 @@ session greeter_agent-20260912-073154-890a
 2026-09-11 22:31:56  assistant: Hello! 👋 How can I help you today?
 ```
 
-## Persisting Conversations in Code
+## 9. Persisting Conversations in Code
 
 `runa chat` uses `SQLiteSession` under the hood by default; use it directly to persist
 history from your own code:
@@ -413,7 +413,7 @@ You said: "Hi, I'm new here."
 With a `session`, prior turns are read from `runa.db` automatically, you
 only ever pass the new message.
 
-## Evaluating Your Agent
+## 10. Evaluating Your Agent
 
 `evals/` holds behavioral evals, grading with a judge model instead of an
 assertion:
@@ -463,7 +463,7 @@ Answer relevance     100%
 1/1 passed
 ```
 
-## Inspecting Traces
+## 11. Inspecting Traces
 
 Every run is traced to `runa.db`:
 
